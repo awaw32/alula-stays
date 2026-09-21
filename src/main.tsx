@@ -16,7 +16,9 @@ const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));
 const Apartments = lazy(() => import("./pages/Apartments.tsx"));
 const ApartmentDetail = lazy(() => import("./pages/ApartmentDetail.tsx"));
 const Favorites = lazy(() => import("./pages/Favorites.tsx"));
+const MyBookings = lazy(() => import("./pages/MyBookings.tsx"));
 const OwnerDashboard = lazy(() => import("./pages/OwnerDashboard.tsx"));
+const AddApartment = lazy(() => import("./pages/AddApartment.tsx"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
@@ -128,6 +130,7 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/apartments" element={<Apartments />} />
               <Route path="/apartment/:id" element={<ApartmentDetail />} />
               <Route path="/favorites" element={<Favorites />} />
+              <Route path="/my-bookings" element={<MyBookings />} />
               <Route
                 path="/auth"
                 element={<AuthPage redirectAfterAuth="/owner" />}
@@ -145,6 +148,14 @@ createRoot(document.getElementById("root")!).render(
                 element={
                   <RequireAuth>
                     <OwnerDashboard />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/owner/add"
+                element={
+                  <RequireAuth>
+                    <AddApartment />
                   </RequireAuth>
                 }
               />

@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { Home, Search, Heart, User, Menu, X } from "lucide-react";
+import { Home, Search, Heart, User, Menu, X, Calendar } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router";
 import { useAuth } from "@/hooks/use-auth";
@@ -8,6 +8,7 @@ const navLinks = [
   { href: "/", label: "الرئيسية", labelEn: "Home", icon: Home },
   { href: "/apartments", label: "الشقق", labelEn: "Apartments", icon: Search },
   { href: "/favorites", label: "المفضلة", labelEn: "Favorites", icon: Heart },
+  { href: "/my-bookings", label: "حجوزاتي", labelEn: "My Bookings", icon: Calendar },
 ];
 
 export function Navigation() {
@@ -117,12 +118,12 @@ export function Navigation() {
               })}
               <hr className="border-[var(--border)] my-1" />
               <Link
-                to={isAuthenticated ? "/dashboard" : "/auth"}
+                to={isAuthenticated ? "/owner" : "/auth"}
                 onClick={() => setMobileOpen(false)}
                 className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium clay-btn text-center justify-center"
               >
                 <User className="w-5 h-5" />
-                {isAuthenticated ? "حسابي" : "تسجيل الدخول"}
+                {isAuthenticated ? "لوحة التحكم" : "تسجيل الدخول"}
               </Link>
             </nav>
           </div>
@@ -158,10 +159,10 @@ export function Navigation() {
             );
           })}
           <Link
-            to={isAuthenticated ? "/dashboard" : "/auth"}
+            to={isAuthenticated ? "/owner" : "/auth"}
             className={cn(
               "flex flex-col items-center gap-1 px-3 py-1.5 rounded-2xl transition-all min-w-[60px]",
-              location.pathname === "/auth" || location.pathname === "/dashboard"
+              location.pathname === "/auth" || location.pathname === "/owner"
                 ? "text-[var(--clay-accent)]"
                 : "text-[var(--muted-foreground)]",
             )}
@@ -169,14 +170,14 @@ export function Navigation() {
             <div
               className={cn(
                 "p-1.5 rounded-xl transition-all",
-                (location.pathname === "/auth" || location.pathname === "/dashboard") &&
+                (location.pathname === "/auth" || location.pathname === "/owner") &&
                   "bg-[var(--clay-accent-soft)] shadow-sm",
               )}
             >
               <User className="w-5 h-5" />
             </div>
             <span className="text-[10px] font-medium">
-              {isAuthenticated ? "حسابي" : "دخول"}
+              {isAuthenticated ? "لوحتي" : "دخول"}
             </span>
           </Link>
         </div>

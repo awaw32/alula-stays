@@ -33,6 +33,7 @@ export default function OwnerDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const myApartments = useQuery(api.admin.ownerApartments);
+  const addApartment = () => navigate("/owner/add");
   const myBookings = useQuery(api.bookings.ownerBookings);
   const deleteApartment = useMutation(api.admin.deleteApartment);
   const [activeTab, setActiveTab] = useState<"apartments" | "bookings">("apartments");
@@ -110,7 +111,8 @@ export default function OwnerDashboard() {
               <div className="clay p-12 text-center">
                 <Home className="w-12 h-12 mx-auto text-[var(--muted-foreground)] mb-4" />
                 <h3 className="font-bold text-lg mb-2">لا توجد شقق بعد</h3>
-                <p className="text-sm text-[var(--muted-foreground)]">أضف شقتك الأولى للبدء</p>
+                <p className="text-sm text-[var(--muted-foreground)] mb-4">أضف شقتك الأولى للبدء</p>
+                <button onClick={() => navigate("/owner/add")} className="clay-btn text-sm">إضافة شقة</button>
               </div>
             ) : (
               <div className="space-y-4">
