@@ -15,6 +15,9 @@ const AuthPage = lazy(() => import("./pages/Auth.tsx"));
 const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));
 const Apartments = lazy(() => import("./pages/Apartments.tsx"));
 const ApartmentDetail = lazy(() => import("./pages/ApartmentDetail.tsx"));
+const Favorites = lazy(() => import("./pages/Favorites.tsx"));
+const OwnerDashboard = lazy(() => import("./pages/OwnerDashboard.tsx"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 // Simple loading fallback for route transitions
@@ -124,15 +127,32 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/" element={<Landing />} />
               <Route path="/apartments" element={<Apartments />} />
               <Route path="/apartment/:id" element={<ApartmentDetail />} />
+              <Route path="/favorites" element={<Favorites />} />
               <Route
                 path="/auth"
-                element={<AuthPage redirectAfterAuth="/dashboard" />}
+                element={<AuthPage redirectAfterAuth="/owner" />}
               />
               <Route
                 path="/dashboard"
                 element={
                   <RequireAuth>
                     <Dashboard />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/owner"
+                element={
+                  <RequireAuth>
+                    <OwnerDashboard />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/admin"
+                element={
+                  <RequireAuth>
+                    <AdminDashboard />
                   </RequireAuth>
                 }
               />

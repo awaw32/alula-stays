@@ -7,12 +7,14 @@ export const ROLES = {
   ADMIN: "admin",
   USER: "user",
   MEMBER: "member",
+  OWNER: "owner",
 } as const;
 
 export const roleValidator = v.union(
   v.literal(ROLES.ADMIN),
   v.literal(ROLES.USER),
   v.literal(ROLES.MEMBER),
+  v.literal(ROLES.OWNER),
 );
 export type Role = Infer<typeof roleValidator>;
 
@@ -68,12 +70,52 @@ const schema = defineSchema(
     reviews: defineTable({
       apartmentId: v.id("apartments"),
       userId: v.id("users"),
+      userName: v.string(),
       rating: v.number(),
       comment: v.string(),
       createdAt: v.number(),
     })
       .index("by_apartment", ["apartmentId"])
       .index("by_user", ["userId"]),
+
+    // Bookings
+    bookings: defineTable({
+      apartmentId: v.id("apartments"),
+      userId: v.id("users"),
+      checkIn: v.number(), // timestamp
+      checkOut: v.number(), // timestamp
+      guests: v.number(),
+      totalNights: v.number(),
+      pricePerNight: v.number(),
+      totalPrice: v.number(),
+      platformFee: v.number(), // 10% commission
+      status: v.union(
+        v.literal("pending"),
+        v.literal("confirmed"),
+        v.literal("cancelled"),
+        v.literal("completed"),
+      ),
+      paymentStatus: v.union(
+        v.literal("unpaid"),
+        v.literal("paid"),
+        v.literal("refunded"),
+      ),
+      createdAt: v.number(),
+    })
+      .index("by_apartment", ["apartmentId"])
+      .index("by_user", ["userId"])
+      .index("by_status", ["status"])
+      .index("by_checkin", ["checkIn"]),
+
+    // Favorites
+    favorites: defineTable({
+      userId: v.id("users"),
+      apartmentId: v.id("apartments"),
+      createdAt: v.number(),
+    })
+      .index("by_user", ["userId"])
+      .index("by_apartment", ["apartmentId"])
+      .index("by_user_apartment", ["userId", "apartmentId"]),
   },
   {
     schemaValidation: false,
