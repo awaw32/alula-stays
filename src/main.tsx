@@ -88,8 +88,7 @@ class RootErrorBoundary extends React.Component<
 }
 
 const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string);
-
-
+const routerBasename = import.meta.env.BASE_URL.replace(/\/$/, "") || undefined;
 
 function RouteSyncer() {
   const location = useLocation();
@@ -122,7 +121,7 @@ createRoot(document.getElementById("root")!).render(
         <VlyToolbar />
       </ToolbarErrorBoundary>
       <ConvexAuthProvider client={convex}>
-        <BrowserRouter>
+        <BrowserRouter basename={routerBasename}>
           <RouteSyncer />
           <Suspense fallback={<RouteLoading />}>
             <Routes>

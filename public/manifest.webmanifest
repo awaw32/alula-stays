@@ -1,16 +1,19 @@
 {
-  "name": "freebuff.com application",
-  "short_name": "freebuff.com",
-  "description": "freebuff.com application",
-  "start_url": "/",
+  "name": "شقق العلا",
+  "short_name": "شقق العلا",
+  "description": "منصة حجز الشقق والإقامات في العلا",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#000000",
+  "background_color": "#FAF6F1",
+  "theme_color": "#C2694F",
   "icons": [
     {
-      "src": "/logo.png",
+      "src": "./logo.svg",
       "sizes": "any",
-      "type": "image/png",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     }
   ]

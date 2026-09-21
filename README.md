@@ -21,6 +21,20 @@ Use bun for the package manager.
 
 This project is set up already and running on a cloud environment, as well as a convex development in the sandbox.
 
+## GitHub Pages Deployment
+
+The frontend is deployed to GitHub Pages through `.github/workflows/deploy-pages.yml`.
+Convex remains the backend for the deployed application.
+
+1. In the repository settings, open **Pages** and select **GitHub Actions** as the source.
+2. Add these repository Actions secrets:
+   - `VITE_CONVEX_URL`: the public production Convex URL used by the browser.
+   - `CONVEX_DEPLOY_KEY`: a production Convex deploy key used only to generate backend types during CI.
+3. Push to `main` or start the **Deploy to GitHub Pages** workflow manually.
+4. The project site will be available at `https://awaw32.github.io/alula-stays/`.
+
+The Vite base path and React Router basename are configured for the repository path, and the build creates a `404.html` fallback so direct SPA routes continue to work on GitHub Pages.
+
 ## Environment Variables
 
 The project is set up with project specific CONVEX_DEPLOYMENT and VITE_CONVEX_URL environment variables on the client side.

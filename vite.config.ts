@@ -4,8 +4,22 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 import { defineConfig } from "vite";
 
+function resolveBasePath() {
+  const configuredBase = process.env.VITE_BASE_PATH?.trim();
+
+  if (configuredBase) {
+    return configuredBase.endsWith("/") ? configuredBase : `${configuredBase}/`;
+  }
+
+  const repositoryName = process.env.GITHUB_REPOSITORY?.split("/")[1];
+  return process.env.GITHUB_ACTIONS === "true" && repositoryName
+    ? `/${repositoryName}/`
+    : "/";
+}
+
 // https://vite.dev/config/
 export default defineConfig({
+  base: resolveBasePath(),
   plugins: [react(), vlyPlugin(), tailwindcss()],
   resolve: {
     alias: {
