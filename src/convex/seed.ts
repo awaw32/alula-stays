@@ -6,10 +6,21 @@ export const seed = mutation({
     const existing = await ctx.db.query("apartments").first();
     if (existing) return "Already seeded";
 
+    const existingSeedUser = await ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", "seed@alula-stays.local"))
+      .first();
+    const seedUserId = existingSeedUser?._id ?? (await ctx.db.insert("users", {
+      name: "زائر تجريبي",
+      email: "seed@alula-stays.local",
+      isAnonymous: true,
+      role: "user",
+    }));
+
     const apartments = [
       {
         title: "Desert Rose Suite — AlUla Heritage Village",
-        titleAr: "ج套房 وردة الصحراء — قرية العلا التراثية",
+titleAr: "جناح وردة الصحراء — قرية العلا التراثية",
         description:
           "A stunning 2-bedroom apartment nestled in the heart of AlUla's Heritage Village. Floor-to-ceiling windows frame breathtaking views of the ancient sandstone formations. The interior blends modern comfort with traditional Najdi architectural elements — think hand-carved wooden details, earthy terracotta tones, and soft linen fabrics. The open-plan living area flows onto a private terrace overlooking the Oasis. Includes a fully equipped kitchen with premium appliances, spa-inspired bathrooms with rainfall showers, and high-speed WiFi. Perfect for families exploring Hegra, AlUla Old Town, and Dadan.",
         descriptionAr:
@@ -73,7 +84,7 @@ export const seed = mutation({
       },
       {
         title: "Oasis Garden Studio — AlUla Old Town",
-        titleAr: "ستوديو حديقة الواحة —دينة العلا القديمة",
+titleAr: "ستوديو حديقة الواحة — ديرة العلا القديمة",
         description:
           "A charming studio apartment in the heart of AlUla Old Town, steps away from ancient alleyways and traditional souqs. This intimate space is perfect for solo travelers or couples seeking an authentic AlUla experience. The apartment features hand-painted ceramic tiles, a cozy sleeping loft, and a private garden courtyard with date palms and a small fountain.",
         descriptionAr: "شقة استوديو ساحرة في قلب ديرة العلا القديمة، على بُعد خطوات من الأزقة القديمة والأسواق التقليدية.",
@@ -197,10 +208,10 @@ export const seed = mutation({
       },
       {
         title: "Maraya Concert Suite — AlUla Arts District",
-        titleAr: "ج套房 ماريا الموسيقي — حي الفنون في العلا",
+titleAr: "جناح مارايا الموسيقي — حي الفنون في العلا",
         description:
           "Located in the vibrant AlUla Arts District near the world-famous Maraya concert hall, this chic 2-bedroom suite is perfect for culture enthusiasts. The apartment features a gallery-inspired design with rotating local artwork, a vinyl record collection, and a dedicated music listening corner.",
-        descriptionAr: "تقع في حي العلا لل الفني النابض بالحياة بالقرب من قاعة ماريا الشهيرة عالمياً، هذه الج套房 الأنيقة من غرفتي نوم مثالية لمحبي الثقافة.",
+descriptionAr: "تقع في حي الفنون النابض بالحياة بالقرب من قاعة مارايا الشهيرة عالمياً، هذه الجناح الأنيق من غرفتي نوم مثالي لمحبي الثقافة.",
         price: 900,
         bedrooms: 2,
         bathrooms: 2,
@@ -279,13 +290,13 @@ export const seed = mutation({
       { aptIdx: 4, name: "Omar M.", rating: 4, comment: "Great location near Elephant Rock. The apartment is stylish and comfortable. Only minor issue was WiFi speed during peak hours." },
       { aptIdx: 5, name: "سلطان المطيري", rating: 5, comment: "تجربة فريدة بالقرب من الحِجر. التصميم النبطي رائع والموقع مثالي لعشاق المغامرة. المقرمشات العربية ممتازة." },
       { aptIdx: 6, name: "هند الغامدي", rating: 4, comment: "موقع مميز بالقرب من ماريا. التصميم الفني جميل والشقة مريحة. الحفلات في ماريا قريبة جداً." },
-      { aptIdx: 7, name: "يوسف الزهراني", rating: 5, comment: "أجمل تجربة عائلية في العلا. المزرعة ساحرة والأطفال أحبوا ح picking fresh herbs. المجلس الخارجي مثالي للمساء." },
+        { aptIdx: 7, name: "يوسف الزهراني", rating: 5, comment: "أجمل تجربة عائلية في العلا. المزرعة ساحرة والأطفال أحبوا قطف الأعشاب الطازجة. المجلس الخارجي مثالي للمساء." },
     ];
 
     for (const review of reviewData) {
       await ctx.db.insert("reviews", {
-        apartmentId: aptIds[review.aptIdx] as any,
-        userId: "seed_user" as any,
+        apartmentId: aptIds[review.aptIdx],
+        userId: seedUserId,
         userName: review.name,
         rating: review.rating,
         comment: review.comment,

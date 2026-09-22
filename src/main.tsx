@@ -1,6 +1,6 @@
 import '@vly-ai/integrations';
 import { Toaster } from "@/components/ui/sonner";
-import { RequireAuth } from "@/components/RequireAuth";
+import { RequireAuth, RequireRole } from "@/components/RequireAuth";
 import { VlyToolbar } from "../vly-toolbar-readonly.tsx";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { ConvexReactClient } from "convex/react";
@@ -19,6 +19,7 @@ const Favorites = lazy(() => import("./pages/Favorites.tsx"));
 const MyBookings = lazy(() => import("./pages/MyBookings.tsx"));
 const OwnerDashboard = lazy(() => import("./pages/OwnerDashboard.tsx"));
 const AddApartment = lazy(() => import("./pages/AddApartment.tsx"));
+const EditApartment = lazy(() => import("./pages/EditApartment.tsx"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
@@ -128,11 +129,25 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/" element={<Landing />} />
               <Route path="/apartments" element={<Apartments />} />
               <Route path="/apartment/:id" element={<ApartmentDetail />} />
-              <Route path="/favorites" element={<Favorites />} />
-              <Route path="/my-bookings" element={<MyBookings />} />
+              <Route
+                path="/favorites"
+                element={
+                  <RequireAuth>
+                    <Favorites />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/my-bookings"
+                element={
+                  <RequireAuth>
+                    <MyBookings />
+                  </RequireAuth>
+                }
+              />
               <Route
                 path="/auth"
-                element={<AuthPage redirectAfterAuth="/owner" />}
+                element={<AuthPage redirectAfterAuth="/dashboard" />}
               />
               <Route
                 path="/dashboard"
@@ -145,25 +160,33 @@ createRoot(document.getElementById("root")!).render(
               <Route
                 path="/owner"
                 element={
-                  <RequireAuth>
+                  <RequireRole roles={["owner", "admin"]}>
                     <OwnerDashboard />
-                  </RequireAuth>
+                  </RequireRole>
                 }
               />
               <Route
                 path="/owner/add"
                 element={
-                  <RequireAuth>
+                  <RequireRole roles={["owner", "admin"]}>
                     <AddApartment />
-                  </RequireAuth>
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/owner/edit/:id"
+                element={
+                  <RequireRole roles={["owner", "admin"]}>
+                    <EditApartment />
+                  </RequireRole>
                 }
               />
               <Route
                 path="/admin"
                 element={
-                  <RequireAuth>
+                  <RequireRole roles={["admin"]}>
                     <AdminDashboard />
-                  </RequireAuth>
+                  </RequireRole>
                 }
               />
               <Route path="*" element={<NotFound />} />

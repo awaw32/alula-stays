@@ -1,17 +1,17 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
+import { requireAnyRole, requireApartmentOwner, requireRole } from "./lib/authorization";
 
 // ─── Owner Functions ───
 
 export const ownerApartments = query({
   args: {},
   handler: async (ctx) => {
-    const userId = (await ctx.auth.getUserIdentity())?.subject;
-    if (!userId) return [];
+    const user = await requireAnyRole(ctx, ["owner", "admin"]);
 
     return await ctx.db
       .query("apartments")
-      .filter((q) => q.eq(q.field("ownerId"), userId))
+      .withIndex("by_owner", (q) => q.eq("ownerId", user._id))
       .collect();
   },
 });
@@ -37,8 +37,7 @@ export const createApartment = mutation({
     rulesAr: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
-    const userId = (await ctx.auth.getUserIdentity())?.subject;
-    if (!userId) throw new Error("يجب تسجيل الدخول أولاً");
+    const user = await requireAnyRole(ctx, ["owner", "admin"]);
 
     const apartmentId = await ctx.db.insert("apartments", {
       ...args,
@@ -47,7 +46,7 @@ export const createApartment = mutation({
       isVerified: false,
       isFeatured: false,
       available: true,
-      ownerId: userId as any,
+      ownerId: user._id,
     });
 
     return apartmentId;
@@ -77,14 +76,7 @@ export const updateApartment = mutation({
     available: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const userId = (await ctx.auth.getUserIdentity())?.subject;
-    if (!userId) throw new Error("يجب تسجيل الدخول أولاً");
-
-    const apartment = await ctx.db.get(args.apartmentId);
-    if (!apartment) throw new Error("الشقة غير موجودة");
-    if (apartment.ownerId !== userId) {
-      throw new Error("ليس لديك صلاحية تعديل هذه الشقة");
-    }
+    await requireApartmentOwner(ctx, args.apartmentId);
 
     const { apartmentId, ...updates } = args;
     await ctx.db.patch(apartmentId, updates);
@@ -95,14 +87,7 @@ export const updateApartment = mutation({
 export const deleteApartment = mutation({
   args: { apartmentId: v.id("apartments") },
   handler: async (ctx, args) => {
-    const userId = (await ctx.auth.getUserIdentity())?.subject;
-    if (!userId) throw new Error("يجب تسجيل الدخول أولاً");
-
-    const apartment = await ctx.db.get(args.apartmentId);
-    if (!apartment) throw new Error("الشقة غير موجودة");
-    if (apartment.ownerId !== userId) {
-      throw new Error("ليس لديك صلاحية حذف هذه الشقة");
-    }
+    await requireApartmentOwner(ctx, args.apartmentId);
 
     await ctx.db.delete(args.apartmentId);
     return "تم حذف الشقة بنجاح";
@@ -114,6 +99,7 @@ export const deleteApartment = mutation({
 export const allApartments = query({
   args: {},
   handler: async (ctx) => {
+    await requireRole(ctx, "admin");
     return await ctx.db.query("apartments").collect();
   },
 });
@@ -121,6 +107,7 @@ export const allApartments = query({
 export const allUsers = query({
   args: {},
   handler: async (ctx) => {
+    await requireRole(ctx, "admin");
     return await ctx.db.query("users").collect();
   },
 });
@@ -131,6 +118,7 @@ export const adminVerifyApartment = mutation({
     verified: v.boolean(),
   },
   handler: async (ctx, args) => {
+    await requireRole(ctx, "admin");
     await ctx.db.patch(args.apartmentId, {
       isVerified: args.verified,
     });
@@ -144,6 +132,7 @@ export const adminFeatureApartment = mutation({
     featured: v.boolean(),
   },
   handler: async (ctx, args) => {
+    await requireRole(ctx, "admin");
     await ctx.db.patch(args.apartmentId, {
       isFeatured: args.featured,
     });
@@ -162,6 +151,7 @@ export const adminUpdateUserRole = mutation({
     ),
   },
   handler: async (ctx, args) => {
+    await requireRole(ctx, "admin");
     await ctx.db.patch(args.userId, { role: args.role });
     return "تم تحديث الدور";
   },
@@ -169,6 +159,7 @@ export const adminUpdateUserRole = mutation({
 
 export const adminDashboardStats = query({
   handler: async (ctx) => {
+    await requireRole(ctx, "admin");
     const users = await ctx.db.query("users").collect();
     const apartments = await ctx.db.query("apartments").collect();
     const bookings = await ctx.db.query("bookings").collect();

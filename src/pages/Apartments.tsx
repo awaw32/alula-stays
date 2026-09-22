@@ -4,6 +4,7 @@ import { ApartmentCard } from "@/components/ApartmentCard";
 import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { useState, useMemo } from "react";
+import type { ApartmentRecord } from "@/types/apartment";
 import {
   Search,
   SlidersHorizontal,
@@ -70,12 +71,11 @@ export default function Apartments() {
   const filteredApartments = useMemo(() => {
     if (!apartments) return [];
     if (!search.trim()) return apartments;
-    const q = search.toLowerCase();
-    return apartments.filter(
-      (a) =>
-        a.title.toLowerCase().includes(q) ||
-        a.location.toLowerCase().includes(q) ||
-        a.description.toLowerCase().includes(q),
+    const q = search.toLocaleLowerCase("ar-SA");
+    return apartments.filter((apartment) =>
+      [apartment.title, apartment.titleAr, apartment.location, apartment.locationAr, apartment.description, apartment.descriptionAr]
+        .filter(Boolean)
+        .some((value) => value!.toLocaleLowerCase("ar-SA").includes(q)),
     );
   }, [apartments, search]);
 
@@ -307,7 +307,7 @@ export default function Apartments() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredApartments.map((apt, i) => (
               <motion.div key={apt._id} variants={fadeUp} custom={i + 2}>
-                <ApartmentCard apartment={apt as any} />
+                <ApartmentCard apartment={apt as ApartmentRecord} />
               </motion.div>
             ))}
           </div>

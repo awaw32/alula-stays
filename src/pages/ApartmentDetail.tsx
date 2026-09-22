@@ -1,7 +1,11 @@
 import { motion } from "framer-motion";
 import { Navigation } from "@/components/Navigation";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../convex/_generated/api";
+import type { Id } from "../convex/_generated/dataModel";
+import { getApartmentDescription, getApartmentLocation, getApartmentRules, getApartmentTitle, formatArabicDate, getAmenityLabel } from "@/lib/apartment-content";
+import { getErrorMessage } from "@/lib/error-message";
+import { toast } from "sonner";
 import { useParams, Link, useNavigate } from "react-router";
 import {
   Star,
@@ -34,10 +38,30 @@ import {
   X,
   Loader2,
   AlertCircle,
-  Clock,
   MessageSquare,
 } from "lucide-react";
 import { useState } from "react";
+
+type BookingSuccess = {
+  bookingId: Id<"bookings">;
+  totalPrice: number;
+  platformFee: number;
+  totalNights: number;
+};
+
+function parseDateInput(value: string) {
+  if (!value) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function formatDateInput(date: Date | null) {
+  if (!date) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -94,12 +118,14 @@ function StarRating({ rating, size = "w-4 h-4" }: { rating: number; size?: strin
 export default function ApartmentDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const apartment = useQuery(api.apartments.get, id ? { apartmentId: id as any } : "skip");
-  const reviews = useQuery(api.reviews.list, id ? { apartmentId: id as any } : "skip");
-  const isFavorited = useQuery(api.favorites.isFavorited, id ? { apartmentId: id as any } : "skip");
+  const apartmentId = id as Id<"apartments"> | undefined;
+  const apartment = useQuery(api.apartments.get, apartmentId ? { apartmentId } : "skip");
+  const reviews = useQuery(api.reviews.list, apartmentId ? { apartmentId } : "skip");
+  const isFavorited = useQuery(api.favorites.isFavorited, apartmentId ? { apartmentId } : "skip");
   const toggleFavorite = useMutation(api.favorites.toggle);
   const createBooking = useMutation(api.bookings.create);
   const createReview = useMutation(api.reviews.create);
+  const createCheckoutSession = useAction(api.payments.createCheckoutSession);
 
   const [selectedImage, setSelectedImage] = useState(0);
   const [showLightbox, setShowLightbox] = useState(false);
@@ -109,13 +135,13 @@ export default function ApartmentDetail() {
 
   const availability = useQuery(
     api.bookings.checkAvailability,
-    id && checkIn && checkOut
-      ? { apartmentId: id as any, checkIn: checkIn.getTime(), checkOut: checkOut.getTime() }
+    apartmentId && checkIn && checkOut
+      ? { apartmentId, checkIn: checkIn.getTime(), checkOut: checkOut.getTime() }
       : "skip",
   );
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
-  const [bookingSuccess, setBookingSuccess] = useState<any>(null);
+  const [bookingSuccess, setBookingSuccess] = useState<BookingSuccess | null>(null);
 
   // Review form
   const [showReviewForm, setShowReviewForm] = useState(false);
@@ -132,55 +158,64 @@ export default function ApartmentDetail() {
   const platformFee = Math.round(totalPrice * 0.1);
 
   const handleBooking = async () => {
-    if (!checkIn || !checkOut || !id) return;
+    if (!checkIn || !checkOut || !apartmentId) return;
     setBookingLoading(true);
     setBookingError(null);
     try {
       const result = await createBooking({
-        apartmentId: id as any,
+        apartmentId,
         checkIn: checkIn.getTime(),
         checkOut: checkOut.getTime(),
         guests,
       });
       setBookingSuccess(result);
-    } catch (err: any) {
-      setBookingError(err.message || "حدث خطأ أثناء الحجز");
+      toast.success("تم إنشاء الحجز، جارٍ تحويلك إلى الدفع");
+      const checkout = await createCheckoutSession({ bookingId: result.bookingId });
+      if (checkout.url) {
+        window.location.assign(checkout.url);
+      }
+    } catch (error) {
+      const message = getErrorMessage(error, "حدث خطأ أثناء إنشاء الحجز");
+      setBookingError(message);
+      toast.error(message);
     } finally {
       setBookingLoading(false);
     }
   };
 
   const handleReview = async () => {
-    if (!id || !reviewComment.trim()) return;
+    if (!apartmentId || !reviewComment.trim()) return;
     setReviewLoading(true);
     setReviewError(null);
     try {
       await createReview({
-        apartmentId: id as any,
+        apartmentId,
         rating: reviewRating,
-        comment: reviewComment,
+        comment: reviewComment.trim(),
       });
       setShowReviewForm(false);
       setReviewComment("");
       setReviewRating(5);
-    } catch (err: any) {
-      setReviewError(err.message || "حدث خطأ أثناء إرسال التقييم");
+      toast.success("تم إرسال تقييمك بنجاح");
+    } catch (error) {
+      const message = getErrorMessage(error, "حدث خطأ أثناء إرسال التقييم");
+      setReviewError(message);
+      toast.error(message);
     } finally {
       setReviewLoading(false);
     }
   };
 
   const handleFavorite = async () => {
-    if (!id) return;
+    if (!apartmentId) return;
     try {
-      await toggleFavorite({ apartmentId: id as any });
+      const result = await toggleFavorite({ apartmentId });
+      toast.success(result.favorited ? "تمت إضافة الشقة إلى المفضلة" : "تمت إزالة الشقة من المفضلة");
     } catch {
-      navigate("/auth");
+      navigate(`/auth?returnTo=${encodeURIComponent(`/apartment/${id}`)}`);
     }
   };
 
-  const formatDate = (ts: number) =>
-    new Date(ts).toLocaleDateString("ar-SA", { year: "numeric", month: "long", day: "numeric" });
 
   if (apartment === undefined) {
     return (
@@ -220,12 +255,12 @@ export default function ApartmentDetail() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 pb-12">
         {/* Breadcrumb */}
         <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={0}>
-          <div className="flex items-center gap-2 text-sm text-[var(--muted-foreground)] mb-6">
-            <Link to="/" className="hover:text-[var(--clay-accent)] transition-colors">الرئيسية</Link>
+            <div className="mb-6 flex items-center gap-2 text-sm text-[var(--muted-foreground)]">
+            <Link to="/" className="transition-colors hover:text-[var(--clay-accent)]">الرئيسية</Link>
             <span>/</span>
             <Link to="/apartments" className="hover:text-[var(--clay-accent)] transition-colors">الشقق</Link>
             <span>/</span>
-            <span className="text-[var(--foreground)] font-medium truncate max-w-[200px]">{apartment.title}</span>
+            <span className="max-w-[200px] truncate font-medium text-[var(--foreground)]">{getApartmentTitle(apartment)}</span>
           </div>
         </motion.div>
 
@@ -236,7 +271,7 @@ export default function ApartmentDetail() {
               className="relative aspect-[16/9] md:aspect-[21/9] bg-[var(--clay-surface)] cursor-pointer overflow-hidden rounded-t-[1.5rem]"
               onClick={() => setShowLightbox(true)}
             >
-              <img src={apartment.images[selectedImage]} alt={apartment.title} className="w-full h-full object-cover transition-transform duration-500 hover:scale-105" />
+              <img src={apartment.images[selectedImage]} alt={getApartmentTitle(apartment)} className="h-full w-full object-cover transition-transform duration-500 hover:scale-105" />
               {displayBadges.length > 0 && (
                 <div className="absolute top-4 left-4 flex gap-2">
                   {displayBadges.map((badge, i) => (
@@ -248,16 +283,17 @@ export default function ApartmentDetail() {
               )}
               {/* Favorite button */}
               <button
-                onClick={(e) => { e.stopPropagation(); handleFavorite(); }}
-                className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
-              >
-                <Heart className={`w-5 h-5 ${isFavorited ? "fill-red-500 text-red-500" : "text-gray-400"}`} />
+                onClick={(e) => { e.stopPropagation(); void handleFavorite(); }}
+                 className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-lg backdrop-blur-sm transition-transform hover:scale-110"
+                 aria-label={isFavorited ? "إزالة الشقة من المفضلة" : "إضافة الشقة إلى المفضلة"}
+               >
+                 <Heart className={`h-5 w-5 ${isFavorited ? "fill-red-500 text-red-500" : "text-gray-400"}`} aria-hidden="true" />
               </button>
             </div>
             <div className="flex gap-2 p-3 overflow-x-auto">
-              {apartment.images.map((img, i) => (
-                <button key={i} onClick={() => setSelectedImage(i)} className={`shrink-0 w-20 h-16 rounded-xl overflow-hidden border-2 transition-all ${selectedImage === i ? "border-[var(--clay-accent)] shadow-md" : "border-transparent opacity-70 hover:opacity-100"}`}>
-                  <img src={img} alt="" className="w-full h-full object-cover" />
+               {apartment.images.map((img, i) => (
+                 <button key={i} type="button" onClick={() => setSelectedImage(i)} className={`h-16 w-20 shrink-0 overflow-hidden rounded-xl border-2 transition-all ${selectedImage === i ? "border-[var(--clay-accent)] shadow-md" : "border-transparent opacity-70 hover:opacity-100"}`} aria-label={`عرض الصورة ${i + 1}`} aria-pressed={selectedImage === i}>
+                   <img src={img} alt={`${getApartmentTitle(apartment)} - صورة ${i + 1}`} className="h-full w-full object-cover" />
                 </button>
               ))}
             </div>
@@ -272,9 +308,9 @@ export default function ApartmentDetail() {
               <div className="clay p-6">
                 <div className="flex items-start justify-between gap-4 mb-4">
                   <div>
-                    <h1 className="text-2xl md:text-3xl font-bold text-[var(--foreground)] mb-2">{apartment.title}</h1>
-                    <div className="flex items-center gap-2 text-[var(--muted-foreground)]">
-                      <MapPin className="w-4 h-4" /><span>{apartment.location}</span>
+                    <h1 className="mb-2 text-2xl font-bold text-[var(--foreground)] md:text-3xl">{getApartmentTitle(apartment)}</h1>
+                     <div className="flex items-center gap-2 text-[var(--muted-foreground)]">
+                       <MapPin className="h-4 w-4" aria-hidden="true" /><span>{getApartmentLocation(apartment)}</span>
                       {apartment.isVerified && (
                         <span className="flex items-center gap-1 text-emerald-600 text-xs font-medium">
                           <CheckCircle className="w-3.5 h-3.5" />موثقة
@@ -301,7 +337,7 @@ export default function ApartmentDetail() {
             <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={3}>
               <div className="clay p-6">
                 <h2 className="text-lg font-bold text-[var(--foreground)] mb-3">عن الشقة</h2>
-                <p className="text-[var(--muted-foreground)] leading-relaxed whitespace-pre-line">{apartment.description}</p>
+                <p className="whitespace-pre-line leading-relaxed text-[var(--muted-foreground)]">{getApartmentDescription(apartment)}</p>
               </div>
             </motion.div>
 
@@ -318,7 +354,7 @@ export default function ApartmentDetail() {
                         <div className="w-9 h-9 rounded-xl bg-[var(--clay-accent-soft)] flex items-center justify-center shrink-0">
                           <Icon className="w-4 h-4 text-[var(--clay-accent)]" />
                         </div>
-                        <span className="text-sm font-medium text-[var(--foreground)]">{config?.label || amenity.replace(/_/g, " ")}</span>
+                        <span className="text-sm font-medium text-[var(--foreground)]">{getAmenityLabel(amenity)}</span>
                       </div>
                     );
                   })}
@@ -327,12 +363,12 @@ export default function ApartmentDetail() {
             </motion.div>
 
             {/* Rules */}
-            {apartment.rules && apartment.rules.length > 0 && (
+            {getApartmentRules(apartment).length > 0 && (
               <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={5}>
                 <div className="clay p-6">
                   <h2 className="text-lg font-bold text-[var(--foreground)] mb-3">قواعد الإقامة</h2>
                   <ul className="space-y-2">
-                    {apartment.rules.map((rule, i) => (
+                    {getApartmentRules(apartment).map((rule, i) => (
                       <li key={i} className="flex items-center gap-2 text-sm text-[var(--muted-foreground)]">
                         <div className="w-1.5 h-1.5 rounded-full bg-[var(--clay-accent)] shrink-0" />{rule}
                       </li>
@@ -347,27 +383,27 @@ export default function ApartmentDetail() {
               <div className="clay p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-bold text-[var(--foreground)]">آراء الضيوف</h2>
-                  <button onClick={() => setShowReviewForm(!showReviewForm)} className="clay-btn text-sm py-2 px-4 flex items-center gap-2">
+                  <button type="button" onClick={() => setShowReviewForm(!showReviewForm)} className="clay-btn flex items-center gap-2 px-4 py-2 text-sm" aria-expanded={showReviewForm} aria-controls="review-form">
                     <MessageSquare className="w-4 h-4" />أضف تقييم
                   </button>
                 </div>
 
                 {/* Review Form */}
                 {showReviewForm && (
-                  <div className="clay-inset p-4 mb-4">
+                  <div id="review-form" className="clay-inset mb-4 p-4">
                     <div className="mb-3">
                       <label className="text-sm font-medium text-[var(--foreground)] mb-2 block">تقييمك</label>
                       <StarRating rating={reviewRating} size="w-6 h-6" />
-                      <input type="range" min={1} max={5} value={reviewRating} onChange={(e) => setReviewRating(Number(e.target.value))} className="w-full mt-2 accent-[var(--clay-accent)]" />
+                          <input type="range" min={1} max={5} value={reviewRating} onChange={(e) => setReviewRating(Number(e.target.value))} className="mt-2 w-full accent-[var(--clay-accent)]" aria-label="تقييم الشقة من 1 إلى 5" />
                     </div>
-                    <textarea value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} placeholder="اكتب تجربتك..." className="clay-input w-full min-h-[100px] text-sm resize-none" />
+                    <textarea value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} placeholder="اكتب تجربتك..." className="clay-input min-h-[100px] w-full resize-none text-sm" aria-label="تعليقك على الإقامة" />
                     {reviewError && <p className="text-red-500 text-sm mt-2 flex items-center gap-1"><AlertCircle className="w-4 h-4" />{reviewError}</p>}
                     <div className="flex gap-2 mt-3">
-                      <button onClick={handleReview} disabled={reviewLoading || !reviewComment.trim()} className="clay-btn text-sm py-2 px-6 flex items-center gap-2">
+                      <button type="button" onClick={() => void handleReview()} disabled={reviewLoading || !reviewComment.trim()} className="clay-btn flex items-center gap-2 px-6 py-2 text-sm">
                         {reviewLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                         إرسال
                       </button>
-                      <button onClick={() => setShowReviewForm(false)} className="clay-btn-outline text-sm py-2 px-4">إلغاء</button>
+                      <button type="button" onClick={() => setShowReviewForm(false)} className="clay-btn-outline px-4 py-2 text-sm">إلغاء</button>
                     </div>
                   </div>
                 )}
@@ -390,7 +426,7 @@ export default function ApartmentDetail() {
                             </div>
                             <div>
                               <span className="text-sm font-bold text-[var(--foreground)]">{review.userName}</span>
-                              <span className="text-xs text-[var(--muted-foreground)] block">{formatDate(review.createdAt)}</span>
+                          <span className="block text-xs text-[var(--muted-foreground)]">{formatArabicDate(review.createdAt)}</span>
                             </div>
                           </div>
                           <StarRating rating={review.rating} size="w-3.5 h-3.5" />
@@ -407,11 +443,11 @@ export default function ApartmentDetail() {
             <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={7}>
               <div className="clay p-6">
                 <h2 className="text-lg font-bold text-[var(--foreground)] mb-3">الموقع على الخريطة</h2>
-                <div className="clay-inset aspect-[16/9] rounded-2xl flex items-center justify-center overflow-hidden">
+                  <div className="clay-inset flex aspect-[16/9] items-center justify-center overflow-hidden rounded-2xl">
                   {apartment.latitude && apartment.longitude ? (
                     <iframe title="Apartment Location" className="w-full h-full border-0 rounded-2xl" loading="lazy" src={`https://www.openstreetmap.org/export/embed.html?bbox=${apartment.longitude - 0.02}%2C${apartment.latitude - 0.02}%2C${apartment.longitude + 0.02}%2C${apartment.latitude + 0.02}&layer=mapnik&marker=${apartment.latitude}%2C${apartment.longitude}`} />
                   ) : (
-                    <div className="text-center text-[var(--muted-foreground)]"><MapPin className="w-10 h-10 mx-auto mb-2 opacity-50" /><p className="text-sm">{apartment.location}</p></div>
+                    <div className="text-center text-[var(--muted-foreground)]"><MapPin className="mx-auto mb-2 h-10 w-10 opacity-50" aria-hidden="true" /><p className="text-sm">{getApartmentLocation(apartment)}</p></div>
                   )}
                 </div>
                 {apartment.latitude && apartment.longitude && (
@@ -429,7 +465,7 @@ export default function ApartmentDetail() {
               <div className="clay p-6">
                 {/* Price */}
                 <div className="flex items-baseline gap-2 mb-6">
-                  <span className="text-3xl font-extrabold text-[var(--clay-accent)]">{apartment.price.toLocaleString()}</span>
+                  <span className="text-3xl font-extrabold text-[var(--clay-accent)]">{apartment.price.toLocaleString("ar-SA")}</span>
                   <span className="text-lg font-medium text-[var(--muted-foreground)]">ر.س</span>
                   <span className="text-sm text-[var(--muted-foreground)]">/ ليلة</span>
                 </div>
@@ -458,11 +494,11 @@ export default function ApartmentDetail() {
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <span className="text-[10px] text-[var(--muted-foreground)] block mb-1"> الوصول</span>
-                          <input type="date" className="clay-input text-sm text-center w-full" min={new Date().toISOString().split("T")[0]} onChange={(e) => setCheckIn(e.target.value ? new Date(e.target.value) : null)} />
+                           <input type="date" className="clay-input w-full text-center text-sm" min={formatDateInput(new Date())} value={formatDateInput(checkIn)} onChange={(e) => setCheckIn(parseDateInput(e.target.value))} aria-label="تاريخ الوصول" />
                         </div>
                         <div>
                           <span className="text-[10px] text-[var(--muted-foreground)] block mb-1">المغادرة</span>
-                          <input type="date" className="clay-input text-sm text-center w-full" min={checkIn ? checkIn.toISOString().split("T")[0] : new Date().toISOString().split("T")[0]} onChange={(e) => setCheckOut(e.target.value ? new Date(e.target.value) : null)} />
+                           <input type="date" className="clay-input w-full text-center text-sm" min={checkIn ? formatDateInput(checkIn) : formatDateInput(new Date())} value={formatDateInput(checkOut)} onChange={(e) => setCheckOut(parseDateInput(e.target.value))} aria-label="تاريخ المغادرة" />
                         </div>
                       </div>
                     </div>
@@ -471,9 +507,9 @@ export default function ApartmentDetail() {
                     <div className="mb-4">
                       <label className="text-sm font-medium text-[var(--foreground)] mb-2 block"><Users className="w-4 h-4 inline ml-1.5" />عدد الضيوف</label>
                       <div className="flex items-center gap-3 clay-inset px-4 py-2">
-                        <button onClick={() => setGuests(Math.max(1, guests - 1))} className="w-8 h-8 rounded-full bg-[var(--clay-accent-soft)] text-[var(--clay-accent)] font-bold flex items-center justify-center">-</button>
+                         <button type="button" onClick={() => setGuests(Math.max(1, guests - 1))} className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--clay-accent-soft)] font-bold text-[var(--clay-accent)]" aria-label="تقليل عدد الضيوف">-</button>
                         <span className="font-bold text-lg text-[var(--foreground)] min-w-[30px] text-center">{guests}</span>
-                        <button onClick={() => setGuests(Math.min(apartment.maxGuests, guests + 1))} className="w-8 h-8 rounded-full bg-[var(--clay-accent-soft)] text-[var(--clay-accent)] font-bold flex items-center justify-center">+</button>
+                         <button type="button" onClick={() => setGuests(Math.min(apartment.maxGuests, guests + 1))} className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--clay-accent-soft)] font-bold text-[var(--clay-accent)]" aria-label="زيادة عدد الضيوف">+</button>
                         <span className="text-xs text-[var(--muted-foreground)] mr-auto">حتى {apartment.maxGuests}</span>
                       </div>
                     </div>
@@ -506,12 +542,12 @@ export default function ApartmentDetail() {
                     )}
 
                     {bookingError && (
-                      <p className="text-red-500 text-sm mb-3 flex items-center gap-1"><AlertCircle className="w-4 h-4" />{bookingError}</p>
+                      <p className="mb-3 flex items-center gap-1 text-sm text-red-500" role="alert" aria-live="assertive"><AlertCircle className="h-4 w-4" aria-hidden="true" />{bookingError}</p>
                     )}
 
                     {/* CTA */}
-                    <button onClick={handleBooking} disabled={bookingLoading || !checkIn || !checkOut || totalNights < 1} className="clay-btn w-full text-center text-lg py-3.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-                      {bookingLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Calendar className="w-5 h-5" />}
+                    <button type="button" onClick={() => void handleBooking()} disabled={bookingLoading || !checkIn || !checkOut || totalNights < 1} className="clay-btn flex w-full items-center justify-center gap-2 py-3.5 text-center text-lg disabled:cursor-not-allowed disabled:opacity-50">
+                      {bookingLoading ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : <Calendar className="h-5 w-5" aria-hidden="true" />}
                       {bookingLoading ? "جاري الحجز..." : "احجز الآن"}
                     </button>
 
@@ -541,12 +577,12 @@ export default function ApartmentDetail() {
       {/* Lightbox */}
       {showLightbox && (
         <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4" onClick={() => setShowLightbox(false)}>
-          <button className="absolute top-6 right-6 text-white/70 hover:text-white z-10" onClick={() => setShowLightbox(false)}><X className="w-8 h-8" /></button>
-          <img src={apartment.images[selectedImage]} alt={apartment.title} className="max-w-full max-h-[85vh] object-contain rounded-2xl" />
+          <button type="button" className="absolute right-6 top-6 z-10 text-white/70 hover:text-white" onClick={() => setShowLightbox(false)} aria-label="إغلاق معرض الصور"><X className="h-8 w-8" aria-hidden="true" /></button>
+           <img src={apartment.images[selectedImage]} alt={getApartmentTitle(apartment)} className="max-h-[85vh] max-w-full rounded-2xl object-contain" />
           <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-2">
             {apartment.images.map((img, i) => (
-              <button key={i} onClick={(e) => { e.stopPropagation(); setSelectedImage(i); }} className={`w-12 h-10 rounded-lg overflow-hidden border-2 transition-all ${selectedImage === i ? "border-white scale-110" : "border-white/30 opacity-60"}`}>
-                <img src={img} alt="" className="w-full h-full object-cover" />
+              <button key={i} type="button" onClick={(e) => { e.stopPropagation(); setSelectedImage(i); }} className={`h-10 w-12 overflow-hidden rounded-lg border-2 transition-all ${selectedImage === i ? "border-white scale-110" : "border-white/30 opacity-60"}`} aria-label={`عرض الصورة ${i + 1}`} aria-pressed={selectedImage === i}>
+                <img src={img} alt={`${getApartmentTitle(apartment)} - صورة ${i + 1}`} className="h-full w-full object-cover" />
               </button>
             ))}
           </div>

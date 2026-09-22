@@ -4,6 +4,7 @@ import { ApartmentCard } from "@/components/ApartmentCard";
 import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { Link } from "react-router";
+import type { ApartmentRecord } from "@/types/apartment";
 import { Heart, Search } from "lucide-react";
 
 const fadeUp = {
@@ -56,7 +57,7 @@ export default function Favorites() {
             {favorites.map((fav, i) => (
               fav.apartment && (
                 <motion.div key={fav._id} variants={fadeUp} custom={i + 1}>
-                  <ApartmentCard apartment={fav.apartment as any} />
+                  <ApartmentCard apartment={fav.apartment as ApartmentRecord} />
                 </motion.div>
               )
             ))}

@@ -2,7 +2,12 @@ import { motion } from "framer-motion";
 import { Navigation } from "@/components/Navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../convex/_generated/api";
+import type { Id } from "../convex/_generated/dataModel";
 import { useAuth } from "@/hooks/use-auth";
+import type { UserRole } from "@/types/auth";
+import { getApartmentLocation, getApartmentTitle } from "@/lib/apartment-content";
+import { getErrorMessage } from "@/lib/error-message";
+import { toast } from "sonner";
 import {
   Home,
   Users,
@@ -38,15 +43,30 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<"stats" | "apartments" | "users">("stats");
 
   const handleVerify = async (id: string, verified: boolean) => {
-    await verifyApartment({ apartmentId: id as any, verified });
+    try {
+      await verifyApartment({ apartmentId: id as Id<"apartments">, verified });
+      toast.success(verified ? "تم توثيق الشقة" : "تم إلغاء توثيق الشقة");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر تحديث حالة التوثيق"));
+    }
   };
 
   const handleFeature = async (id: string, featured: boolean) => {
-    await featureApartment({ apartmentId: id as any, featured });
+    try {
+      await featureApartment({ apartmentId: id as Id<"apartments">, featured });
+      toast.success(featured ? "تم تمييز الشقة" : "تم إلغاء تمييز الشقة");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر تحديث الشقة"));
+    }
   };
 
-  const handleRoleChange = async (id: string, role: string) => {
-    await updateRole({ userId: id as any, role: role as any });
+  const handleRoleChange = async (id: string, role: UserRole) => {
+    try {
+      await updateRole({ userId: id as Id<"users">, role });
+      toast.success("تم تحديث دور المستخدم");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر تحديث دور المستخدم"));
+    }
   };
 
   return (
@@ -91,9 +111,16 @@ export default function AdminDashboard() {
         )}
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6">
+        <div className="mb-6 flex gap-2" role="tablist" aria-label="أقسام لوحة الإدارة">
           {(["stats", "apartments", "users"] as const).map((tab) => (
-            <button key={tab} onClick={() => setActiveTab(tab)} className={`clay-sm px-5 py-2.5 text-sm font-medium transition-all ${activeTab === tab ? "!bg-[var(--clay-accent)] !text-white" : "text-[var(--muted-foreground)]"}`}>
+            <button
+              key={tab}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab}
+              onClick={() => setActiveTab(tab)}
+              className={`clay-sm px-5 py-2.5 text-sm font-medium transition-all ${activeTab === tab ? "!bg-[var(--clay-accent)] !text-white" : "text-[var(--muted-foreground)]"}`}
+            >
               {tab === "stats" ? "نظرة عامة" : tab === "apartments" ? "الشقق" : "المستخدمون"}
             </button>
           ))}
@@ -108,17 +135,17 @@ export default function AdminDashboard() {
               <div className="space-y-3">
                 {allApartments.map((apt) => (
                   <div key={apt._id} className="clay p-4 flex flex-col md:flex-row gap-4 items-start">
-                    <img src={apt.images[0]} alt="" className="w-full md:w-24 h-20 object-cover rounded-xl shrink-0" />
+                      <img src={apt.images[0]} alt={getApartmentTitle(apt)} className="w-full md:w-24 h-20 object-cover rounded-xl shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-[var(--foreground)] truncate">{apt.title}</h3>
-                      <p className="text-sm text-[var(--muted-foreground)]">{apt.location} · {apt.price.toLocaleString()} ر.س/ليلة</p>
+                      <h3 className="font-bold text-[var(--foreground)] truncate">{getApartmentTitle(apt)}</h3>
+                      <p className="text-sm text-[var(--muted-foreground)]">{getApartmentLocation(apt)} · {apt.price.toLocaleString("ar-SA")} ر.س/ليلة</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <button onClick={() => handleVerify(apt._id, !apt.isVerified)} className={`clay-sm px-3 py-1.5 text-xs font-medium flex items-center gap-1 ${apt.isVerified ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-600"}`}>
+                      <button type="button" onClick={() => handleVerify(apt._id, !apt.isVerified)} className={`clay-sm flex items-center gap-1 px-3 py-1.5 text-xs font-medium ${apt.isVerified ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-600"}`} aria-label={apt.isVerified ? "إلغاء توثيق الشقة" : "توثيق الشقة"}>
                         {apt.isVerified ? <CheckCircle className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
                         {apt.isVerified ? "موثقة" : "توثيق"}
                       </button>
-                      <button onClick={() => handleFeature(apt._id, !apt.isFeatured)} className={`clay-sm px-3 py-1.5 text-xs font-medium flex items-center gap-1 ${apt.isFeatured ? "bg-amber-50 text-amber-700" : "bg-gray-100 text-gray-600"}`}>
+                      <button type="button" onClick={() => handleFeature(apt._id, !apt.isFeatured)} className={`clay-sm flex items-center gap-1 px-3 py-1.5 text-xs font-medium ${apt.isFeatured ? "bg-amber-50 text-amber-700" : "bg-gray-100 text-gray-600"}`} aria-label={apt.isFeatured ? "إلغاء تمييز الشقة" : "تمييز الشقة"}>
                         <Star className={`w-3.5 h-3.5 ${apt.isFeatured ? "fill-amber-400" : ""}`} />
                         {apt.isFeatured ? "مميزة" : "تمييز"}
                       </button>
@@ -147,7 +174,7 @@ export default function AdminDashboard() {
                       <p className="text-sm text-[var(--muted-foreground)]">{u.email || "بدون بريد"}</p>
                     </div>
                     <div className="shrink-0">
-                      <select value={u.role || "user"} onChange={(e) => handleRoleChange(u._id, e.target.value)} className="clay-input text-xs py-1.5 px-3">
+                      <select value={u.role || "user"} onChange={(e) => handleRoleChange(u._id, e.target.value as UserRole)} className="clay-input px-3 py-1.5 text-xs" aria-label={`دور ${u.name || u.email || "المستخدم"}`}>
                         <option value="user">مستخدم</option>
                         <option value="owner">مالك</option>
                         <option value="member">عضو</option>

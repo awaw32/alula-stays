@@ -1,25 +1,24 @@
-import { query, mutation } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { requireUser } from "./lib/authorization";
 
 export const list = query({
   args: {},
   handler: async (ctx) => {
-    const userId = (await ctx.auth.getUserIdentity())?.subject;
-    if (!userId) return [];
-
-    const favs = await ctx.db
+    const user = await requireUser(ctx);
+    const favorites = await ctx.db
       .query("favorites")
-      .withIndex("by_user", (q) => q.eq("userId", userId as any))
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
       .collect();
 
     const enriched = await Promise.all(
-      favs.map(async (fav) => {
-        const apartment = await ctx.db.get(fav.apartmentId);
-        return { ...fav, apartment };
-      }),
+      favorites.map(async (favorite) => ({
+        ...favorite,
+        apartment: await ctx.db.get(favorite.apartmentId),
+      })),
     );
 
-    return enriched.filter((f) => f.apartment);
+    return enriched.filter((favorite) => favorite.apartment);
   },
 });
 
@@ -32,37 +31,35 @@ export const isFavorited = query({
     const existing = await ctx.db
       .query("favorites")
       .withIndex("by_user_apartment", (q) =>
-        q.eq("userId", userId as any).eq("apartmentId", args.apartmentId),
+        q.eq("userId", userId).eq("apartmentId", args.apartmentId),
       )
       .first();
 
-    return !!existing;
+    return Boolean(existing);
   },
 });
 
 export const toggle = mutation({
   args: { apartmentId: v.id("apartments") },
   handler: async (ctx, args) => {
-    const userId = (await ctx.auth.getUserIdentity())?.subject;
-    if (!userId) throw new Error("يجب تسجيل الدخول أولاً");
-
+    const user = await requireUser(ctx);
     const existing = await ctx.db
       .query("favorites")
       .withIndex("by_user_apartment", (q) =>
-        q.eq("userId", userId as any).eq("apartmentId", args.apartmentId),
+        q.eq("userId", user._id).eq("apartmentId", args.apartmentId),
       )
       .first();
 
     if (existing) {
       await ctx.db.delete(existing._id);
       return { favorited: false };
-    } else {
-      await ctx.db.insert("favorites", {
-        userId: userId as any,
-        apartmentId: args.apartmentId,
-        createdAt: Date.now(),
-      });
-      return { favorited: true };
     }
+
+    await ctx.db.insert("favorites", {
+      userId: user._id,
+      apartmentId: args.apartmentId,
+      createdAt: Date.now(),
+    });
+    return { favorited: true };
   },
 });

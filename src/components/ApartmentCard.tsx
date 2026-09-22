@@ -1,5 +1,6 @@
 import { ClayCard } from "./ClayCard";
 import { cn } from "@/lib/utils";
+import { getAmenityLabel, getApartmentLocation, getApartmentTitle } from "@/lib/apartment-content";
 import {
   Bed,
   Bath,
@@ -13,26 +14,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
-
-interface Apartment {
-  _id: string;
-  title: string;
-  titleAr?: string;
-  price: number;
-  bedrooms: number;
-  bathrooms: number;
-  maxGuests: number;
-  area: number;
-  location: string;
-  locationAr?: string;
-  images: string[];
-  amenities: string[];
-  rating: number;
-  reviewCount: number;
-  isVerified?: boolean;
-  isFeatured?: boolean;
-  badges?: string[];
-}
+import type { ApartmentRecord } from "@/types/apartment";
 
 const amenityIcons: Record<string, string> = {
   wifi: "📶",
@@ -88,7 +70,7 @@ const badgeConfig: Record<string, { label: string; labelAr: string; icon: typeof
 };
 
 interface ApartmentCardProps {
-  apartment: Apartment;
+  apartment: ApartmentRecord;
 }
 
 export function ApartmentCard({ apartment }: ApartmentCardProps) {
@@ -102,7 +84,8 @@ export function ApartmentCard({ apartment }: ApartmentCardProps) {
 
   return (
     <ClayCard
-      className="overflow-hidden group"
+      className="group overflow-hidden"
+      ariaLabel={`عرض ${getApartmentTitle(apartment)}`}
       onClick={() => navigate(`/apartment/${apartment._id}`)}
     >
       {/* Image */}
@@ -145,7 +128,7 @@ export function ApartmentCard({ apartment }: ApartmentCardProps) {
         <div className="absolute bottom-3 right-3">
           <div className="clay-sm px-3 py-1.5 bg-white/90 backdrop-blur-sm">
             <span className="text-lg font-bold text-[var(--clay-accent)]">
-              {apartment.price.toLocaleString()} ر.س
+              {apartment.price.toLocaleString("ar-SA")} ر.س
             </span>
             <span className="text-xs text-[var(--muted-foreground)] block -mt-0.5">
               / ليلة
@@ -158,7 +141,7 @@ export function ApartmentCard({ apartment }: ApartmentCardProps) {
       <div className="p-4">
         <div className="flex items-start justify-between gap-2 mb-2">
           <h3 className="font-bold text-base leading-tight text-[var(--foreground)] line-clamp-1">
-            {apartment.title}
+            {getApartmentTitle(apartment)}
           </h3>
           <div className="flex items-center gap-1 shrink-0">
             <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
@@ -171,7 +154,7 @@ export function ApartmentCard({ apartment }: ApartmentCardProps) {
 
         <div className="flex items-center gap-1 text-sm text-[var(--muted-foreground)] mb-3">
           <MapPin className="w-3.5 h-3.5" />
-          <span>{apartment.location}</span>
+          <span>{getApartmentLocation(apartment)}</span>
         </div>
 
         {/* Stats */}
@@ -197,8 +180,8 @@ export function ApartmentCard({ apartment }: ApartmentCardProps) {
               key={amenity}
               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-[var(--clay-surface)] text-[var(--muted-foreground)]"
             >
-              <span>{amenityIcons[amenity] || "✨"}</span>
-              {amenity.replace(/_/g, " ")}
+              <span aria-hidden="true">{amenityIcons[amenity] || "✨"}</span>
+              {getAmenityLabel(amenity)}
             </span>
           ))}
           {apartment.amenities.length > 4 && (

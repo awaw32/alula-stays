@@ -1,12 +1,13 @@
 import { motion } from "framer-motion";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Navigation } from "@/components/Navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../convex/_generated/api";
+import type { Id } from "../convex/_generated/dataModel";
 import { useAuth } from "@/hooks/use-auth";
 import { useNavigate } from "react-router";
 import {
   Home,
-  Plus,
   Calendar,
   DollarSign,
   Star,
@@ -14,11 +15,11 @@ import {
   Trash2,
   Eye,
   CheckCircle,
-  XCircle,
-  Clock,
   Loader2,
 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/error-message";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -33,21 +34,23 @@ export default function OwnerDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const myApartments = useQuery(api.admin.ownerApartments);
-  const addApartment = () => navigate("/owner/add");
   const myBookings = useQuery(api.bookings.ownerBookings);
   const deleteApartment = useMutation(api.admin.deleteApartment);
   const [activeTab, setActiveTab] = useState<"apartments" | "bookings">("apartments");
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [now] = useState(() => Date.now());
 
   const handleDelete = async (id: string) => {
-    if (!confirm("هل أنت متأكد من حذف هذه الشقة؟")) return;
     setDeleting(id);
     try {
-      await deleteApartment({ apartmentId: id as any });
-    } catch {
-      alert("حدث خطأ أثناء الحذف");
+      await deleteApartment({ apartmentId: id as Id<"apartments"> });
+      toast.success("تم حذف الشقة بنجاح");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "حدث خطأ أثناء حذف الشقة"));
     } finally {
       setDeleting(null);
+      setDeleteTarget(null);
     }
   };
 
@@ -55,7 +58,7 @@ export default function OwnerDashboard() {
     ?.filter((b) => b.paymentStatus === "paid")
     .reduce((sum, b) => sum + (b.totalPrice - b.platformFee), 0) || 0;
 
-  const activeBookings = myBookings?.filter((b) => b.status === "confirmed" && b.checkOut > Date.now()) || [];
+  const activeBookings = myBookings?.filter((b) => b.status === "confirmed" && b.checkOut > now) || [];
 
   return (
     <div className="min-h-screen bg-[var(--background)] pb-24 md:pb-0">
@@ -76,7 +79,7 @@ export default function OwnerDashboard() {
             { icon: Calendar, label: "الحجوزات النشطة", value: activeBookings.length, color: "bg-emerald-50 text-emerald-600" },
             { icon: DollarSign, label: "الأرباح", value: `${totalEarnings.toLocaleString()} ر.س`, color: "bg-amber-50 text-amber-600" },
             { icon: Star, label: "متوسط التقييم", value: myApartments?.length ? (myApartments.reduce((s, a) => s + a.rating, 0) / myApartments.length).toFixed(1) : "0", color: "bg-purple-50 text-purple-600" },
-          ].map((stat, i) => (
+          ].map((stat) => (
             <div key={stat.label} className="clay p-4">
               <div className={`w-10 h-10 rounded-xl ${stat.color} flex items-center justify-center mb-2`}>
                 <stat.icon className="w-5 h-5" />
@@ -133,10 +136,10 @@ export default function OwnerDashboard() {
                       </div>
                     </div>
                     <div className="flex md:flex-col gap-2 shrink-0">
-                      <button onClick={() => navigate(`/apartment/${apt._id}`)} className="clay-sm p-2 hover:bg-[var(--clay-accent-soft)] transition-colors"><Eye className="w-4 h-4 text-[var(--muted-foreground)]" /></button>
-                      <button className="clay-sm p-2 hover:bg-[var(--clay-accent-soft)] transition-colors"><Edit className="w-4 h-4 text-[var(--muted-foreground)]" /></button>
-                      <button onClick={() => handleDelete(apt._id)} disabled={deleting === apt._id} className="clay-sm p-2 hover:bg-red-50 transition-colors">
-                        {deleting === apt._id ? <Loader2 className="w-4 h-4 animate-spin text-red-500" /> : <Trash2 className="w-4 h-4 text-red-500" />}
+                      <button type="button" onClick={() => navigate(`/apartment/${apt._id}`)} className="clay-sm p-2 transition-colors hover:bg-[var(--clay-accent-soft)]" aria-label={`عرض ${apt.title}`} title="عرض الشقة"><Eye className="h-4 w-4 text-[var(--muted-foreground)]" aria-hidden="true" /></button>
+                      <button type="button" onClick={() => navigate(`/owner/edit/${apt._id}`)} className="clay-sm p-2 transition-colors hover:bg-[var(--clay-accent-soft)]" aria-label={`تعديل ${apt.title}`} title="تعديل الشقة"><Edit className="h-4 w-4 text-[var(--muted-foreground)]" aria-hidden="true" /></button>
+                      <button type="button" onClick={() => setDeleteTarget(apt._id)} disabled={deleting === apt._id} className="clay-sm p-2 transition-colors hover:bg-red-50" aria-label={`حذف ${apt.title}`} title="حذف الشقة">
+                        {deleting === apt._id ? <Loader2 className="h-4 w-4 animate-spin text-red-500" aria-hidden="true" /> : <Trash2 className="h-4 w-4 text-red-500" aria-hidden="true" />}
                       </button>
                     </div>
                   </div>
@@ -188,6 +191,19 @@ export default function OwnerDashboard() {
           </motion.div>
         )}
       </div>
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="حذف الشقة؟"
+        description="سيتم حذف الشقة نهائياً ولا يمكن التراجع عن هذا الإجراء."
+        confirmLabel="حذف الشقة"
+        destructive
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        onConfirm={async () => {
+          if (deleteTarget) await handleDelete(deleteTarget);
+        }}
+      />
     </div>
   );
 }

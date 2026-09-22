@@ -4,6 +4,7 @@ import { ApartmentCard } from "@/components/ApartmentCard";
 import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { Link } from "react-router";
+import type { ApartmentRecord } from "@/types/apartment";
 import {
   Search,
   MapPin,
@@ -60,12 +61,12 @@ const alUlaHighlights = [
   {
     icon: Compass,
     title: "مواقع تراثية",
-    desc: "ziarat الحِجر ودadan والمواقع الأثرية العالمية",
+    desc: "استكشف الحِجر ودادان والمواقع الأثرية العالمية",
     color: "from-[#D4A574] to-[#B8860B]",
   },
   {
     icon: Tent,
-    title: " experiences فريدة",
+    title: "تجارب فريدة",
     desc: "تجربة الإقامة في قلب الطبيعة الصحراوية الخلابة",
     color: "from-[#8B6F5E] to-[#6B4F3E]",
   },
@@ -201,7 +202,7 @@ export default function Landing() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {featuredApartments.map((apt, i) => (
                 <motion.div key={apt._id} variants={fadeUp} custom={i + 1}>
-                  <ApartmentCard apartment={apt as any} />
+                  <ApartmentCard apartment={apt as ApartmentRecord} />
                 </motion.div>
               ))}
             </div>

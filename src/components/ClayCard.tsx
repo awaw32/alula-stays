@@ -6,6 +6,7 @@ interface ClayCardProps {
   className?: string;
   hover?: boolean;
   onClick?: () => void;
+  ariaLabel?: string;
 }
 
 export function ClayCard({
@@ -13,14 +14,24 @@ export function ClayCard({
   className,
   hover = true,
   onClick,
+  ariaLabel,
 }: ClayCardProps) {
   return (
     <div
       onClick={onClick}
+      onKeyDown={(event) => {
+        if (onClick && (event.key === "Enter" || event.key === " ")) {
+          event.preventDefault();
+          onClick();
+        }
+      }}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      aria-label={ariaLabel}
       className={cn(
         "clay",
-        hover && "hover:-translate-y-0.5 transition-all duration-300",
-        onClick && "cursor-pointer",
+        hover && "transition-all duration-300 hover:-translate-y-0.5",
+        onClick && "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--clay-accent)]",
         className,
       )}
     >

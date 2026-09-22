@@ -64,7 +64,8 @@ const schema = defineSchema(
       .index("by_location", ["location"])
       .index("by_price", ["price"])
       .index("by_rating", ["rating"])
-      .index("by_featured", ["isFeatured"]),
+      .index("by_featured", ["isFeatured"])
+      .index("by_owner", ["ownerId"]),
 
     // Reviews
     reviews: defineTable({
@@ -100,12 +101,14 @@ const schema = defineSchema(
         v.literal("paid"),
         v.literal("refunded"),
       ),
+      paymentSessionId: v.optional(v.string()),
       createdAt: v.number(),
     })
       .index("by_apartment", ["apartmentId"])
       .index("by_user", ["userId"])
       .index("by_status", ["status"])
-      .index("by_checkin", ["checkIn"]),
+      .index("by_checkin", ["checkIn"])
+      .index("by_payment_session", ["paymentSessionId"]),
 
     // Favorites
     favorites: defineTable({

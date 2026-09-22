@@ -14,6 +14,7 @@ export function useAuth() {
     isLoading,
     isAuthenticated,
     user,
+    role: user?.role ?? null,
     signIn,
     signOut,
   };

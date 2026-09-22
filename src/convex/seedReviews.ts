@@ -9,6 +9,17 @@ export const seed = mutation({
     const apartments = await ctx.db.query("apartments").collect();
     if (apartments.length === 0) return "No apartments found — seed apartments first";
 
+    const existingSeedUser = await ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", "seed@alula-stays.local"))
+      .first();
+    const seedUserId = existingSeedUser?._id ?? (await ctx.db.insert("users", {
+      name: "زائر تجريبي",
+      email: "seed@alula-stays.local",
+      isAnonymous: true,
+      role: "user",
+    }));
+
     const reviewData = [
       { aptTitle: "Desert Rose Suite", name: "محمد العتيبي", rating: 5, comment: "تجربة رائعة! الشقة نظيفة جداً والموقع مثالي لاستكشاف العلا. الإطلالة على الواحة كانت خلابة. بالتأكيد سأعود مرة أخرى." },
       { aptTitle: "Desert Rose Suite", name: "سارة القحطاني", rating: 5, comment: "أجمل شقة أقام فيها في العلا. التصميم الداخلي يجمع بين العصرية والتراثية بشكل مبهر. المطبخ مجهز بالكامل." },
@@ -22,7 +33,7 @@ export const seed = mutation({
       { aptTitle: "Elephant Rock", name: "Omar M.", rating: 4, comment: "Great location near Elephant Rock. The apartment is stylish and comfortable. Only minor issue was WiFi speed during peak hours." },
       { aptTitle: "Hegra Explorer", name: "سلطان المطيري", rating: 5, comment: "تجربة فريدة بالقرب من الحِجر. التصميم النبطي رائع والموقع مثالي لعشاق المغامرة." },
       { aptTitle: "Maraya Concert", name: "هند الغامدي", rating: 4, comment: "موقع مميز بالقرب من ماريا. التصميم الفني جميل والشقة مريحة. الحفلات في ماريا قريبة جداً." },
-      { aptTitle: "Farmhouse Retreat", name: "يوسف الزهراني", rating: 5, comment: "أجمل تجربة عائلية في العلا. المزرعة ساحرة والأطفال أحبوا picking fresh herbs. المجلس الخارجي مثالي للمساء." },
+      { aptTitle: "Farmhouse Retreat", name: "يوسف الزهراني", rating: 5, comment: "أجمل تجربة عائلية في العلا. المزرعة ساحرة والأطفال أحبوا قطف الأعشاب الطازجة. المجلس الخارجي مثالي للمساء." },
     ];
 
     let count = 0;
@@ -31,7 +42,7 @@ export const seed = mutation({
       if (apt) {
         await ctx.db.insert("reviews", {
           apartmentId: apt._id,
-          userId: "seed_user" as any,
+          userId: seedUserId,
           userName: review.name,
           rating: review.rating,
           comment: review.comment,

@@ -1,44 +1,70 @@
-import { query, mutation } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 import { v } from "convex/values";
+import {
+  type DatabaseCtx,
+  requireAnyRole,
+  requireBookingAccess,
+  requireRole,
+  requireUser,
+} from "./lib/authorization";
+
+const DAY_MS = 1000 * 60 * 60 * 24;
+const bookingStatusValidator = v.union(
+  v.literal("pending"),
+  v.literal("confirmed"),
+  v.literal("cancelled"),
+  v.literal("completed"),
+);
+
+async function enrichBooking(ctx: DatabaseCtx, booking: Doc<"bookings">) {
+  const apartment = await ctx.db.get(booking.apartmentId);
+  return { ...booking, apartment };
+}
+
+async function enrichBookings(
+  ctx: DatabaseCtx,
+  bookings: Doc<"bookings">[],
+) {
+  return Promise.all(bookings.map((booking) => enrichBooking(ctx, booking)));
+}
 
 export const list = query({
-  args: {
-    userId: v.optional(v.id("users")),
-    apartmentId: v.optional(v.id("apartments")),
-    status: v.optional(v.string()),
+  args: {},
+  handler: async (ctx) => {
+    const user = await requireUser(ctx);
+    const bookings = await ctx.db
+      .query("bookings")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .order("desc")
+      .collect();
+
+    return enrichBookings(ctx, bookings);
   },
+});
+
+export const adminList = query({
+  args: { status: v.optional(bookingStatusValidator) },
   handler: async (ctx, args) => {
-    let bookings = await ctx.db.query("bookings").collect();
+    await requireRole(ctx, "admin");
 
-    if (args.userId) {
-      bookings = bookings.filter((b) => b.userId === args.userId);
-    }
-    if (args.apartmentId) {
-      bookings = bookings.filter((b) => b.apartmentId === args.apartmentId);
-    }
-    if (args.status) {
-      bookings = bookings.filter((b) => b.status === args.status);
-    }
+    const bookings = args.status
+      ? await ctx.db
+          .query("bookings")
+          .withIndex("by_status", (q) => q.eq("status", args.status!))
+          .order("desc")
+          .collect()
+      : await ctx.db.query("bookings").order("desc").collect();
 
-    // Enrich with apartment info
-    const enriched = await Promise.all(
-      bookings.map(async (booking) => {
-        const apartment = await ctx.db.get(booking.apartmentId);
-        return { ...booking, apartment };
-      }),
-    );
-
-    return enriched.sort((a, b) => b.createdAt - a.createdAt);
+    return enrichBookings(ctx, bookings);
   },
 });
 
 export const get = query({
   args: { bookingId: v.id("bookings") },
   handler: async (ctx, args) => {
-    const booking = await ctx.db.get(args.bookingId);
-    if (!booking) return null;
-    const apartment = await ctx.db.get(booking.apartmentId);
-    return { ...booking, apartment };
+    const { booking } = await requireBookingAccess(ctx, args.bookingId);
+    return enrichBooking(ctx, booking);
   },
 });
 
@@ -49,28 +75,32 @@ export const checkAvailability = query({
     checkOut: v.number(),
   },
   handler: async (ctx, args) => {
+    if (!Number.isFinite(args.checkIn) || !Number.isFinite(args.checkOut)) {
+      return { available: false };
+    }
+
+    if (args.checkOut <= args.checkIn) {
+      return { available: false };
+    }
+
+    const apartment = await ctx.db.get(args.apartmentId);
+    if (!apartment || apartment.available === false) {
+      return { available: false };
+    }
+
     const bookings = await ctx.db
       .query("bookings")
       .withIndex("by_apartment", (q) => q.eq("apartmentId", args.apartmentId))
       .collect();
 
-    const activeBookings = bookings.filter(
-      (b) => b.status !== "cancelled",
+    const hasOverlap = bookings.some(
+      (booking) =>
+        booking.status !== "cancelled" &&
+        args.checkIn < booking.checkOut &&
+        args.checkOut > booking.checkIn,
     );
 
-    // Check for overlapping dates
-    const hasOverlap = activeBookings.some(
-      (b) => args.checkIn < b.checkOut && args.checkOut > b.checkIn,
-    );
-
-    return {
-      available: !hasOverlap,
-      conflictingBookings: hasOverlap
-        ? activeBookings.filter(
-            (b) => args.checkIn < b.checkOut && args.checkOut > b.checkIn,
-          )
-        : [],
-    };
+    return { available: !hasOverlap };
   },
 });
 
@@ -82,48 +112,59 @@ export const create = mutation({
     guests: v.number(),
   },
   handler: async (ctx, args) => {
-    const userId = (await ctx.auth.getUserIdentity())?.subject;
-    if (!userId) throw new Error("يجب تسجيل الدخول أولاً");
-
-    const user = await ctx.db
-      .query("users")
-      .filter((q) => q.eq(q.field("_id"), userId))
-      .first();
-    if (!user) throw new Error("المستخدم غير موجود");
-
+    const user = await requireUser(ctx);
     const apartment = await ctx.db.get(args.apartmentId);
-    if (!apartment) throw new Error("الشقة غير موجودة");
-    if (!apartment.available) throw new Error("الشقة غير متاحة حالياً");
 
-    // Check availability
+    if (!apartment) {
+      throw new Error("الشقة غير موجودة");
+    }
+    if (apartment.available === false) {
+      throw new Error("الشقة غير متاحة حالياً");
+    }
+    if (!Number.isInteger(args.guests) || args.guests < 1) {
+      throw new Error("عدد الضيوف غير صالح");
+    }
+    if (args.guests > apartment.maxGuests) {
+      throw new Error("عدد الضيوف يتجاوز الحد المسموح");
+    }
+
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    if (
+      !Number.isFinite(args.checkIn) ||
+      !Number.isFinite(args.checkOut) ||
+      args.checkIn < startOfToday.getTime() ||
+      args.checkOut <= args.checkIn
+    ) {
+      throw new Error("تواريخ الحجز غير صالحة");
+    }
+
+    const totalNights = Math.ceil((args.checkOut - args.checkIn) / DAY_MS);
+    if (totalNights < 1) {
+      throw new Error("يجب أن يكون الحجز ليلة على الأقل");
+    }
+
     const bookings = await ctx.db
       .query("bookings")
-      .withIndex("by_apartment", (q) =>
-        q.eq("apartmentId", args.apartmentId),
-      )
+      .withIndex("by_apartment", (q) => q.eq("apartmentId", args.apartmentId))
       .collect();
-
-    const activeBookings = bookings.filter((b) => b.status !== "cancelled");
-    const hasOverlap = activeBookings.some(
-      (b) => args.checkIn < b.checkOut && args.checkOut > b.checkIn,
+    const hasOverlap = bookings.some(
+      (booking) =>
+        booking.status !== "cancelled" &&
+        args.checkIn < booking.checkOut &&
+        args.checkOut > booking.checkIn,
     );
 
     if (hasOverlap) {
       throw new Error("التواريخ غير متاحة — يوجد حجز في هذه الأيام");
     }
 
-    // Calculate pricing
-    const totalNights = Math.ceil(
-      (args.checkOut - args.checkIn) / (1000 * 60 * 60 * 24),
-    );
-    if (totalNights < 1) throw new Error("يجب أن يكون الحجز ليلة على الأقل");
-
     const totalPrice = totalNights * apartment.price;
-    const platformFee = Math.round(totalPrice * 0.1); // 10% commission
+    const platformFee = Math.round(totalPrice * 0.1);
 
     const bookingId = await ctx.db.insert("bookings", {
       apartmentId: args.apartmentId,
-      userId: userId as any,
+      userId: user._id,
       checkIn: args.checkIn,
       checkOut: args.checkOut,
       guests: args.guests,
@@ -143,8 +184,15 @@ export const create = mutation({
 export const confirm = mutation({
   args: { bookingId: v.id("bookings") },
   handler: async (ctx, args) => {
+    await requireRole(ctx, "admin");
     const booking = await ctx.db.get(args.bookingId);
-    if (!booking) throw new Error("الحجز غير موجود");
+
+    if (!booking) {
+      throw new Error("الحجز غير موجود");
+    }
+    if (booking.status !== "pending") {
+      throw new Error("لا يمكن تأكيد هذا الحجز");
+    }
 
     await ctx.db.patch(args.bookingId, {
       status: "confirmed",
@@ -158,24 +206,27 @@ export const confirm = mutation({
 export const cancel = mutation({
   args: { bookingId: v.id("bookings") },
   handler: async (ctx, args) => {
-    const booking = await ctx.db.get(args.bookingId);
-    if (!booking) throw new Error("الحجز غير موجود");
-
-    // Calculate cancellation fee based on time remaining
-    const now = Date.now();
-    const hoursUntilCheckin =
-      (booking.checkIn - now) / (1000 * 60 * 60);
-    let refundPercentage = 100;
-
-    if (hoursUntilCheckin < 24) {
-      refundPercentage = 0; // No refund within 24 hours
-    } else if (hoursUntilCheckin < 72) {
-      refundPercentage = 50; // 50% refund within 3 days
+    const { user, booking } = await requireBookingAccess(ctx, args.bookingId);
+    if (user.role !== "admin" && booking.userId !== user._id) {
+      throw new Error("لا يمكنك إلغاء هذا الحجز");
     }
+    if (booking.status === "cancelled" || booking.status === "completed") {
+      throw new Error("لا يمكن إلغاء هذا الحجز");
+    }
+
+    const hoursUntilCheckin = (booking.checkIn - Date.now()) / (1000 * 60 * 60);
+    const refundPercentage =
+      hoursUntilCheckin < 24 ? 0 : hoursUntilCheckin < 72 ? 50 : 100;
+    const paymentStatus =
+      booking.paymentStatus !== "paid"
+        ? "unpaid"
+        : refundPercentage === 100
+          ? "refunded"
+          : "paid";
 
     await ctx.db.patch(args.bookingId, {
       status: "cancelled",
-      paymentStatus: refundPercentage === 100 ? "refunded" : "paid",
+      paymentStatus,
     });
 
     return {
@@ -191,36 +242,42 @@ export const cancel = mutation({
   },
 });
 
-// Owner: get bookings for their apartments
 export const ownerBookings = query({
   args: {},
   handler: async (ctx) => {
-    const userId = (await ctx.auth.getUserIdentity())?.subject;
-    if (!userId) return [];
+    const user = await requireAnyRole(ctx, ["owner", "admin"]);
+    const apartments =
+      user.role === "admin"
+        ? await ctx.db.query("apartments").collect()
+        : await ctx.db
+            .query("apartments")
+            .withIndex("by_owner", (q) => q.eq("ownerId", user._id))
+            .collect();
 
-    // Get owner's apartments
-    const apartments = await ctx.db.query("apartments").collect();
-    const myApartments = apartments.filter((a) => a.ownerId === userId);
+    if (apartments.length === 0) {
+      return [];
+    }
 
-    const bookings = await ctx.db.query("bookings").collect();
-    const myBookings = bookings.filter((b) =>
-      myApartments.some((a) => a._id === b.apartmentId),
-    );
+    const bookings = (
+      await Promise.all(
+        apartments.map((apartment) =>
+          ctx.db
+            .query("bookings")
+            .withIndex("by_apartment", (q) => q.eq("apartmentId", apartment._id))
+            .collect(),
+        ),
+      )
+    ).flat();
 
-    const enriched = await Promise.all(
-      myBookings.map(async (booking) => {
-        const apartment = await ctx.db.get(booking.apartmentId);
-        return { ...booking, apartment };
-      }),
-    );
-
+    const enriched = await enrichBookings(ctx, bookings);
     return enriched.sort((a, b) => b.createdAt - a.createdAt);
   },
 });
 
-// Stats for admin
 export const adminStats = query({
+  args: {},
   handler: async (ctx) => {
+    await requireRole(ctx, "admin");
     const allBookings = await ctx.db.query("bookings").collect();
     const now = Date.now();
     const monthStart = new Date(
@@ -230,20 +287,20 @@ export const adminStats = query({
     ).getTime();
 
     const monthlyBookings = allBookings.filter(
-      (b) => b.createdAt >= monthStart,
+      (booking) => booking.createdAt >= monthStart,
     );
     const activeBookings = allBookings.filter(
-      (b) => b.status === "confirmed" && b.checkOut > now,
+      (booking) => booking.status === "confirmed" && booking.checkOut > now,
     );
     const totalRevenue = allBookings
-      .filter((b) => b.paymentStatus === "paid")
-      .reduce((sum, b) => sum + b.totalPrice, 0);
+      .filter((booking) => booking.paymentStatus === "paid")
+      .reduce((sum, booking) => sum + booking.totalPrice, 0);
     const platformRevenue = allBookings
-      .filter((b) => b.paymentStatus === "paid")
-      .reduce((sum, b) => sum + b.platformFee, 0);
+      .filter((booking) => booking.paymentStatus === "paid")
+      .reduce((sum, booking) => sum + booking.platformFee, 0);
     const monthlyRevenue = monthlyBookings
-      .filter((b) => b.paymentStatus === "paid")
-      .reduce((sum, b) => sum + b.totalPrice, 0);
+      .filter((booking) => booking.paymentStatus === "paid")
+      .reduce((sum, booking) => sum + booking.totalPrice, 0);
 
     return {
       total: allBookings.length,
@@ -253,5 +310,65 @@ export const adminStats = query({
       monthlyBookings: monthlyBookings.length,
       monthlyRevenue,
     };
+  },
+});
+
+export const getPaymentContext = internalQuery({
+  args: { bookingId: v.id("bookings") },
+  handler: async (ctx, args) => {
+    const booking = await ctx.db.get(args.bookingId);
+    if (!booking) {
+      return null;
+    }
+
+    const apartment = await ctx.db.get(booking.apartmentId);
+    return { booking, apartment };
+  },
+});
+
+export const attachPaymentSession = internalMutation({
+  args: {
+    bookingId: v.id("bookings"),
+    sessionId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const booking = await ctx.db.get(args.bookingId);
+    if (!booking) {
+      throw new Error("الحجز غير موجود");
+    }
+    if (booking.status !== "pending" || booking.paymentStatus !== "unpaid") {
+      throw new Error("لا يمكن بدء الدفع لهذا الحجز");
+    }
+
+    await ctx.db.patch(args.bookingId, { paymentSessionId: args.sessionId });
+  },
+});
+
+export const markPaid = internalMutation({
+  args: {
+    bookingId: v.id("bookings"),
+    sessionId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const booking = await ctx.db.get(args.bookingId);
+    if (!booking) {
+      throw new Error("الحجز غير موجود");
+    }
+    if (booking.paymentStatus === "paid" && booking.status === "confirmed") {
+      return booking;
+    }
+    if (
+      booking.status !== "pending" ||
+      booking.paymentSessionId !== args.sessionId
+    ) {
+      throw new Error("جلسة الدفع غير صالحة لهذا الحجز");
+    }
+
+    await ctx.db.patch(args.bookingId, {
+      status: "confirmed",
+      paymentStatus: "paid",
+    });
+
+    return await ctx.db.get(args.bookingId);
   },
 });
