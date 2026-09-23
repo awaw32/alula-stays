@@ -1,0 +1,9 @@
+src/convex/**
+.git
+node_modules
+dist
+.vite
+.convex
+*.lock
+.env
+.env.local

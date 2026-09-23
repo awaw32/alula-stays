@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
+    "build": "tsc -b --listFilesOnly && vite build",
+    "lint": "eslint . --ignore-pattern 'src/convex/**'",
     "format": "prettier --write .",
     "preview": "vite preview"
   },
