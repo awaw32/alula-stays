@@ -4,31 +4,18 @@ compatibility_date = "2024-09-23"
 
 [env.production]
 name = "alula-stays-prod"
-routes = [
-  { pattern = "alula-stays.pages.dev", zone_name = "" }
-]
 vars = { ENVIRONMENT = "production" }
 
 [env.development]
 vars = { ENVIRONMENT = "development" }
 
-# Build settings
+[assets]
+directory = "./dist"
+
 [build]
 command = "bun run build"
 cwd = "./"
-watch_paths = ["src/**/*.{ts,tsx}"]
 
-# Development server
 [dev]
 port = 5173
-local_protocol = "http"
 
-# Upload rules
-[[rules]]
-type = "Text"
-globs = ["**/*.js", "**/*.json"]
-fallthrough = true
-
-# Limits
-[limits]
-cpu_seconds = 50
