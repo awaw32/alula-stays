@@ -1,0 +1,27 @@
+name = "alula-stays"
+main = "dist/index.js"
+type = "javascript"
+compatibility_date = "2024-09-23"
+
+# Build configuration
+[build]
+command = "bun run build"
+cwd = "./"
+watch_paths = ["src/**/*.tsx", "src/**/*.ts"]
+
+# Environment variables
+[env.production]
+vars = { ENVIRONMENT = "production" }
+
+[env.development]
+vars = { ENVIRONMENT = "development" }
+
+# Routes
+[routes]
+pattern = "api/*"
+zone_name = "example.com"
+
+# Compatibility flags
+compatibility_flags = [
+  "streams_enable_constructors"
+]
