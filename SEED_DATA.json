@@ -1,0 +1,671 @@
+{
+  "metadata": {
+    "title": "شقق العلا - البيانات التجريبية الكاملة",
+    "version": "1.0",
+    "date": "2026-09-23",
+    "totalItems": {
+      "users": 14,
+      "reviews": 152,
+      "bookings": 30,
+      "favorites": 15
+    }
+  },
+  "users": [
+    {
+      "id": "user_1",
+      "email": "ahmed@example.com",
+      "name": "أحمد محمد",
+      "phone": "+966501234567",
+      "role": "user",
+      "avatar": "👨‍💼"
+    },
+    {
+      "id": "user_2",
+      "email": "fatima@example.com",
+      "name": "فاطمة علي",
+      "phone": "+966502345678",
+      "role": "user",
+      "avatar": "👩‍💼"
+    },
+    {
+      "id": "user_3",
+      "email": "sara@example.com",
+      "name": "سارة خالد",
+      "phone": "+966503456789",
+      "role": "user",
+      "avatar": "👩‍💼"
+    },
+    {
+      "id": "user_4",
+      "email": "mohammed@example.com",
+      "name": "محمد حسن",
+      "phone": "+966504567890",
+      "role": "user",
+      "avatar": "👨‍💼"
+    },
+    {
+      "id": "user_5",
+      "email": "noor@example.com",
+      "name": "نور الدين",
+      "phone": "+966505678901",
+      "role": "user",
+      "avatar": "👨‍💼"
+    },
+    {
+      "id": "user_6",
+      "email": "hana@example.com",
+      "name": "هناء علي",
+      "phone": "+966506789012",
+      "role": "user",
+      "avatar": "👩‍💼"
+    },
+    {
+      "id": "user_7",
+      "email": "khalid@example.com",
+      "name": "خالد سالم",
+      "phone": "+966507890123",
+      "role": "user",
+      "avatar": "👨‍💼"
+    },
+    {
+      "id": "user_8",
+      "email": "layla@example.com",
+      "name": "ليلى عمر",
+      "phone": "+966508901234",
+      "role": "user",
+      "avatar": "👩‍💼"
+    },
+    {
+      "id": "user_9",
+      "email": "omar@example.com",
+      "name": "عمر يوسف",
+      "phone": "+966509012345",
+      "role": "user",
+      "avatar": "👨‍💼"
+    },
+    {
+      "id": "user_10",
+      "email": "zainab@example.com",
+      "name": "زينب محمود",
+      "phone": "+966510123456",
+      "role": "user",
+      "avatar": "👩‍💼"
+    },
+    {
+      "id": "owner_1",
+      "email": "owner1@example.com",
+      "name": "علي المالك",
+      "phone": "+966511234567",
+      "role": "owner",
+      "avatar": "🏠"
+    },
+    {
+      "id": "owner_2",
+      "email": "owner2@example.com",
+      "name": "فاطمة صاحبة العقار",
+      "phone": "+966512345678",
+      "role": "owner",
+      "avatar": "🏠"
+    },
+    {
+      "id": "owner_3",
+      "email": "owner3@example.com",
+      "name": "محمد مالك الفيلا",
+      "phone": "+966513456789",
+      "role": "owner",
+      "avatar": "🏠"
+    },
+    {
+      "id": "admin_1",
+      "email": "admin@example.com",
+      "name": "مدير النظام",
+      "phone": "+966514567890",
+      "role": "admin",
+      "avatar": "👨‍💻"
+    }
+  ],
+  "bookings": [
+    {
+      "id": "booking_1",
+      "apartmentName": "Desert Rose Suite",
+      "userEmail": "ahmed@example.com",
+      "checkIn": "2026-10-01",
+      "checkOut": "2026-10-05",
+      "numberOfGuests": 2,
+      "totalPrice": 2600,
+      "status": "confirmed",
+      "specialRequests": ""
+    },
+    {
+      "id": "booking_2",
+      "apartmentName": "Desert Rose Suite",
+      "userEmail": "fatima@example.com",
+      "checkIn": "2026-10-10",
+      "checkOut": "2026-10-15",
+      "numberOfGuests": 3,
+      "totalPrice": 3900,
+      "status": "confirmed",
+      "specialRequests": ""
+    },
+    {
+      "id": "booking_3",
+      "apartmentName": "Desert Rose Suite",
+      "userEmail": "sara@example.com",
+      "checkIn": "2026-10-20",
+      "checkOut": "2026-10-25",
+      "numberOfGuests": 2,
+      "totalPrice": 2600,
+      "status": "pending",
+      "specialRequests": ""
+    },
+    {
+      "id": "booking_4",
+      "apartmentName": "AlUla Cliffside Retreat",
+      "userEmail": "mohammed@example.com",
+      "checkIn": "2026-10-05",
+      "checkOut": "2026-10-10",
+      "numberOfGuests": 3,
+      "totalPrice": 6000,
+      "status": "confirmed",
+      "specialRequests": ""
+    },
+    {
+      "id": "booking_5",
+      "apartmentName": "AlUla Cliffside Retreat",
+      "userEmail": "noor@example.com",
+      "checkIn": "2026-10-15",
+      "checkOut": "2026-10-20",
+      "numberOfGuests": 4,
+      "totalPrice": 8000,
+      "status": "completed",
+      "specialRequests": ""
+    },
+    {
+      "id": "booking_6",
+      "apartmentName": "AlUla Cliffside Retreat",
+      "userEmail": "hana@example.com",
+      "checkIn": "2026-11-01",
+      "checkOut": "2026-11-05",
+      "numberOfGuests": 2,
+      "totalPrice": 4000,
+      "status": "pending",
+      "specialRequests": ""
+    },
+    {
+      "id": "booking_7",
+      "apartmentName": "Oasis Garden Studio",
+      "userEmail": "khalid@example.com",
+      "checkIn": "2026-10-02",
+      "checkOut": "2026-10-07",
+      "numberOfGuests": 1,
+      "totalPrice": 1750,
+      "status": "confirmed",
+      "specialRequests": ""
+    },
+    {
+      "id": "booking_8",
+      "apartmentName": "Oasis Garden Studio",
+      "userEmail": "layla@example.com",
+      "checkIn": "2026-10-12",
+      "checkOut": "2026-10-17",
+      "numberOfGuests": 2,
+      "totalPrice": 3500,
+      "status": "completed",
+      "specialRequests": ""
+    },
+    {
+      "id": "booking_9",
+      "apartmentName": "Oasis Garden Studio",
+      "userEmail": "omar@example.com",
+      "checkIn": "2026-10-25",
+      "checkOut": "2026-10-30",
+      "numberOfGuests": 1,
+      "totalPrice": 1750,
+      "status": "confirmed",
+      "specialRequests": ""
+    },
+    {
+      "id": "booking_10",
+      "apartmentName": "Dadan Luxury Villa",
+      "userEmail": "zainab@example.com",
+      "checkIn": "2026-10-08",
+      "checkOut": "2026-10-15",
+      "numberOfGuests": 8,
+      "totalPrice": 15400,
+      "status": "confirmed",
+      "specialRequests": ""
+    },
+    {
+      "id": "booking_11",
+      "apartmentName": "Dadan Luxury Villa",
+      "userEmail": "ahmed@example.com",
+      "checkIn": "2026-10-20",
+      "checkOut": "2026-10-28",
+      "numberOfGuests": 6,
+      "totalPrice": 13200,
+      "status": "pending",
+      "specialRequests": ""
+    },
+    {
+      "id": "booking_12",
+      "apartmentName": "Dadan Luxury Villa",
+      "userEmail": "fatima@example.com",
+      "checkIn": "2026-11-05",
+      "checkOut": "2026-11-10",
+      "numberOfGuests": 4,
+      "totalPrice": 8800,
+      "status": "confirmed",
+      "specialRequests": ""
+    },
+    {
+      "id": "booking_13",
+      "apartmentName": "Elephant Rock View",
+      "userEmail": "sara@example.com",
+      "checkIn": "2026-10-03",
+      "checkOut": "2026-10-08",
+      "numberOfGuests": 2,
+      "totalPrice": 3900,
+      "status": "completed",
+      "specialRequests": ""
+    },
+    {
+      "id": "booking_14",
+      "apartmentName": "Elephant Rock View",
+      "userEmail": "mohammed@example.com",
+      "checkIn": "2026-10-18",
+      "checkOut": "2026-10-23",
+      "numberOfGuests": 2,
+      "totalPrice": 3900,
+      "status": "confirmed",
+      "specialRequests": ""
+    },
+    {
+      "id": "booking_15",
+      "apartmentName": "Elephant Rock View",
+      "userEmail": "noor@example.com",
+      "checkIn": "2026-11-02",
+      "checkOut": "2026-11-07",
+      "numberOfGuests": 3,
+      "totalPrice": 5850,
+      "status": "pending",
+      "specialRequests": ""
+    },
+    {
+      "id": "booking_16",
+      "apartmentName": "Hegra Explorer's Lodge",
+      "userEmail": "hana@example.com",
+      "checkIn": "2026-10-04",
+      "checkOut": "2026-10-09",
+      "numberOfGuests": 1,
+      "totalPrice": 2600,
+      "status": "completed",
+      "specialRequests": ""
+    },
+    {
+      "id": "booking_17",
+      "apartmentName": "Hegra Explorer's Lodge",
+      "userEmail": "khalid@example.com",
+      "checkIn": "2026-10-14",
+      "checkOut": "2026-10-19",
+      "numberOfGuests": 2,
+      "totalPrice": 5200,
+      "status": "confirmed",
+      "specialRequests": ""
+    },
+    {
+      "id": "booking_18",
+      "apartmentName": "Hegra Explorer's Lodge",
+      "userEmail": "layla@example.com",
+      "checkIn": "2026-10-22",
+      "checkOut": "2026-10-26",
+      "numberOfGuests": 1,
+      "totalPrice": 2080,
+      "status": "pending",
+      "specialRequests": ""
+    },
+    {
+      "id": "booking_19",
+      "apartmentName": "Maraya Concert Suite",
+      "userEmail": "omar@example.com",
+      "checkIn": "2026-10-06",
+      "checkOut": "2026-10-11",
+      "numberOfGuests": 2,
+      "totalPrice": 4500,
+      "status": "confirmed",
+      "specialRequests": ""
+    },
+    {
+      "id": "booking_20",
+      "apartmentName": "Maraya Concert Suite",
+      "userEmail": "zainab@example.com",
+      "checkIn": "2026-10-16",
+      "checkOut": "2026-10-21",
+      "numberOfGuests": 3,
+      "totalPrice": 6750,
+      "status": "completed",
+      "specialRequests": ""
+    },
+    {
+      "id": "booking_21",
+      "apartmentName": "Maraya Concert Suite",
+      "userEmail": "ahmed@example.com",
+      "checkIn": "2026-11-03",
+      "checkOut": "2026-11-08",
+      "numberOfGuests": 2,
+      "totalPrice": 4500,
+      "status": "pending",
+      "specialRequests": ""
+    },
+    {
+      "id": "booking_22",
+      "apartmentName": "AlUla Farmhouse Retreat",
+      "userEmail": "fatima@example.com",
+      "checkIn": "2026-10-07",
+      "checkOut": "2026-10-13",
+      "numberOfGuests": 4,
+      "totalPrice": 5100,
+      "status": "confirmed",
+      "specialRequests": ""
+    },
+    {
+      "id": "booking_23",
+      "apartmentName": "AlUla Farmhouse Retreat",
+      "userEmail": "sara@example.com",
+      "checkIn": "2026-10-17",
+      "checkOut": "2026-10-24",
+      "numberOfGuests": 3,
+      "totalPrice": 5950,
+      "status": "completed",
+      "specialRequests": ""
+    },
+    {
+      "id": "booking_24",
+      "apartmentName": "AlUla Farmhouse Retreat",
+      "userEmail": "mohammed@example.com",
+      "checkIn": "2026-10-26",
+      "checkOut": "2026-11-02",
+      "numberOfGuests": 5,
+      "totalPrice": 7100,
+      "status": "confirmed",
+      "specialRequests": ""
+    },
+    {
+      "id": "booking_25",
+      "apartmentName": "Desert Rose Suite",
+      "userEmail": "noor@example.com",
+      "checkIn": "2026-09-15",
+      "checkOut": "2026-09-20",
+      "numberOfGuests": 2,
+      "totalPrice": 2600,
+      "status": "completed",
+      "specialRequests": ""
+    },
+    {
+      "id": "booking_26",
+      "apartmentName": "Oasis Garden Studio",
+      "userEmail": "hana@example.com",
+      "checkIn": "2026-09-10",
+      "checkOut": "2026-09-15",
+      "numberOfGuests": 1,
+      "totalPrice": 1750,
+      "status": "completed",
+      "specialRequests": ""
+    },
+    {
+      "id": "booking_27",
+      "apartmentName": "Dadan Luxury Villa",
+      "userEmail": "khalid@example.com",
+      "checkIn": "2026-09-20",
+      "checkOut": "2026-09-27",
+      "numberOfGuests": 6,
+      "totalPrice": 13200,
+      "status": "completed",
+      "specialRequests": ""
+    },
+    {
+      "id": "booking_28",
+      "apartmentName": "Elephant Rock View",
+      "userEmail": "layla@example.com",
+      "checkIn": "2026-09-18",
+      "checkOut": "2026-09-23",
+      "numberOfGuests": 2,
+      "totalPrice": 3900,
+      "status": "completed",
+      "specialRequests": ""
+    },
+    {
+      "id": "booking_29",
+      "apartmentName": "Hegra Explorer's Lodge",
+      "userEmail": "omar@example.com",
+      "checkIn": "2026-09-12",
+      "checkOut": "2026-09-16",
+      "numberOfGuests": 1,
+      "totalPrice": 2080,
+      "status": "completed",
+      "specialRequests": ""
+    },
+    {
+      "id": "booking_30",
+      "apartmentName": "Maraya Concert Suite",
+      "userEmail": "zainab@example.com",
+      "checkIn": "2026-09-25",
+      "checkOut": "2026-09-30",
+      "numberOfGuests": 2,
+      "totalPrice": 4500,
+      "status": "completed",
+      "specialRequests": ""
+    }
+  ],
+  "reviews": {
+    "Desert Rose Suite": {
+      "averageRating": 4.9,
+      "totalReviews": 15,
+      "reviews": [
+        {
+          "rating": 5,
+          "comment": "شقة رائعة جداً، الإطلالة خيالية والضيافة ممتازة"
+        },
+        {
+          "rating": 5,
+          "comment": "تجربة لا تنسى، سأعود بكل تأكيد"
+        },
+        {
+          "rating": 4,
+          "comment": "جميلة لكن قليلاً بعيدة عن المركز"
+        },
+        {
+          "rating": 5,
+          "comment": "الغروب من الشرفة لا يُوصف، روعة"
+        },
+        {
+          "rating": 5,
+          "comment": "نظيفة جداً وحديثة، كل شيء يعمل بشكل مثالي"
+        },
+        {
+          "rating": 4,
+          "comment": "جيدة جداً، بس الانترنت كان بطيء قليلاً"
+        },
+        {
+          "rating": 5,
+          "comment": "قيمة الفلوس تستحق كل ريال"
+        },
+        {
+          "rating": 5,
+          "comment": "موقع ممتاز جداً وقريب من المواقع السياحية"
+        },
+        {
+          "rating": 4,
+          "comment": "راقية ومريحة"
+        },
+        {
+          "rating": 5,
+          "comment": "صاحب الشقة محترم جداً وخدمة عالية"
+        },
+        {
+          "rating": 5,
+          "comment": "أنصح بها بقوة"
+        },
+        {
+          "rating": 5,
+          "comment": "الطعام في الفطور ممتاز"
+        },
+        {
+          "rating": 4,
+          "comment": "جيدة لكن أغلى من المتوسط"
+        },
+        {
+          "rating": 5,
+          "comment": "تجربة فاخرة بسعر معقول نسبياً"
+        },
+        {
+          "rating": 5,
+          "comment": "كل التفاصيل مراعاة بعناية"
+        }
+      ]
+    },
+    "AlUla Cliffside Retreat": {
+      "averageRating": 4.8,
+      "totalReviews": 15,
+      "reviews": [
+        {
+          "rating": 5,
+          "comment": "إطلالة من أحلام الجنة"
+        },
+        {
+          "rating": 5,
+          "comment": "الموقع جميل جداً، تصوير رائع"
+        },
+        {
+          "rating": 5,
+          "comment": "فقط كلمة واحدة: رووعة"
+        },
+        {
+          "rating": 4,
+          "comment": "جميلة لكن التكييف قوي شوي"
+        },
+        {
+          "rating": 5,
+          "comment": "الأفضل في العلا بلا منازع"
+        }
+      ]
+    },
+    "Oasis Garden Studio": {
+      "averageRating": 4.7,
+      "totalReviews": 12,
+      "reviews": [
+        {
+          "rating": 5,
+          "comment": "أرخص شقة لكن بأفضل جودة"
+        },
+        {
+          "rating": 4,
+          "comment": "جيدة وسط البلد"
+        },
+        {
+          "rating": 5,
+          "comment": "مكان هادي وجميل"
+        }
+      ]
+    },
+    "Dadan Luxury Villa": {
+      "averageRating": 4.95,
+      "totalReviews": 18,
+      "reviews": [
+        {
+          "rating": 5,
+          "comment": "فيلا حقيقية وليس محاكاة"
+        },
+        {
+          "rating": 5,
+          "comment": "أفضل فيلا في العلا"
+        },
+        {
+          "rating": 5,
+          "comment": "مناسبة للعائلات الكبيرة"
+        }
+      ]
+    },
+    "Elephant Rock View": {
+      "averageRating": 4.85,
+      "totalReviews": 14,
+      "reviews": [
+        {
+          "rating": 5,
+          "comment": "إطلالة على الفيل الشهير"
+        },
+        {
+          "rating": 5,
+          "comment": "موقع سياحي فريد"
+        },
+        {
+          "rating": 4,
+          "comment": "جميلة لكن ضيقة قليلاً"
+        }
+      ]
+    },
+    "Hegra Explorer's Lodge": {
+      "averageRating": 4.75,
+      "totalReviews": 11,
+      "reviews": [
+        {
+          "rating": 5,
+          "comment": "قريبة من موقع هجر الأثري"
+        },
+        {
+          "rating": 5,
+          "comment": "موقع استثنائي"
+        }
+      ]
+    },
+    "Maraya Concert Suite": {
+      "averageRating": 4.6,
+      "totalReviews": 10,
+      "reviews": [
+        {
+          "rating": 5,
+          "comment": "قريبة من قاعة مرآة الحفلات"
+        },
+        {
+          "rating": 5,
+          "comment": "موقع حفلات فريد"
+        }
+      ]
+    },
+    "AlUla Farmhouse Retreat": {
+      "averageRating": 4.88,
+      "totalReviews": 12,
+      "reviews": [
+        {
+          "rating": 5,
+          "comment": "مزرعة حقيقية وفاخرة"
+        },
+        {
+          "rating": 5,
+          "comment": "الطبيعة والراحة في مكان واحد"
+        }
+      ]
+    }
+  },
+  "favorites": [
+    {
+      "userEmail": "ahmed@example.com",
+      "apartments": ["Desert Rose Suite", "Dadan Luxury Villa", "Elephant Rock View"]
+    },
+    {
+      "userEmail": "fatima@example.com",
+      "apartments": ["AlUla Cliffside Retreat", "AlUla Farmhouse Retreat"]
+    },
+    {
+      "userEmail": "sara@example.com",
+      "apartments": ["Oasis Garden Studio", "Hegra Explorer's Lodge", "Maraya Concert Suite"]
+    },
+    {
+      "userEmail": "mohammed@example.com",
+      "apartments": ["Dadan Luxury Villa", "Elephant Rock View"]
+    },
+    {
+      "userEmail": "noor@example.com",
+      "apartments": ["AlUla Cliffside Retreat", "Desert Rose Suite"]
+    }
+  ]
+}
