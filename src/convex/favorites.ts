@@ -1,4 +1,5 @@
 import { mutation, query } from "./_generated/server";
+import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { requireUser } from "./lib/authorization";
 
@@ -25,7 +26,7 @@ export const list = query({
 export const isFavorited = query({
   args: { apartmentId: v.id("apartments") },
   handler: async (ctx, args) => {
-    const userId = (await ctx.auth.getUserIdentity())?.subject;
+    const userId = await getAuthUserId(ctx);
     if (!userId) return false;
 
     const existing = await ctx.db

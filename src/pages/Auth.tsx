@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/input-otp";
 
 import { useAuth } from "@/hooks/use-auth";
+import { DEMO_MODE } from "@/lib/demo-data";
 import logo from "@/assets/logo.svg";
 import { ArrowRight, Loader2, Mail, UserX } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
@@ -53,7 +54,9 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
       navigate(redirect);
     }
   }, [authLoading, isAuthenticated, navigate, redirect]);
+  const demoBlock = async () => { setError("الوضع التجريبي: اربط VITE_CONVEX_URL لتفعيل تسجيل الدخول."); };
   const handleEmailSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    if (DEMO_MODE) { event.preventDefault(); await demoBlock(); return; }
     event.preventDefault();
     setIsLoading(true);
     setError(null);
@@ -70,6 +73,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
   };
 
   const handleOtpSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    if (DEMO_MODE) { event.preventDefault(); await demoBlock(); return; }
     event.preventDefault();
     setIsLoading(true);
     setError(null);
@@ -87,6 +91,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
   };
 
   const handleGuestLogin = async () => {
+    if (DEMO_MODE) { await demoBlock(); return; }
     setIsLoading(true);
     setError(null);
     try {

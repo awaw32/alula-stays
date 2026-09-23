@@ -4,6 +4,7 @@ import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import { getApartmentDescription, getApartmentLocation, getApartmentRules, getApartmentTitle, formatArabicDate, getAmenityLabel } from "@/lib/apartment-content";
+import { DEMO_MODE, DEMO_APARTMENTS } from "@/lib/demo-data";
 import { getErrorMessage } from "@/lib/error-message";
 import { toast } from "sonner";
 import { useParams, Link, useNavigate } from "react-router";
@@ -119,9 +120,12 @@ export default function ApartmentDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const apartmentId = id as Id<"apartments"> | undefined;
-  const apartment = useQuery(api.apartments.get, apartmentId ? { apartmentId } : "skip");
-  const reviews = useQuery(api.reviews.list, apartmentId ? { apartmentId } : "skip");
-  const isFavorited = useQuery(api.favorites.isFavorited, apartmentId ? { apartmentId } : "skip");
+  const liveApartment = useQuery(api.apartments.get, DEMO_MODE || !apartmentId ? "skip" : { apartmentId });
+  const liveReviews = useQuery(api.reviews.list, DEMO_MODE || !apartmentId ? "skip" : { apartmentId });
+  const liveFavorited = useQuery(api.favorites.isFavorited, DEMO_MODE || !apartmentId ? "skip" : { apartmentId });
+  const apartment = DEMO_MODE ? (DEMO_APARTMENTS.find((a) => a._id === id) ?? null) : liveApartment;
+  const reviews = DEMO_MODE ? [] : liveReviews;
+  const isFavorited = DEMO_MODE ? false : liveFavorited;
   const toggleFavorite = useMutation(api.favorites.toggle);
   const createBooking = useMutation(api.bookings.create);
   const createReview = useMutation(api.reviews.create);
@@ -133,12 +137,13 @@ export default function ApartmentDetail() {
   const [checkOut, setCheckOut] = useState<Date | null>(null);
   const [guests, setGuests] = useState(2);
 
-  const availability = useQuery(
+  const liveAvailability = useQuery(
     api.bookings.checkAvailability,
-    apartmentId && checkIn && checkOut
-      ? { apartmentId, checkIn: checkIn.getTime(), checkOut: checkOut.getTime() }
-      : "skip",
+    DEMO_MODE || !apartmentId || !checkIn || !checkOut
+      ? "skip"
+      : { apartmentId, checkIn: checkIn.getTime(), checkOut: checkOut.getTime() },
   );
+  const availability = DEMO_MODE ? { available: true } : liveAvailability;
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [bookingSuccess, setBookingSuccess] = useState<BookingSuccess | null>(null);
@@ -158,6 +163,7 @@ export default function ApartmentDetail() {
   const platformFee = Math.round(totalPrice * 0.1);
 
   const handleBooking = async () => {
+    if (DEMO_MODE) { toast.error("الوضع التجريبي: اربط Convex لتفعيل الحجز."); return; }
     if (!checkIn || !checkOut || !apartmentId) return;
     setBookingLoading(true);
     setBookingError(null);
@@ -184,6 +190,7 @@ export default function ApartmentDetail() {
   };
 
   const handleReview = async () => {
+    if (DEMO_MODE) { toast.error("الوضع التجريبي: اربط Convex لإرسال التقييم."); return; }
     if (!apartmentId || !reviewComment.trim()) return;
     setReviewLoading(true);
     setReviewError(null);
@@ -207,6 +214,7 @@ export default function ApartmentDetail() {
   };
 
   const handleFavorite = async () => {
+    if (DEMO_MODE) { toast.error("الوضع التجريبي: اربط Convex لحفظ المفضلة."); return; }
     if (!apartmentId) return;
     try {
       const result = await toggleFavorite({ apartmentId });

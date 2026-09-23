@@ -8,6 +8,22 @@ import {
   requireRole,
   requireUser,
 } from "./lib/authorization";
+import {
+  validateBookingDates,
+  validateGuests,
+  validatePrice,
+} from "./lib/validation";
+import {
+  ERROR_MESSAGES,
+  ValidationError,
+  assertExists,
+} from "./lib/errors";
+import {
+  calculateTotalPrice,
+  calculatePlatformFee,
+  calculateRefund,
+} from "./lib/money";
+import { checkRateLimit } from "./lib/rateLimiting";
 
 const DAY_MS = 1000 * 60 * 60 * 24;
 const bookingStatusValidator = v.union(
@@ -112,133 +128,184 @@ export const create = mutation({
     guests: v.number(),
   },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    const apartment = await ctx.db.get(args.apartmentId);
+    try {
+      // التحقق من تسجيل الدخول
+      const user = await requireUser(ctx);
 
-    if (!apartment) {
-      throw new Error("الشقة غير موجودة");
+      // التحقق من معدل الطلبات
+      if (!checkRateLimit(user._id, "BOOKING")) {
+        throw new ValidationError(ERROR_MESSAGES.RATE_LIMIT_EXCEEDED);
+      }
+
+      // جلب الشقة والتحقق من وجودها
+      const apartmentData = await ctx.db.get(args.apartmentId);
+      if (!apartmentData) {
+        throw new ValidationError(ERROR_MESSAGES.APARTMENT_NOT_FOUND);
+      }
+      const apartment = apartmentData;
+
+      // التحقق من أن الشقة متاحة
+      if (apartment.available === false) {
+        throw new ValidationError(ERROR_MESSAGES.APARTMENT_UNAVAILABLE);
+      }
+
+      // التحقق من صحة السعر
+      validatePrice(apartment.price);
+
+      // التحقق من صحة التواريخ
+      const totalNights = validateBookingDates(args.checkIn, args.checkOut);
+
+      // التحقق من صحة عدد الضيوف
+      validateGuests(args.guests, apartment.maxGuests);
+
+      // التحقق من عدم وجود حجوزات متعارضة
+      const bookings = await ctx.db
+        .query("bookings")
+        .withIndex("by_apartment", (q) => q.eq("apartmentId", args.apartmentId))
+        .collect();
+
+      const hasOverlap = bookings.some(
+        (booking) =>
+          booking.status !== "cancelled" &&
+          args.checkIn < booking.checkOut &&
+          args.checkOut > booking.checkIn,
+      );
+
+      if (hasOverlap) {
+        throw new ValidationError(ERROR_MESSAGES.BOOKING_DATES_UNAVAILABLE);
+      }
+
+      // حساب الأسعار بأمان
+      const totalPrice = calculateTotalPrice(totalNights, apartment.price);
+      const platformFee = calculatePlatformFee(totalPrice, 10); // 10% رسوم
+
+      // إنشاء الحجز
+      const bookingId = await ctx.db.insert("bookings", {
+        apartmentId: args.apartmentId,
+        userId: user._id,
+        checkIn: args.checkIn,
+        checkOut: args.checkOut,
+        guests: args.guests,
+        totalNights,
+        pricePerNight: apartment.price,
+        totalPrice,
+        platformFee,
+        status: "pending",
+        paymentStatus: "unpaid",
+        createdAt: Date.now(),
+      });
+
+      return { bookingId, totalPrice, platformFee, totalNights };
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        throw error;
+      }
+      throw new ValidationError(
+        error instanceof Error ? error.message : "فشل إنشاء الحجز"
+      );
     }
-    if (apartment.available === false) {
-      throw new Error("الشقة غير متاحة حالياً");
-    }
-    if (!Number.isInteger(args.guests) || args.guests < 1) {
-      throw new Error("عدد الضيوف غير صالح");
-    }
-    if (args.guests > apartment.maxGuests) {
-      throw new Error("عدد الضيوف يتجاوز الحد المسموح");
-    }
-
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    if (
-      !Number.isFinite(args.checkIn) ||
-      !Number.isFinite(args.checkOut) ||
-      args.checkIn < startOfToday.getTime() ||
-      args.checkOut <= args.checkIn
-    ) {
-      throw new Error("تواريخ الحجز غير صالحة");
-    }
-
-    const totalNights = Math.ceil((args.checkOut - args.checkIn) / DAY_MS);
-    if (totalNights < 1) {
-      throw new Error("يجب أن يكون الحجز ليلة على الأقل");
-    }
-
-    const bookings = await ctx.db
-      .query("bookings")
-      .withIndex("by_apartment", (q) => q.eq("apartmentId", args.apartmentId))
-      .collect();
-    const hasOverlap = bookings.some(
-      (booking) =>
-        booking.status !== "cancelled" &&
-        args.checkIn < booking.checkOut &&
-        args.checkOut > booking.checkIn,
-    );
-
-    if (hasOverlap) {
-      throw new Error("التواريخ غير متاحة — يوجد حجز في هذه الأيام");
-    }
-
-    const totalPrice = totalNights * apartment.price;
-    const platformFee = Math.round(totalPrice * 0.1);
-
-    const bookingId = await ctx.db.insert("bookings", {
-      apartmentId: args.apartmentId,
-      userId: user._id,
-      checkIn: args.checkIn,
-      checkOut: args.checkOut,
-      guests: args.guests,
-      totalNights,
-      pricePerNight: apartment.price,
-      totalPrice,
-      platformFee,
-      status: "pending",
-      paymentStatus: "unpaid",
-      createdAt: Date.now(),
-    });
-
-    return { bookingId, totalPrice, platformFee, totalNights };
   },
 });
 
 export const confirm = mutation({
   args: { bookingId: v.id("bookings") },
   handler: async (ctx, args) => {
-    await requireRole(ctx, "admin");
-    const booking = await ctx.db.get(args.bookingId);
+    try {
+      await requireRole(ctx, "admin");
+      const bookingData = await ctx.db.get(args.bookingId);
 
-    if (!booking) {
-      throw new Error("الحجز غير موجود");
+      if (!bookingData) {
+        throw new ValidationError(ERROR_MESSAGES.BOOKING_NOT_FOUND);
+      }
+      const booking = bookingData;
+
+      if (booking.status !== "pending") {
+        throw new ValidationError(ERROR_MESSAGES.BOOKING_CANNOT_CONFIRM);
+      }
+
+      await ctx.db.patch(args.bookingId, {
+        status: "confirmed",
+        paymentStatus: "paid",
+      });
+
+      return "تم تأكيد الحجز";
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        throw error;
+      }
+      throw new ValidationError(
+        error instanceof Error ? error.message : "فشل تأكيد الحجز"
+      );
     }
-    if (booking.status !== "pending") {
-      throw new Error("لا يمكن تأكيد هذا الحجز");
-    }
-
-    await ctx.db.patch(args.bookingId, {
-      status: "confirmed",
-      paymentStatus: "paid",
-    });
-
-    return "تم تأكيد الحجز";
   },
 });
 
 export const cancel = mutation({
   args: { bookingId: v.id("bookings") },
   handler: async (ctx, args) => {
-    const { user, booking } = await requireBookingAccess(ctx, args.bookingId);
-    if (user.role !== "admin" && booking.userId !== user._id) {
-      throw new Error("لا يمكنك إلغاء هذا الحجز");
+    try {
+      const { user, booking } = await requireBookingAccess(ctx, args.bookingId);
+
+      // التحقق من الصلاحيات
+      if (user.role !== "admin" && booking.userId !== user._id) {
+        throw new ValidationError(ERROR_MESSAGES.UNAUTHORIZED);
+      }
+
+      // التحقق من أن الحجز قابل للإلغاء
+      if (booking.status === "cancelled" || booking.status === "completed") {
+        throw new ValidationError(ERROR_MESSAGES.BOOKING_CANNOT_CANCEL);
+      }
+
+      // حساب الوقت المتبقي قبل تاريخ الوصول
+      const hoursUntilCheckin = (booking.checkIn - Date.now()) / (1000 * 60 * 60);
+
+      // حساب الاسترجاع بأمان
+      const { refundPercentage, refundAmount, feeRefund } = calculateRefund(
+        booking.totalPrice,
+        booking.platformFee,
+        hoursUntilCheckin
+      );
+
+      // تحديد حالة الدفع بناءً على الاسترجاع
+      const paymentStatus =
+        booking.paymentStatus !== "paid"
+          ? "unpaid"
+          : refundPercentage === 100
+            ? "refunded"
+            : "paid";
+
+      // تحديث الحجز
+      await ctx.db.patch(args.bookingId, {
+        status: "cancelled",
+        paymentStatus,
+      });
+
+      // رسالة نتيجة واضحة
+      const getMessage = () => {
+        if (refundPercentage === 100) {
+          return "تم الإلغاء واسترداد المبلغ بالكامل";
+        }
+        if (refundPercentage === 50) {
+          return "تم الإلغاء واسترداد 50% من المبلغ";
+        }
+        return "تم الإلغاء بدون استرداد (أقل من 24 ساعة)";
+      };
+
+      return {
+        cancelled: true,
+        refundPercentage,
+        refundAmount,
+        feeRefund,
+        message: getMessage(),
+      };
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        throw error;
+      }
+      throw new ValidationError(
+        error instanceof Error ? error.message : "فشل إلغاء الحجز"
+      );
     }
-    if (booking.status === "cancelled" || booking.status === "completed") {
-      throw new Error("لا يمكن إلغاء هذا الحجز");
-    }
-
-    const hoursUntilCheckin = (booking.checkIn - Date.now()) / (1000 * 60 * 60);
-    const refundPercentage =
-      hoursUntilCheckin < 24 ? 0 : hoursUntilCheckin < 72 ? 50 : 100;
-    const paymentStatus =
-      booking.paymentStatus !== "paid"
-        ? "unpaid"
-        : refundPercentage === 100
-          ? "refunded"
-          : "paid";
-
-    await ctx.db.patch(args.bookingId, {
-      status: "cancelled",
-      paymentStatus,
-    });
-
-    return {
-      cancelled: true,
-      refundPercentage,
-      message:
-        refundPercentage === 100
-          ? "تم الإلغاء واسترداد المبلغ بالكامل"
-          : refundPercentage === 50
-            ? "تم الإلغاء واسترداد 50% من المبلغ"
-            : "تم الإلغاء بدون استرداد (أقل من 24 ساعة)",
-    };
   },
 });
 

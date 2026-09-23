@@ -1,5 +1,3 @@
-import type { ApartmentFormValues } from "@/types/apartment";
-
 type ApartmentContent = {
   title: string;
   titleAr?: string;

@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Navigation } from "@/components/Navigation";
 import { useQuery, useMutation } from "convex/react";
+import { DEMO_MODE } from "@/lib/demo-data";
 import { api } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import { useAuth } from "@/hooks/use-auth";
@@ -33,8 +34,8 @@ const fadeUp = {
 export default function OwnerDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const myApartments = useQuery(api.admin.ownerApartments);
-  const myBookings = useQuery(api.bookings.ownerBookings);
+  const myApartments = useQuery(api.admin.ownerApartments, DEMO_MODE ? "skip" : undefined);
+  const myBookings = useQuery(api.bookings.ownerBookings, DEMO_MODE ? "skip" : undefined);
   const deleteApartment = useMutation(api.admin.deleteApartment);
   const [activeTab, setActiveTab] = useState<"apartments" | "bookings">("apartments");
   const [deleting, setDeleting] = useState<string | null>(null);

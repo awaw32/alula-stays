@@ -1,4 +1,5 @@
 import { mutation } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 
 export const seed = mutation({
   handler: async (ctx) => {
@@ -270,7 +271,7 @@ descriptionAr: "تقع في حي الفنون النابض بالحياة بال
       },
     ];
 
-    const aptIds: string[] = [];
+    const aptIds: Id<"apartments">[] = [];
     for (const apartment of apartments) {
       const id = await ctx.db.insert("apartments", { ...apartment, available: true });
       aptIds.push(id);

@@ -3,6 +3,7 @@ import { Navigation } from "@/components/Navigation";
 import { ApartmentCard } from "@/components/ApartmentCard";
 import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
+import { DEMO_MODE, DEMO_APARTMENTS, DEMO_STATS } from "@/lib/demo-data";
 import { Link } from "react-router";
 import type { ApartmentRecord } from "@/types/apartment";
 import {
@@ -79,8 +80,16 @@ const alUlaHighlights = [
 ];
 
 export default function Landing() {
-  const featuredApartments = useQuery(api.apartments.featured);
-  const stats = useQuery(api.apartments.stats);
+  const liveFeatured = useQuery(
+    api.apartments.featured,
+    DEMO_MODE ? "skip" : undefined,
+  );
+  const liveStats = useQuery(
+    api.apartments.stats,
+    DEMO_MODE ? "skip" : undefined,
+  );
+  const featuredApartments = DEMO_MODE ? DEMO_APARTMENTS.slice(0, 3) : liveFeatured;
+  const stats = DEMO_MODE ? DEMO_STATS : liveStats;
 
   return (
     <div className="min-h-screen bg-[var(--background)] pb-24 md:pb-0">

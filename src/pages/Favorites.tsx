@@ -3,6 +3,7 @@ import { Navigation } from "@/components/Navigation";
 import { ApartmentCard } from "@/components/ApartmentCard";
 import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
+import { DEMO_MODE } from "@/lib/demo-data";
 import { Link } from "react-router";
 import type { ApartmentRecord } from "@/types/apartment";
 import { Heart, Search } from "lucide-react";
@@ -17,7 +18,8 @@ const fadeUp = {
 };
 
 export default function Favorites() {
-  const favorites = useQuery(api.favorites.list);
+  const liveFavorites = useQuery(api.favorites.list, DEMO_MODE ? "skip" : undefined);
+  const favorites = DEMO_MODE ? [] : liveFavorites;
 
   return (
     <div className="min-h-screen bg-[var(--background)] pb-24 md:pb-0">

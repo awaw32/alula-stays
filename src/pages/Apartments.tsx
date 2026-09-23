@@ -3,6 +3,7 @@ import { Navigation } from "@/components/Navigation";
 import { ApartmentCard } from "@/components/ApartmentCard";
 import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
+import { DEMO_MODE, DEMO_APARTMENTS } from "@/lib/demo-data";
 import { useState, useMemo } from "react";
 import type { ApartmentRecord } from "@/types/apartment";
 import {
@@ -60,13 +61,20 @@ export default function Apartments() {
   const [maxPrice, setMaxPrice] = useState<number | "">("");
   const [showFilters, setShowFilters] = useState(false);
 
-  const apartments = useQuery(api.apartments.list, {
-    location: selectedLocation === "all" ? undefined : selectedLocation,
-    bedrooms: bedrooms > 0 ? bedrooms : undefined,
-    minPrice: minPrice !== "" ? minPrice : undefined,
-    maxPrice: maxPrice !== "" ? maxPrice : undefined,
-    sortBy: sortBy === "recommended" ? undefined : sortBy,
-  });
+  const liveApartments = useQuery(
+    api.apartments.list,
+    DEMO_MODE
+      ? "skip"
+      : {
+          location: selectedLocation === "all" ? undefined : selectedLocation,
+          bedrooms: bedrooms > 0 ? bedrooms : undefined,
+          minPrice: minPrice !== "" ? minPrice : undefined,
+          maxPrice: maxPrice !== "" ? maxPrice : undefined,
+          sortBy: sortBy === "recommended" ? undefined : sortBy,
+        },
+  );
+
+  const apartments = DEMO_MODE ? DEMO_APARTMENTS : liveApartments;
 
   const filteredApartments = useMemo(() => {
     if (!apartments) return [];

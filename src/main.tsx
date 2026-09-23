@@ -2,8 +2,9 @@ import '@vly-ai/integrations';
 import { Toaster } from "@/components/ui/sonner";
 import { RequireAuth, RequireRole } from "@/components/RequireAuth";
 import { VlyToolbar } from "../vly-toolbar-readonly.tsx";
+import { DEMO_MODE } from "@/lib/demo-data";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
-import { ConvexReactClient } from "convex/react";
+import { ConvexReactClient, ConvexProvider } from "convex/react";
 import React, { StrictMode, useEffect, lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router";
@@ -88,8 +89,10 @@ class RootErrorBoundary extends React.Component<
   }
 }
 
-const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string);
-const routerBasename = import.meta.env.BASE_URL.replace(/\/$/, "") || undefined;
+const convexUrl = import.meta.env.VITE_CONVEX_URL as string | undefined;
+const routerBasename =
+  (import.meta.env.BASE_URL as string | undefined)?.replace(/\/$/, "") ||
+  undefined;
 
 function RouteSyncer() {
   const location = useLocation();
@@ -115,86 +118,134 @@ function RouteSyncer() {
 }
 
 
+function DemoBanner() {
+  if (!DEMO_MODE) return null;
+  return (
+    <div
+      dir="rtl"
+      className="sticky top-0 z-50 bg-amber-100 text-amber-900 text-xs sm:text-sm px-4 py-2 text-center border-b border-amber-200"
+    >
+      الوضع التجريبي: يتم عرض بيانات تجريبية. اربط{" "}
+      <code dir="ltr" className="font-mono">VITE_CONVEX_URL</code> لتفعيل الحجوزات
+      وتسجيل الدخول.
+    </div>
+  );
+}
+
+function AppRoutes() {
+  return (
+    <BrowserRouter basename={routerBasename}>
+      <RouteSyncer />
+      <DemoBanner />
+      <Suspense fallback={<RouteLoading />}>
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/apartments" element={<Apartments />} />
+          <Route path="/apartment/:id" element={<ApartmentDetail />} />
+          <Route
+            path="/favorites"
+            element={
+              <RequireAuth>
+                <Favorites />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/my-bookings"
+            element={
+              <RequireAuth>
+                <MyBookings />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/auth"
+            element={<AuthPage redirectAfterAuth="/dashboard" />}
+          />
+          <Route
+            path="/dashboard"
+            element={
+              <RequireAuth>
+                <Dashboard />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/owner"
+            element={
+              <RequireRole roles={["owner", "admin"]}>
+                <OwnerDashboard />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/owner/add"
+            element={
+              <RequireRole roles={["owner", "admin"]}>
+                <AddApartment />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/owner/edit/:id"
+            element={
+              <RequireRole roles={["owner", "admin"]}>
+                <EditApartment />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <RequireRole roles={["admin"]}>
+                <AdminDashboard />
+              </RequireRole>
+            }
+          />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
+    </BrowserRouter>
+  );
+}
+
+function AppRoot() {
+  const convexClient = React.useMemo(() => {
+    const url = DEMO_MODE ? "https://demo-dummy.convex.cloud" : convexUrl;
+    if (!url) return null;
+    try {
+      return new ConvexReactClient(url);
+    } catch (err) {
+      console.error("[Convex] init failed:", err);
+      return null;
+    }
+  }, []);
+
+  // Demo mode: all queries use "skip" so the dummy client never makes
+  // network calls — no useQuery is ever executed without a provider.
+  if (!convexClient) return <RouteLoading />;
+  if (DEMO_MODE) {
+    return (
+      <ConvexProvider client={convexClient}>
+        <AppRoutes />
+      </ConvexProvider>
+    );
+  }
+  return (
+    <ConvexAuthProvider client={convexClient}>
+      <AppRoutes />
+    </ConvexAuthProvider>
+  );
+}
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <RootErrorBoundary>
       <ToolbarErrorBoundary>
         <VlyToolbar />
       </ToolbarErrorBoundary>
-      <ConvexAuthProvider client={convex}>
-        <BrowserRouter basename={routerBasename}>
-          <RouteSyncer />
-          <Suspense fallback={<RouteLoading />}>
-            <Routes>
-              <Route path="/" element={<Landing />} />
-              <Route path="/apartments" element={<Apartments />} />
-              <Route path="/apartment/:id" element={<ApartmentDetail />} />
-              <Route
-                path="/favorites"
-                element={
-                  <RequireAuth>
-                    <Favorites />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="/my-bookings"
-                element={
-                  <RequireAuth>
-                    <MyBookings />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="/auth"
-                element={<AuthPage redirectAfterAuth="/dashboard" />}
-              />
-              <Route
-                path="/dashboard"
-                element={
-                  <RequireAuth>
-                    <Dashboard />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="/owner"
-                element={
-                  <RequireRole roles={["owner", "admin"]}>
-                    <OwnerDashboard />
-                  </RequireRole>
-                }
-              />
-              <Route
-                path="/owner/add"
-                element={
-                  <RequireRole roles={["owner", "admin"]}>
-                    <AddApartment />
-                  </RequireRole>
-                }
-              />
-              <Route
-                path="/owner/edit/:id"
-                element={
-                  <RequireRole roles={["owner", "admin"]}>
-                    <EditApartment />
-                  </RequireRole>
-                }
-              />
-              <Route
-                path="/admin"
-                element={
-                  <RequireRole roles={["admin"]}>
-                    <AdminDashboard />
-                  </RequireRole>
-                }
-              />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
-        </BrowserRouter>
-        <Toaster />
-      </ConvexAuthProvider>
+      <AppRoot />
+      <Toaster />
     </RootErrorBoundary>
   </StrictMode>,
 );

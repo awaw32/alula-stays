@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Navigation } from "@/components/Navigation";
 import { useQuery, useMutation } from "convex/react";
+import { DEMO_MODE } from "@/lib/demo-data";
 import { api } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import { useAuth } from "@/hooks/use-auth";
@@ -34,9 +35,9 @@ const fadeUp = {
 
 export default function AdminDashboard() {
   const { user } = useAuth();
-  const stats = useQuery(api.admin.adminDashboardStats);
-  const allApartments = useQuery(api.admin.allApartments);
-  const allUsers = useQuery(api.admin.allUsers);
+  const stats = useQuery(api.admin.adminDashboardStats, DEMO_MODE ? "skip" : undefined);
+  const allApartments = useQuery(api.admin.allApartments, DEMO_MODE ? "skip" : undefined);
+  const allUsers = useQuery(api.admin.allUsers, DEMO_MODE ? "skip" : undefined);
   const verifyApartment = useMutation(api.admin.adminVerifyApartment);
   const featureApartment = useMutation(api.admin.adminFeatureApartment);
   const updateRole = useMutation(api.admin.adminUpdateUserRole);

@@ -3,6 +3,7 @@ import { ApartmentForm } from "@/components/apartments/ApartmentForm";
 import { useAuth } from "@/hooks/use-auth";
 import type { ApartmentFormValues, ApartmentRecord } from "@/types/apartment";
 import { useMutation, useQuery } from "convex/react";
+import { DEMO_MODE } from "@/lib/demo-data";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Loader2 } from "lucide-react";
@@ -36,7 +37,8 @@ export default function EditApartment() {
   const { id } = useParams<{ id: string }>();
   const { role } = useAuth();
   const navigate = useNavigate();
-  const apartments = useQuery(api.admin.ownerApartments);
+  const liveApartments = useQuery(api.admin.ownerApartments, DEMO_MODE ? "skip" : undefined);
+  const apartments = DEMO_MODE ? [] : liveApartments;
   const updateApartment = useMutation(api.admin.updateApartment);
   const apartment = apartments?.find((item) => item._id === id);
 

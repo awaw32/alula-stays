@@ -2,6 +2,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Navigation } from "@/components/Navigation";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { DEMO_MODE } from "@/lib/demo-data";
 import type { Id } from "@/convex/_generated/dataModel";
 import { getApartmentLocation, getApartmentTitle, formatArabicDate } from "@/lib/apartment-content";
 import { getErrorMessage } from "@/lib/error-message";
@@ -30,7 +31,8 @@ export default function MyBookings() {
   const [now] = useState(() => Date.now());
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const bookings = useQuery(api.bookings.list, {});
+  const liveBookings = useQuery(api.bookings.list, DEMO_MODE ? "skip" : {});
+  const bookings = DEMO_MODE ? [] : liveBookings;
   const cancelBooking = useMutation(api.bookings.cancel);
   const verifyPayment = useAction(api.payments.verifyPayment);
 
@@ -40,6 +42,7 @@ export default function MyBookings() {
   useEffect(() => {
     if (!sessionId || !bookingId) return;
     let active = true;
+    if (DEMO_MODE) return;
     void verifyPayment({ bookingId: bookingId as Id<"bookings">, sessionId })
       .then((result) => {
         if (!active) return;
