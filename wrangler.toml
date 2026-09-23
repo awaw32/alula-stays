@@ -1,21 +1,7 @@
 name = "alula-stays"
-type = "javascript"
 compatibility_date = "2024-09-23"
-
-[env.production]
-name = "alula-stays-prod"
-vars = { ENVIRONMENT = "production" }
-
-[env.development]
-vars = { ENVIRONMENT = "development" }
 
 [assets]
 directory = "./dist"
 
-[build]
-command = "bun run build"
-cwd = "./"
-
-[dev]
-port = 5173
 
