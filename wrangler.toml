@@ -1,27 +1,34 @@
 name = "alula-stays"
-main = "dist/index.js"
 type = "javascript"
 compatibility_date = "2024-09-23"
 
-# Build configuration
-[build]
-command = "bun run build"
-cwd = "./"
-watch_paths = ["src/**/*.tsx", "src/**/*.ts"]
-
-# Environment variables
 [env.production]
+name = "alula-stays-prod"
+routes = [
+  { pattern = "alula-stays.pages.dev", zone_name = "" }
+]
 vars = { ENVIRONMENT = "production" }
 
 [env.development]
 vars = { ENVIRONMENT = "development" }
 
-# Routes
-[routes]
-pattern = "api/*"
-zone_name = "example.com"
+# Build settings
+[build]
+command = "bun run build"
+cwd = "./"
+watch_paths = ["src/**/*.{ts,tsx}"]
 
-# Compatibility flags
-compatibility_flags = [
-  "streams_enable_constructors"
-]
+# Development server
+[dev]
+port = 5173
+local_protocol = "http"
+
+# Upload rules
+[[rules]]
+type = "Text"
+globs = ["**/*.js", "**/*.json"]
+fallthrough = true
+
+# Limits
+[limits]
+cpu_seconds = 50
