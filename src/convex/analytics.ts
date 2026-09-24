@@ -107,7 +107,7 @@ export const getPlatformStats = query({
     const allUsers = await ctx.db.query("users").collect();
     const totalUsers = allUsers.length;
     const owners = allUsers.filter((u) => u.role === "owner").length;
-    const guests = allUsers.filter((u) => u.role === "guest").length;
+    const guests = allUsers.filter((u) => u.role === "user").length;
 
     // جلب جميع الشقق
     const allApartments = await ctx.db.query("apartments").collect();

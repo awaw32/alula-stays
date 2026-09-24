@@ -63,24 +63,26 @@ export const getUserNotifications = query({
     const limit = args.limit || 20;
     const skip = args.skip || 0;
 
-    // البحث عن المستخدم
-    const user = await ctx.db
-      .query("users")
-      .filter((q) => q.eq(q.field("clerkId"), identity.subject))
-      .first();
+    // البحث عن المستخدم عبر بريد الهوية الحالية
+    const email = identity.email ?? identity.subject;
+    const user = email
+      ? await ctx.db
+          .query("users")
+          .withIndex("email", (q) => q.eq("email", email))
+          .unique()
+      : null;
 
     if (!user) {
       return [];
     }
 
     // جلب إشعارات المستخدم
-    const notifications = await ctx.db
+    const all = await ctx.db
       .query("notifications")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .order("desc")
-      .skip(skip)
-      .take(limit)
       .collect();
+    const notifications = all.slice(skip, skip + limit);
 
     return notifications;
   },
@@ -96,10 +98,13 @@ export const getUnreadCount = query({
       return 0;
     }
 
-    const user = await ctx.db
-      .query("users")
-      .filter((q) => q.eq(q.field("clerkId"), identity.subject))
-      .first();
+    const email = identity.email ?? identity.subject;
+    const user = email
+      ? await ctx.db
+          .query("users")
+          .withIndex("email", (q) => q.eq("email", email))
+          .unique()
+      : null;
 
     if (!user) {
       return 0;
@@ -148,10 +153,13 @@ export const markAllAsRead = mutation({
       throw new Error("يجب تسجيل الدخول");
     }
 
-    const user = await ctx.db
-      .query("users")
-      .filter((q) => q.eq(q.field("clerkId"), identity.subject))
-      .first();
+    const email = identity.email ?? identity.subject;
+    const user = email
+      ? await ctx.db
+          .query("users")
+          .withIndex("email", (q) => q.eq("email", email))
+          .unique()
+      : null;
 
     if (!user) {
       throw new Error("المستخدم غير موجود");
@@ -198,10 +206,13 @@ export const clearReadNotifications = mutation({
       throw new Error("يجب تسجيل الدخول");
     }
 
-    const user = await ctx.db
-      .query("users")
-      .filter((q) => q.eq(q.field("clerkId"), identity.subject))
-      .first();
+    const email = identity.email ?? identity.subject;
+    const user = email
+      ? await ctx.db
+          .query("users")
+          .withIndex("email", (q) => q.eq("email", email))
+          .unique()
+      : null;
 
     if (!user) {
       throw new Error("المستخدم غير موجود");

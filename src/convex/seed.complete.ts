@@ -1,5 +1,6 @@
 import { mutation } from "./_generated/server";
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 
 /**
  * 🚀 COMPLETE SEED DATA - شقق العلا
@@ -63,7 +64,7 @@ const reviewsData = [
   { apartmentName: "AlUla Cliffside Retreat", rating: 4, comment: "جميلة لكن التكييف قوي شوي" },
   { apartmentName: "AlUla Cliffside Retreat", rating: 5, comment: "الأفضل في العلا بلا منازع" },
   { apartmentName: "AlUla Cliffside Retreat", rating: 5, comment: "شقة وصاحب الشقة ممتاز" },
-  { aptName: "AlUla Cliffside Retreat", rating: 5, comment: "ساعات الغروب من هنا لا تُنسى" },
+  { apartmentName: "AlUla Cliffside Retreat", rating: 5, comment: "ساعات الغروب من هنا لا تُنسى" },
   { apartmentName: "AlUla Cliffside Retreat", rating: 4, comment: "غالية الثمن لكن تستحق" },
   { apartmentName: "AlUla Cliffside Retreat", rating: 5, comment: "أفضل استثمار سياحي" },
   { apartmentName: "AlUla Cliffside Retreat", rating: 5, comment: "شقة حقيقية وليس الصور الكاذبة" },
@@ -224,12 +225,11 @@ export const seedAll = mutation({
 
     // 1. Seed Users
     console.log("1️⃣ إضافة المستخدمين...");
-    const userIds: Record<string, string> = {};
+    const userIds: Record<string, Id<"users">> = {};
     for (const user of usersData) {
       const userId = await ctx.db.insert("users", {
         email: user.email,
         name: user.name,
-        phone: user.phone,
         role: user.role as "user" | "owner" | "admin",
       });
       userIds[user.email] = userId;
@@ -240,7 +240,7 @@ export const seedAll = mutation({
     // 2. Get Apartment IDs
     console.log("2️⃣ جلب معرفات الشقق...");
     const apartments = await ctx.db.query("apartments").collect();
-    const apartmentIds: Record<string, string> = {};
+    const apartmentIds: Record<string, Id<"apartments">> = {};
     for (const apt of apartments) {
       apartmentIds[apt.title] = apt._id;
     }
@@ -252,14 +252,17 @@ export const seedAll = mutation({
     for (let i = 0; i < reviewsData.length; i++) {
       const review = reviewsData[i];
       const apartmentId = apartmentIds[review.apartmentName];
-      const userId = userIds[usersData[i % usersData.length].email];
+      const reviewer = usersData[i % usersData.length];
+      const userId = reviewer ? userIds[reviewer.email] : undefined;
 
-      if (apartmentId && userId) {
+      if (apartmentId && userId && review) {
         await ctx.db.insert("reviews", {
           apartmentId,
           userId,
+          userName: reviewer.name,
           rating: review.rating,
           comment: review.comment,
+          createdAt: Date.now(),
         });
         reviewCount++;
       }
@@ -273,15 +276,22 @@ export const seedAll = mutation({
       const userId = userIds[booking.userEmail];
 
       if (apartmentId && userId) {
+        const checkIn = new Date(booking.checkIn).getTime();
+        const checkOut = new Date(booking.checkOut).getTime();
+        const totalNights = Math.max(1, Math.round((checkOut - checkIn) / 86_400_000));
         await ctx.db.insert("bookings", {
           apartmentId,
           userId,
-          checkIn: new Date(booking.checkIn),
-          checkOut: new Date(booking.checkOut),
-          numberOfGuests: booking.guests,
+          checkIn,
+          checkOut,
+          guests: booking.guests,
+          totalNights,
+          pricePerNight: Math.round(booking.total / totalNights),
           totalPrice: booking.total,
+          platformFee: Math.round(booking.total * 0.1),
           status: booking.status as "pending" | "confirmed" | "cancelled" | "completed",
-          specialRequests: "",
+          paymentStatus: booking.status === "completed" ? "paid" : "unpaid",
+          createdAt: Date.now(),
         });
         console.log(`   ✅ حجز: ${booking.apartmentName} - ${booking.userEmail}`);
       }
@@ -299,6 +309,7 @@ export const seedAll = mutation({
             await ctx.db.insert("favorites", {
               userId,
               apartmentId,
+              createdAt: Date.now(),
             });
           }
         }

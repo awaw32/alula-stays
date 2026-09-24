@@ -140,7 +140,7 @@ export const sendVerificationEmail = internalAction({
     userName: v.string(),
     verificationToken: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<unknown> => {
     const verificationLink = `${process.env.SITE_URL}/verify-email?token=${args.verificationToken}`;
     const htmlContent = getVerificationEmailTemplate(verificationLink);
 
@@ -163,7 +163,7 @@ export const sendBookingConfirmation = internalAction({
     bookingId: v.string(),
     apartmentName: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<unknown> => {
     const htmlContent = getConfirmationEmailTemplate(args.userName, args.bookingId);
 
     return await ctx.runAction(internal.email.sendEmail, {
@@ -186,7 +186,7 @@ export const sendNewBookingNotification = internalAction({
     guestName: v.string(),
     checkInDate: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<unknown> => {
     const htmlContent = getNewBookingNotificationTemplate(
       args.bookingId,
       args.apartmentName,

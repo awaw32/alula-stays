@@ -127,10 +127,24 @@ export const saveUserProfileImage = mutation({
     storageId: v.string(),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.userId, {
-      profileImageStorageId: args.storageId,
-      profileImageUpdatedAt: Date.now(),
-    });
+    // حقول صورة الملف الشخصي تعيش في جدول userProfiles (انظر schema.ts)
+    const profile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .unique();
+
+    if (profile) {
+      await ctx.db.patch(profile._id, {
+        profileImageStorageId: args.storageId,
+        profileImageUpdatedAt: Date.now(),
+      });
+    } else {
+      await ctx.db.insert("userProfiles", {
+        userId: args.userId,
+        profileImageStorageId: args.storageId,
+        profileImageUpdatedAt: Date.now(),
+      });
+    }
 
     return "تم تحديث صورة الملف الشخصي";
   },
@@ -144,16 +158,19 @@ export const getUserProfileImage = query({
     userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const user = await ctx.db.get(args.userId);
+    const profile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .unique();
 
-    if (!user || !user.profileImageStorageId) {
+    if (!profile || !profile.profileImageStorageId) {
       return null;
     }
 
-    const url = await ctx.storage.getUrl(user.profileImageStorageId);
+    const url = await ctx.storage.getUrl(profile.profileImageStorageId);
     return {
       url,
-      updatedAt: user.profileImageUpdatedAt,
+      updatedAt: profile.profileImageUpdatedAt,
     };
   },
 });
@@ -166,17 +183,20 @@ export const deleteProfileImage = mutation({
     userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const user = await ctx.db.get(args.userId);
+    const profile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .unique();
 
-    if (!user || !user.profileImageStorageId) {
+    if (!profile || !profile.profileImageStorageId) {
       throw new Error("لا توجد صورة ملف شخصي");
     }
 
     // حذف من التخزين
-    await ctx.storage.delete(user.profileImageStorageId);
+    await ctx.storage.delete(profile.profileImageStorageId);
 
-    // تحديث المستخدم
-    await ctx.db.patch(args.userId, {
+    // تحديث السجل
+    await ctx.db.patch(profile._id, {
       profileImageStorageId: undefined,
     });
 

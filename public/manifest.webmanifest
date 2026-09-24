@@ -4,6 +4,7 @@
   "description": "منصة حجز الشقق والإقامات في العلا",
   "lang": "ar",
   "dir": "rtl",
+  "id": "https://soqaqalaula.world/",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

@@ -40,7 +40,11 @@ export function useAuth() {
   // In live mode this behaves exactly as before.
   const { isLoading: isAuthLoading, isAuthenticated } = useConvexAuth();
   const user = useQuery(api.users.currentUser, DEMO_MODE ? "skip" : undefined);
-  const { signIn, signOut } = useAuthActions();
+  // In demo mode there is no ConvexAuthProvider, so useAuthActions() returns
+  // undefined — keep the raw value and only destructure in live mode.
+  const authActions = useAuthActions() as
+    | { signIn: (...args: unknown[]) => Promise<unknown>; signOut: () => Promise<void> }
+    | undefined;
 
   if (DEMO_MODE) {
     return {
@@ -62,8 +66,12 @@ export function useAuth() {
     isAuthenticated,
     user,
     role: user?.role ?? null,
-    signIn,
-    signOut,
+    signIn:
+      authActions?.signIn ??
+      (async () => {
+        throw new Error("المصادقة غير جاهزة بعد.");
+      }),
+    signOut: authActions?.signOut ?? (async () => {}),
   };
 }
 

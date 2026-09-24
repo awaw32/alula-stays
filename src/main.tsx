@@ -4,7 +4,7 @@ import { RequireAuth, RequireRole } from "@/components/RequireAuth";
 import { VlyToolbar } from "../vly-toolbar-readonly.tsx";
 import { DEMO_MODE } from "@/lib/demo-data";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
-import { ConvexReactClient, ConvexProvider } from "convex/react";
+import { ConvexReactClient, ConvexProviderWithAuth } from "convex/react";
 import React, { StrictMode, useEffect, lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router";
@@ -223,12 +223,19 @@ function AppRoot() {
 
   // Demo mode: all queries use "skip" so the dummy client never makes
   // network calls — no useQuery is ever executed without a provider.
+  // The fake useAuth below keeps useConvexAuth()/useAuthActions() working
+  // (unauthenticated, isLoading=false) without any ConvexAuthProvider.
   if (!convexClient) return <RouteLoading />;
   if (DEMO_MODE) {
+    const demoUseAuth = () => ({
+      isLoading: false,
+      isAuthenticated: false,
+      fetchAccessToken: async () => null,
+    });
     return (
-      <ConvexProvider client={convexClient}>
+      <ConvexProviderWithAuth client={convexClient} useAuth={demoUseAuth}>
         <AppRoutes />
-      </ConvexProvider>
+      </ConvexProviderWithAuth>
     );
   }
   return (
