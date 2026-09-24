@@ -17,10 +17,10 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { DEMO_MODE } from "@/lib/demo-data";
 import logo from "@/assets/logo.svg";
-import { ArrowRight, Loader2, Mail, UserX } from "lucide-react";
+import { ArrowRight, KeyRound, Loader2, Mail, UserX } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
 import { getErrorMessage } from "@/lib/error-message";
-import { useNavigate, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 
 interface AuthProps {
   redirectAfterAuth?: string;
@@ -40,10 +40,13 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
   const { isLoading: authLoading, isAuthenticated, signIn } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const redirect = resolveRedirectAfterAuth(
-    searchParams.get("returnTo"),
-    redirectAfterAuth,
-  );
+  const ownerMode = searchParams.get("owner") === "1";
+  const redirect = ownerMode && !searchParams.get("returnTo")
+    ? "/owner/add"
+    : resolveRedirectAfterAuth(
+        searchParams.get("returnTo"),
+        redirectAfterAuth,
+      );
   const [step, setStep] = useState<"signIn" | { email: string }>("signIn");
   const [otp, setOtp] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -124,9 +127,11 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                       onClick={() => navigate("/")}
                     />
                   </div>
-                <CardTitle className="text-xl">ابدأ رحلتك</CardTitle>
+                <CardTitle className="text-xl">{ownerMode ? "بوابة المالكين" : "ابدأ رحلتك"}</CardTitle>
                 <CardDescription>
-                  أدخل بريدك الإلكتروني لتسجيل الدخول أو إنشاء حساب
+                  {ownerMode
+                    ? "سجّل دخولك لترفع شقتك — ستراجعها الإدارة قبل النشر"
+                    : "أدخل بريدك الإلكتروني لتسجيل الدخول أو إنشاء حساب"}
                 </CardDescription>
               </CardHeader>
               <form onSubmit={handleEmailSubmit}>
@@ -183,6 +188,16 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                       <UserX className="mr-2 h-4 w-4" />
                       المتابعة كضيف
                     </Button>
+
+                    <div className="mt-4 text-center">
+                      <Link
+                        to="/auth?owner=1"
+                        className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-[var(--clay-accent)] hover:underline"
+                      >
+                        <KeyRound className="h-3 w-3" />
+                        تسجيل دخول مالك عقار
+                      </Link>
+                    </div>
                   </div>
                 </CardContent>
               </form>

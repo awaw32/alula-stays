@@ -1,5 +1,17 @@
-import { query } from "./_generated/server";
+import { getAuthUserId } from "@convex-dev/auth/server";
+import { query, type QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
+
+/**
+ * جلب دور المستخدم الحالي إن كان مسجلاً (null للزوار).
+ * يُستخدم لإظهار الشقق غير الموثقة لصاحبها والإدارة فقط.
+ */
+async function getViewerRole(ctx: QueryCtx) {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) return null;
+  const user = await ctx.db.get(userId);
+  return user?.role ?? null;
+}
 
 export const list = query({
   args: {
@@ -10,7 +22,15 @@ export const list = query({
     sortBy: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const viewerRole = await getViewerRole(ctx);
+    const canSeeUnverified = viewerRole === "owner" || viewerRole === "admin";
     let apartments = await ctx.db.query("apartments").collect();
+
+    // الزائر العادي والمستأجر يرون المنشور (الموثق) فقط —
+    // المالك يرى شققه غير الموثقة ليتابع حالتها، والإدارة ترى الكل.
+    if (!canSeeUnverified) {
+      apartments = apartments.filter((a) => a.isVerified);
+    }
 
     if (args.location && args.location !== "all") {
       apartments = apartments.filter((a) => a.location === args.location);
@@ -54,28 +74,40 @@ export const list = query({
 export const get = query({
   args: { apartmentId: v.id("apartments") },
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.apartmentId);
+    const apartment = await ctx.db.get(args.apartmentId);
+    if (!apartment) return null;
+
+    // منع عرض الشقق غير الموثقة على الزوار والمستأجرين
+    if (!apartment.isVerified) {
+      const viewerRole = await getViewerRole(ctx);
+      if (viewerRole === "owner" || viewerRole === "admin") return apartment;
+      const userId = await getAuthUserId(ctx);
+      if (userId && apartment.ownerId === userId) return apartment;
+      return null;
+    }
+
+    return apartment;
   },
 });
 
 export const featured = query({
   handler: async (ctx) => {
     const all = await ctx.db.query("apartments").collect();
-    return all.filter((a) => a.isFeatured).slice(0, 6);
+    return all.filter((a) => a.isFeatured && a.isVerified).slice(0, 6);
   },
 });
 
 export const locations = query({
   handler: async (ctx) => {
     const all = await ctx.db.query("apartments").collect();
-    const locs = [...new Set(all.map((a) => a.location))];
+    const locs = [...new Set(all.filter((a) => a.isVerified).map((a) => a.location))];
     return locs;
   },
 });
 
 export const stats = query({
   handler: async (ctx) => {
-    const all = await ctx.db.query("apartments").collect();
+    const all = (await ctx.db.query("apartments").collect()).filter((a) => a.isVerified);
     return {
       total: all.length,
       avgPrice: all.length

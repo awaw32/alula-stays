@@ -56,10 +56,11 @@ type ApartmentFormProps = {
   mode: ApartmentFormMode;
   initialValues: ApartmentFormValues;
   loading?: boolean;
+  disabled?: boolean;
   onSubmit: (values: ApartmentFormValues) => Promise<void>;
 };
 
-export function ApartmentForm({ mode, initialValues, loading = false, onSubmit }: ApartmentFormProps) {
+export function ApartmentForm({ mode, initialValues, loading = false, disabled = false, onSubmit }: ApartmentFormProps) {
   const [form, setForm] = useState<ApartmentFormValues>(initialValues);
   const [imageUrl, setImageUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -148,7 +149,7 @@ export function ApartmentForm({ mode, initialValues, loading = false, onSubmit }
 
       {error && <p className="flex items-center gap-2 text-sm text-red-600" role="alert" aria-live="assertive"><AlertCircle className="h-4 w-4" aria-hidden="true" />{error}</p>}
 
-      <Button type="submit" disabled={loading} className="clay-btn w-full py-3.5 text-lg">
+      <Button type="submit" disabled={loading || disabled} className="clay-btn w-full py-3.5 text-lg">
         {loading ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : <ArrowRight className="h-5 w-5" aria-hidden="true" />}
         {loading ? "جاري الحفظ..." : mode === "create" ? "إضافة الشقة" : "حفظ التغييرات"}
       </Button>

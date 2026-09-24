@@ -124,9 +124,17 @@ export default function OwnerDashboard() {
                   <div key={apt._id} className="clay p-4 flex flex-col md:flex-row gap-4">
                     <img src={apt.images[0]} alt={apt.title} className="w-full md:w-32 h-24 object-cover rounded-xl shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
                         <h3 className="font-bold text-[var(--foreground)] truncate">{apt.title}</h3>
-                        {apt.isVerified && <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />}
+                        {apt.isVerified ? (
+                          <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                            <CheckCircle className="h-3 w-3" /> منشورة
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                            بانتظار مراجعة الإدارة
+                          </span>
+                        )}
                         {apt.isFeatured && <Star className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0" />}
                       </div>
                       <p className="text-sm text-[var(--muted-foreground)] mb-2">{apt.location}</p>
