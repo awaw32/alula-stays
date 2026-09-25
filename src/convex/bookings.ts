@@ -16,12 +16,15 @@ import {
   validatePrice,
 } from "./lib/validation";
 import {
+  calculateStayPrice,
+  meetsMinNights,
+} from "../lib/pricing";
+import {
   ERROR_MESSAGES,
   ValidationError,
   assertExists,
 } from "./lib/errors";
 import {
-  calculateTotalPrice,
   calculatePlatformFee,
   calculateRefund,
 } from "./lib/money";
@@ -174,6 +177,13 @@ export const create = mutation({
       // التحقق من صحة التواريخ
       const totalNights = validateBookingDates(args.checkIn, args.checkOut);
 
+      // الحد الأدنى لعدد الليالي (افتراضياً 1 إن لم يحدده المالك)
+      if (!meetsMinNights(args.checkIn, args.checkOut, apartment.minNights)) {
+        throw new ValidationError(
+          `الحد الأدنى للإقامة في هذه الشقة ${apartment.minNights} ليالٍ`,
+        );
+      }
+
       // التحقق من صحة عدد الضيوف
       validateGuests(args.guests, apartment.maxGuests);
 
@@ -205,8 +215,14 @@ export const create = mutation({
         throw new ValidationError(ERROR_MESSAGES.BOOKING_DATES_UNAVAILABLE);
       }
 
-      // حساب الأسعار بأمان
-      const totalPrice = calculateTotalPrice(totalNights, apartment.price);
+      // حساب الأسعار بأمان — مع سعر نهاية الأسبوع إن حدده المالك
+      const stayPrice = calculateStayPrice(
+        args.checkIn,
+        args.checkOut,
+        apartment.price,
+        apartment.weekendPrice,
+      );
+      const totalPrice = stayPrice.totalPrice;
       const platformFee = calculatePlatformFee(totalPrice, 10); // 10% رسوم
 
       // إنشاء الحجز

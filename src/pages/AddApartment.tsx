@@ -16,6 +16,8 @@ const initialValues: ApartmentFormValues = {
   description: "",
   descriptionAr: "",
   price: 500,
+  weekendPrice: 0,
+  minNights: 1,
   bedrooms: 1,
   bathrooms: 1,
   maxGuests: 2,
@@ -41,15 +43,23 @@ export default function AddApartment() {
 
   // ترقية تلقائية إلى "مالك" إذا كان المستخدم مسجلاً بدور عادي —
   // الإدارة تبقى تتحكم بالنشر عبر المراجعة، فالترقية تفتح الرفع فقط.
+  const needsUpgrade = role !== undefined && role !== "owner" && role !== "admin";
   useEffect(() => {
-    if (role !== "owner" && role !== "admin") {
-      setUpgrading(true);
-      becomeOwner()
-        .then(() => toast.success("تم تفعيل حسابك كمالك عقار"))
-        .catch(() => toast.error("تعذر تفعيل دور المالك"))
-        .finally(() => setUpgrading(false));
-    }
-  }, [role, becomeOwner]);
+    if (!needsUpgrade) return;
+    let cancelled = false;
+    const upgrade = async () => {
+      try {
+        await becomeOwner();
+        if (!cancelled) toast.success("تم تفعيل حسابك كمالك عقار");
+      } catch {
+        if (!cancelled) toast.error("تعذر تفعيل دور المالك");
+      } finally {
+        if (!cancelled) setUpgrading(false);
+      }
+    };
+    void upgrade();
+    return () => { cancelled = true; };
+  }, [needsUpgrade, becomeOwner]);
 
   // إكمال الملف الشخصي قبل إضافة شقة (بعد الـ hooks لضمان ترتيب ثابت)
   if (myProfile !== undefined && !myProfile?.phone) {
@@ -57,12 +67,14 @@ export default function AddApartment() {
   }
 
   const handleSubmit = async (values: ApartmentFormValues) => {
-    const id = await createApartment({
+    await createApartment({
       title: values.title,
       titleAr: values.titleAr || undefined,
       description: values.description,
       descriptionAr: values.descriptionAr || undefined,
       price: values.price,
+      weekendPrice: values.weekendPrice > 0 ? values.weekendPrice : undefined,
+      minNights: values.minNights > 1 ? values.minNights : undefined,
       bedrooms: values.bedrooms,
       bathrooms: values.bathrooms,
       maxGuests: values.maxGuests,

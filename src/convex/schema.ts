@@ -45,6 +45,8 @@ const schema = defineSchema(
       description: v.string(),
       descriptionAr: v.optional(v.string()),
       price: v.number(), // SAR per night
+      weekendPrice: v.optional(v.number()), // سعر ليلة نهاية الأسبوع (الخميس/الجمعة) — إن اختلفت عن الأساسي
+      minNights: v.optional(v.number()), // الحد الأدنى لعدد الليالي
       bedrooms: v.number(),
       bathrooms: v.number(),
       maxGuests: v.number(),

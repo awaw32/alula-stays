@@ -5,6 +5,7 @@ import { api } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import { getApartmentDescription, getApartmentLocation, getApartmentRules, getApartmentTitle, formatArabicDate, getAmenityLabel } from "@/lib/apartment-content";
 import { DEMO_MODE, DEMO_APARTMENTS } from "@/lib/demo-data";
+import { calculateStayPrice } from "@/lib/pricing";
 import { getErrorMessage } from "@/lib/error-message";
 import { toast } from "sonner";
 import { useParams, Link, useNavigate } from "react-router";
@@ -161,12 +162,21 @@ export default function ApartmentDetail() {
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
 
-  const totalNights =
-    checkIn && checkOut
-      ? Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24))
-      : 0;
-  const totalPrice = totalNights * (apartment?.price || 0);
+  // تفصيل التسعير الحقيقي: أسعار نهاية الأسبوع + الحد الأدنى للليالي
+  const stayBreakdown =
+    checkIn && checkOut && apartment
+      ? calculateStayPrice(
+          checkIn.getTime(),
+          checkOut.getTime(),
+          apartment.price,
+          (apartment as { weekendPrice?: number }).weekendPrice,
+        )
+      : null;
+  const totalNights = stayBreakdown?.totalNights ?? 0;
+  const totalPrice = stayBreakdown?.totalPrice ?? 0;
   const platformFee = Math.round(totalPrice * 0.1);
+  const minNights = (apartment as { minNights?: number } | null)?.minNights ?? 1;
+  const nightsBelowMin = totalNights > 0 && totalNights < minNights;
 
   const handleBooking = async () => {
     if (DEMO_MODE) { toast.error("الوضع التجريبي: اربط Convex لتفعيل الحجز."); return; }
@@ -545,19 +555,39 @@ export default function ApartmentDetail() {
 
                     {/* Availability indicator */}
                     {availability && (
-                      <div className={`flex items-center gap-2 text-sm mb-4 px-3 py-2 rounded-xl ${availability.available ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
-                        {availability.available ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-                        {availability.available ? "متاح في هذه التواريخ" : "غير متاح في هذه التواريخ"}
+                      <div className={`flex items-center gap-2 text-sm mb-2 px-3 py-2 rounded-xl ${availability.available && !nightsBelowMin ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
+                        {availability.available && !nightsBelowMin ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                        {!availability.available
+                          ? "غير متاح في هذه التواريخ"
+                          : nightsBelowMin
+                            ? `الحد الأدنى للإقامة ${minNights} ليالٍ — اختر مدة أطول`
+                            : "متاح في هذه التواريخ"}
                       </div>
                     )}
 
                     {/* Price breakdown */}
                     {totalNights > 0 && (
                       <div className="clay-inset p-4 mb-4 space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-[var(--muted-foreground)]">{apartment.price.toLocaleString()} ر.س × {totalNights} ليلة</span>
-                          <span className="font-medium text-[var(--foreground)]">{totalPrice.toLocaleString()} ر.س</span>
-                        </div>
+                        {stayBreakdown && stayBreakdown.weekendNights > 0 && (
+                          <>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-[var(--muted-foreground)]">سعر عادي × {stayBreakdown.weekdayNights} ليلة</span>
+                              <span className="font-medium text-[var(--foreground)]">{(stayBreakdown.weekdayNights * apartment.price).toLocaleString()} ر.س</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-[var(--muted-foreground)]">نهاية الأسبوع (الخميس/الجمعة) × {stayBreakdown.weekendNights} ليلة</span>
+                              <span className="font-medium text-[var(--foreground)]">
+                                {(((apartment as { weekendPrice?: number }).weekendPrice ?? apartment.price) * stayBreakdown.weekendNights).toLocaleString()} ر.س
+                              </span>
+                            </div>
+                          </>
+                        )}
+                        {stayBreakdown && stayBreakdown.weekendNights === 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-[var(--muted-foreground)]">{apartment.price.toLocaleString()} ر.س × {totalNights} ليلة</span>
+                            <span className="font-medium text-[var(--foreground)]">{totalPrice.toLocaleString()} ر.س</span>
+                          </div>
+                        )}
                         <div className="flex justify-between text-sm">
                           <span className="text-[var(--muted-foreground)]">رسوم الخدمة (10%)</span>
                           <span className="font-medium text-[var(--foreground)]">{platformFee.toLocaleString()} ر.س</span>
@@ -575,7 +605,7 @@ export default function ApartmentDetail() {
                     )}
 
                     {/* CTA */}
-                    <button type="button" onClick={() => void handleBooking()} disabled={bookingLoading || !checkIn || !checkOut || totalNights < 1} className="clay-btn flex w-full items-center justify-center gap-2 py-3.5 text-center text-lg disabled:cursor-not-allowed disabled:opacity-50">
+                    <button type="button" onClick={() => void handleBooking()} disabled={bookingLoading || !checkIn || !checkOut || totalNights < 1 || nightsBelowMin} className="clay-btn flex w-full items-center justify-center gap-2 py-3.5 text-center text-lg disabled:cursor-not-allowed disabled:opacity-50">
                       {bookingLoading ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : <Calendar className="h-5 w-5" aria-hidden="true" />}
                       {bookingLoading ? "جاري الحجز..." : "احجز الآن"}
                     </button>

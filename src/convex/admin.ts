@@ -107,6 +107,8 @@ export const createApartment = mutation({
     description: v.string(),
     descriptionAr: v.optional(v.string()),
     price: v.number(),
+    weekendPrice: v.optional(v.number()),
+    minNights: v.optional(v.number()),
     bedrooms: v.number(),
     bathrooms: v.number(),
     maxGuests: v.number(),
@@ -122,6 +124,14 @@ export const createApartment = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
+    // تحقق صارم من قواعد التسعير
+    if (args.weekendPrice !== undefined && args.weekendPrice < 0) {
+      throw new ValidationError("سعر نهاية الأسبوع لا يمكن أن يكون سالباً");
+    }
+    if (args.minNights !== undefined && (!Number.isInteger(args.minNights) || args.minNights < 1 || args.minNights > 30)) {
+      throw new ValidationError("الحد الأدنى للليالي يجب أن يكون بين 1 و 30");
+    }
 
     // أي مستخدم مسجّل يمكنه رفع شقة للمراجعة — تُرقّى صلاحيته تلقائياً إلى مالك.
     if (user.role !== "owner" && user.role !== "admin") {
@@ -166,9 +176,19 @@ export const updateApartment = mutation({
     rules: v.optional(v.array(v.string())),
     rulesAr: v.optional(v.array(v.string())),
     available: v.optional(v.boolean()),
+    weekendPrice: v.optional(v.number()),
+    minNights: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     await requireApartmentOwner(ctx, args.apartmentId);
+
+    // تحقق صارم من قواعد التسعير عند التعديل
+    if (args.weekendPrice !== undefined && args.weekendPrice < 0) {
+      throw new ValidationError("سعر نهاية الأسبوع لا يمكن أن يكون سالباً");
+    }
+    if (args.minNights !== undefined && (!Number.isInteger(args.minNights) || args.minNights < 1 || args.minNights > 30)) {
+      throw new ValidationError("الحد الأدنى للليالي يجب أن يكون بين 1 و 30");
+    }
 
     const { apartmentId, ...updates } = args;
 

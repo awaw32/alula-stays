@@ -7,6 +7,8 @@ export interface ApartmentRecord {
   description: string;
   descriptionAr?: string;
   price: number;
+  weekendPrice?: number;
+  minNights?: number;
   bedrooms: number;
   bathrooms: number;
   maxGuests: number;
@@ -33,6 +35,8 @@ export interface ApartmentFormValues {
   description: string;
   descriptionAr: string;
   price: number;
+  weekendPrice: number;
+  minNights: number;
   bedrooms: number;
   bathrooms: number;
   maxGuests: number;

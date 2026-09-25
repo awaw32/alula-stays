@@ -202,6 +202,14 @@ export function ApartmentForm({ mode, initialValues, loading = false, disabled =
       setError("يرجى التحقق من السعر والتفاصيل الأساسية للشقة");
       return;
     }
+    if (form.weekendPrice > 0 && form.weekendPrice < form.price) {
+      setError("سعر نهاية الأسبوع يجب أن يكون أعلى من السعر الأساسي أو اتركه فارغاً");
+      return;
+    }
+    if (form.minNights < 1 || form.minNights > 30) {
+      setError("الحد الأدنى للليالي يجب أن يكون بين 1 و 30");
+      return;
+    }
 
     setError(null);
     try {
@@ -239,6 +247,8 @@ export function ApartmentForm({ mode, initialValues, loading = false, disabled =
         <h2 className="flex items-center gap-2 text-lg font-bold text-[var(--foreground)]"><DollarSign className="h-5 w-5" aria-hidden="true" />الأسعار والتفاصيل</h2>
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           <div><Label htmlFor="price">السعر / ليلة (ر.س) *</Label><Input id="price" type="number" min={50} value={form.price} onChange={(event) => update("price", Number(event.target.value))} className="clay-input mt-1 w-full" required /></div>
+          <div><Label htmlFor="weekendPrice">سعر ليلة نهاية الأسبوع (ر.س)</Label><Input id="weekendPrice" type="number" min={0} value={form.weekendPrice || ""} onChange={(event) => update("weekendPrice", Number(event.target.value) || 0)} placeholder={`افتراضي: ${form.price}`} className="clay-input mt-1 w-full" /><p className="text-[10px] text-[var(--muted-foreground)] mt-1">الخميس والجمعة — اتركه فارغاً لاستخدام السعر الأساسي</p></div>
+          <div><Label htmlFor="minNights">الحد الأدنى للليالي</Label><Input id="minNights" type="number" min={1} max={30} value={form.minNights || 1} onChange={(event) => update("minNights", Number(event.target.value) || 1)} className="clay-input mt-1 w-full" /></div>
           <div><Label htmlFor="bedrooms"><Bed className="ml-1 inline h-4 w-4" aria-hidden="true" />الغرف</Label><Input id="bedrooms" type="number" min={1} max={10} value={form.bedrooms} onChange={(event) => update("bedrooms", Number(event.target.value))} className="clay-input mt-1 w-full" /></div>
           <div><Label htmlFor="bathrooms"><Bath className="ml-1 inline h-4 w-4" aria-hidden="true" />الحمامات</Label><Input id="bathrooms" type="number" min={1} max={10} value={form.bathrooms} onChange={(event) => update("bathrooms", Number(event.target.value))} className="clay-input mt-1 w-full" /></div>
           <div><Label htmlFor="maxGuests"><Users className="ml-1 inline h-4 w-4" aria-hidden="true" />الضيوف</Label><Input id="maxGuests" type="number" min={1} max={20} value={form.maxGuests} onChange={(event) => update("maxGuests", Number(event.target.value))} className="clay-input mt-1 w-full" /></div>
