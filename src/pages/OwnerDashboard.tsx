@@ -15,12 +15,27 @@ import {
   Edit,
   Trash2,
   Eye,
-  CheckCircle,
   Loader2,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/error-message";
+import { CalendarBlockManager } from "@/components/owner/CalendarBlockManager";
+import { OwnerFinance } from "@/components/owner/OwnerFinance";
+
+const OWNER_STATUS_LABELS: Record<string, { label: string; className: string }> = {
+  pending: { label: "بانتظار مراجعة الإدارة", className: "bg-amber-100 text-amber-700" },
+  approved: { label: "منشورة", className: "bg-emerald-100 text-emerald-700" },
+  rejected: { label: "مرفوضة", className: "bg-red-100 text-red-700" },
+  needs_changes: { label: "تحتاج تعديلات", className: "bg-blue-100 text-blue-700" },
+  suspended: { label: "موقوفة مؤقتاً", className: "bg-gray-100 text-gray-600" },
+};
+
+function getOwnerStatusInfo(apt: { status?: string; isVerified?: boolean }) {
+  if (apt.status) return OWNER_STATUS_LABELS[apt.status];
+  // توافق مع الشقق القديمة قبل إضافة status
+  return apt.isVerified ? OWNER_STATUS_LABELS.approved : OWNER_STATUS_LABELS.pending;
+}
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -38,7 +53,7 @@ export default function OwnerDashboard() {
   const myApartments = useQuery(api.admin.ownerApartments, DEMO_MODE ? "skip" : undefined);
   const myBookings = useQuery(api.bookings.ownerBookings, DEMO_MODE ? "skip" : undefined);
   const deleteApartment = useMutation(api.admin.deleteApartment);
-  const [activeTab, setActiveTab] = useState<"apartments" | "bookings">("apartments");
+  const [activeTab, setActiveTab] = useState<"apartments" | "bookings" | "calendar" | "finance">("apartments");
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [now] = useState(() => Date.now());
@@ -102,7 +117,7 @@ export default function OwnerDashboard() {
 
         {/* Tabs */}
         <div className="flex gap-2 mb-6">
-          {(["apartments", "bookings"] as const).map((tab) => (
+          {(["apartments", "bookings", "calendar", "finance"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -110,7 +125,7 @@ export default function OwnerDashboard() {
                 activeTab === tab ? "!bg-[var(--clay-accent)] !text-white" : "text-[var(--muted-foreground)]"
               }`}
             >
-              {tab === "apartments" ? "شققي" : "الحجوزات"}
+              {tab === "apartments" ? "شققي" : tab === "bookings" ? "الحجوزات" : tab === "calendar" ? "تقويم التوفر" : "المالية"}
             </button>
           ))}
         </div>
@@ -139,17 +154,16 @@ export default function OwnerDashboard() {
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-wrap items-center gap-2 mb-1">
                         <h3 className="font-bold text-[var(--foreground)] truncate">{apt.title}</h3>
-                        {apt.isVerified ? (
-                          <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                            <CheckCircle className="h-3 w-3" /> منشورة
-                          </span>
-                        ) : (
-                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
-                            بانتظار مراجعة الإدارة
-                          </span>
-                        )}
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${getOwnerStatusInfo(apt).className}`}>
+                          {getOwnerStatusInfo(apt).label}
+                        </span>
                         {apt.isFeatured && <Star className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0" />}
                       </div>
+                      {apt.reviewNotes && apt.status !== "approved" && (
+                        <p className="text-xs bg-red-50 border border-red-100 text-red-700 rounded-lg px-3 py-2 mb-2">
+                          📝 ملاحظات الإدارة: {apt.reviewNotes}
+                        </p>
+                      )}
                       <p className="text-sm text-[var(--muted-foreground)] mb-2">{apt.location}</p>
                       <div className="flex items-center gap-4 text-sm text-[var(--muted-foreground)]">
                         <span className="font-bold text-[var(--clay-accent)]">{apt.price.toLocaleString()} ر.س/ليلة</span>
@@ -188,10 +202,15 @@ export default function OwnerDashboard() {
                   <div key={booking._id} className="clay p-4 flex flex-col md:flex-row gap-4 items-start">
                     <div className="flex-1 min-w-0">
                       <h3 className="font-bold text-[var(--foreground)] mb-1">{booking.apartment?.title || "شقة"}</h3>
-                      <div className="flex flex-wrap gap-4 text-sm text-[var(--muted-foreground)]">
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-[var(--muted-foreground)]">
                         <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{new Date(booking.checkIn).toLocaleDateString("ar-SA")} — {new Date(booking.checkOut).toLocaleDateString("ar-SA")}</span>
                         <span>{booking.totalNights} ليلة</span>
-                        <span className="font-bold text-[var(--clay-accent)]">{booking.totalPrice.toLocaleString()} ر.س</span>
+                        <span>{booking.guests} ضيوف</span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-xs">
+                        <span className="text-[var(--muted-foreground)]">إجمالي الحجز: <span className="font-medium">{booking.totalPrice.toLocaleString()} ر.س</span></span>
+                        <span className="text-[var(--muted-foreground)]">عمولة المنصة: <span className="font-medium text-red-600">−{booking.platformFee.toLocaleString()} ر.س</span></span>
+                        <span className="text-emerald-700 font-semibold">صافي مستحقك: {(booking.totalPrice - booking.platformFee).toLocaleString()} ر.س</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -210,6 +229,22 @@ export default function OwnerDashboard() {
                 ))}
               </div>
             )}
+          </motion.div>
+        )}
+
+        {/* Calendar Tab */}
+        {activeTab === "calendar" && (
+          <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={2}>
+            <CalendarBlockManager
+              apartments={myApartments ?? []}
+            />
+          </motion.div>
+        )}
+
+        {/* Finance Tab */}
+        {activeTab === "finance" && (
+          <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={2}>
+            <OwnerFinance />
           </motion.div>
         )}
       </div>
