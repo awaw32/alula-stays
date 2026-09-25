@@ -56,6 +56,53 @@ const fadeUp = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: "easeOut" as const } },
 };
 
+// ━━━ حماية الصور ━━━
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB
+const MAX_IMAGES = 10;
+const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+/** فحص صارم: النوع الحقيقي عبر البايتات الأولى (Magic Numbers) + النوع المعلن + الحجم */
+function validateImageFile(file: File): string | null {
+  if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+    return `نوع الملف "${file.name}" غير مدعوم — المسموح: JPG أو PNG أو WebP`;
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    return `الصورة "${file.name}" تتجاوز 5MB — اختر صورة أصغر`;
+  }
+  if (file.size < 1024) {
+    return `الملف "${file.name}" صغير جداً ليكون صورة حقيقية`;
+  }
+  return null;
+}
+
+/** قراءة البايتات الأولى للتحقق أن الملف صورة فعلية وليس ملفاً متنكراً */
+async function hasValidImageSignature(file: File): Promise<boolean> {
+  const header = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+  const startsWith = (bytes: number[]) => bytes.every((b, i) => header[i] === b);
+  // JPEG: FF D8 FF — PNG: 89 50 4E 47 — WebP: RIFF....WEBP
+  return (
+    startsWith([0xff, 0xd8, 0xff]) ||
+    startsWith([0x89, 0x50, 0x4e, 0x47]) ||
+    (startsWith([0x52, 0x49, 0x46, 0x46]) && header[8] === 0x57 && header[9] === 0x45 && header[10] === 0x42 && header[11] === 0x50)
+  );
+}
+
+/** ضغط الصورة تلقائياً عبر canvas (أقصى عرض 1920px، جودة 0.82) */
+async function compressImage(file: File): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  const maxDim = 1920;
+  const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return file;
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  return await new Promise<Blob>((resolve) =>
+    canvas.toBlob((blob) => resolve(blob && blob.size < file.size ? blob : file), "image/jpeg", 0.82),
+  );
+}
+
 type ApartmentFormProps = {
   mode: ApartmentFormMode;
   initialValues: ApartmentFormValues;
@@ -89,17 +136,44 @@ export function ApartmentForm({ mode, initialValues, loading = false, disabled =
       setError("الوضع التجريبي: ربط Convex لتفعيل رفع الصور.");
       return;
     }
+    // حد أقصى لعدد الصور
+    const remaining = MAX_IMAGES - form.images.length;
+    if (remaining <= 0) {
+      setError(`الحد الأقصى ${MAX_IMAGES} صورة — احذف صورة أولاً`);
+      return;
+    }
+    const fileList = Array.from(files).slice(0, remaining);
+    if (fileList.length < files.length) {
+      setError(`يمكنك إضافة ${remaining} صورة فقط للوصول إلى الحد الأقصى (${MAX_IMAGES})`);
+    }
+
+    // فحص كل ملف قبل الرفع
+    for (const file of fileList) {
+      const validationError = validateImageFile(file);
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
+      if (!(await hasValidImageSignature(file))) {
+        setError(`الملف "${file.name}" ليس صورة حقيقية — تم رفضه`);
+        return;
+      }
+    }
+
     setUploading(true);
     setError(null);
     try {
       const baseUrl = import.meta.env.VITE_CONVEX_URL as string;
       const uploaded: string[] = [];
-      for (const file of Array.from(files)) {
+      for (const file of fileList) {
+        // ضغط تلقائي قبل الرفع
+        const compressed = await compressImage(file);
+        const finalFile = compressed instanceof File ? compressed : new File([compressed], file.name.replace(/\.png$/i, ".jpg"), { type: "image/jpeg" });
         const uploadUrl = await generateUploadUrl();
         const result = await fetch(uploadUrl, {
           method: "POST",
-          headers: { "Content-Type": file.type },
-          body: file,
+          headers: { "Content-Type": finalFile.type },
+          body: finalFile,
         });
         if (!result.ok) {
           throw new Error("فشل رفع الصورة، حاول مرة أخرى");

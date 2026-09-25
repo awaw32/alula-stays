@@ -16,6 +16,11 @@ export async function requireUser(ctx: DatabaseCtx): Promise<Doc<"users">> {
     throw new Error("المستخدم غير موجود");
   }
 
+  // حساب معطّل من الأدمن — لا حجز ولا رفع ولا أي إجراء كتابة
+  if (user.isDisabled) {
+    throw new Error(`تم تعطيل حسابك${user.disabledReason ? `: ${user.disabledReason}` : ""}. تواصل مع الدعم`);
+  }
+
   return user;
 }
 

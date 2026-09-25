@@ -277,3 +277,29 @@ export const verifyPayment = action({
     }
   },
 });
+
+/**
+ * إنهاء جلسة دفع منتهية (يستدعى من Stripe Webhook فقط):
+ * يلغي الحجز غير المدفوع بعد انتهاء جلسة الدفع.
+ */
+export const expireUnpaidSession = internalMutation({
+  args: {
+    bookingId: v.id("bookings"),
+    sessionId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const booking = await ctx.db.get(args.bookingId);
+    if (!booking) return { expired: false };
+
+    if (
+      booking.paymentStatus !== "unpaid" ||
+      booking.paymentSessionId !== args.sessionId ||
+      booking.status !== "pending"
+    ) {
+      return { expired: false };
+    }
+
+    await ctx.db.patch(args.bookingId, { status: "cancelled" });
+    return { expired: true };
+  },
+});
