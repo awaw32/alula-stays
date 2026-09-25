@@ -1,6 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
-import { requireAnyRole, requireApartmentOwner, requireRole } from "./lib/authorization";
+import { requireAnyRole, requireApartmentOwner, requireRole, requireUser } from "./lib/authorization";
 
 // ─── Owner Functions ───
 
@@ -37,7 +37,12 @@ export const createApartment = mutation({
     rulesAr: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
-    const user = await requireAnyRole(ctx, ["owner", "admin"]);
+    const user = await requireUser(ctx);
+
+    // أي مستخدم مسجّل يمكنه رفع شقة للمراجعة — تُرقّى صلاحيته تلقائياً إلى مالك.
+    if (user.role !== "owner" && user.role !== "admin") {
+      await ctx.db.patch(user._id, { role: "owner" });
+    }
 
     const apartmentId = await ctx.db.insert("apartments", {
       ...args,

@@ -3,6 +3,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage } from "@/lib/error-message";
+import { DEMO_MODE } from "@/lib/demo-data";
+import { api } from "@/convex/_generated/api";
+import { useMutation } from "convex/react";
 import type { ApartmentFormMode, ApartmentFormValues } from "@/types/apartment";
 import { motion } from "framer-motion";
 import {
@@ -18,6 +21,7 @@ import {
   Maximize,
   Mountain,
   Plus,
+  Upload,
   Users,
   UtensilsCrossed,
   Waves,
@@ -25,7 +29,7 @@ import {
   Wifi,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 const locations = [
   ["Heritage Village", "القرية التراثية"],
@@ -64,6 +68,9 @@ export function ApartmentForm({ mode, initialValues, loading = false, disabled =
   const [form, setForm] = useState<ApartmentFormValues>(initialValues);
   const [imageUrl, setImageUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const generateUploadUrl = useMutation(api.images.generateUploadUrl);
 
   const update = <K extends keyof ApartmentFormValues>(key: K, value: ApartmentFormValues[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -74,6 +81,41 @@ export function ApartmentForm({ mode, initialValues, loading = false, disabled =
     if (!url || form.images.includes(url)) return;
     update("images", [...form.images, url]);
     setImageUrl("");
+  };
+
+  const handleUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    if (DEMO_MODE) {
+      setError("الوضع التجريبي: ربط Convex لتفعيل رفع الصور.");
+      return;
+    }
+    setUploading(true);
+    setError(null);
+    try {
+      const baseUrl = import.meta.env.VITE_CONVEX_URL as string;
+      const uploaded: string[] = [];
+      for (const file of Array.from(files)) {
+        const uploadUrl = await generateUploadUrl();
+        const result = await fetch(uploadUrl, {
+          method: "POST",
+          headers: { "Content-Type": file.type },
+          body: file,
+        });
+        if (!result.ok) {
+          throw new Error("فشل رفع الصورة، حاول مرة أخرى");
+        }
+        const { storageId } = (await result.json()) as { storageId: string };
+        uploaded.push(`${baseUrl}/api/storage/${storageId}`);
+      }
+      update("images", [...form.images, ...uploaded]);
+    } catch (uploadError) {
+      setError(getErrorMessage(uploadError, "تعذر رفع الصورة"));
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -135,9 +177,36 @@ export function ApartmentForm({ mode, initialValues, loading = false, disabled =
 
       <section className="clay space-y-4 p-6">
         <h2 className="text-lg font-bold text-[var(--foreground)]">الصور *</h2>
+        <div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(event) => handleUpload(event.target.files)}
+          />
+          <Button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading || disabled}
+            className="clay-btn w-full"
+          >
+            {uploading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Upload className="h-4 w-4" aria-hidden="true" />}
+            {uploading ? "جاري رفع الصور..." : "رفع الصور من جهازك"}
+          </Button>
+        </div>
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-background px-2 text-muted-foreground">أو الصق رابط صورة</span>
+          </div>
+        </div>
         <div className="flex gap-2">
           <Input value={imageUrl} onChange={(event) => setImageUrl(event.target.value)} className="clay-input flex-1" placeholder="الصق رابط صورة هنا..." type="url" aria-label="رابط صورة جديدة" onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addImage(); } }} />
-          <Button type="button" onClick={addImage} className="clay-btn" aria-label="إضافة صورة"><Plus className="h-4 w-4" aria-hidden="true" />إضافة</Button>
+          <Button type="button" onClick={addImage} className="clay-btn" aria-label="إضافة صورة بالرابط"><Plus className="h-4 w-4" aria-hidden="true" />إضافة</Button>
         </div>
         {form.images.length > 0 && <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{form.images.map((image, index) => <div key={`${image}-${index}`} className="group relative"><img src={image} alt={`صورة الشقة ${index + 1}`} className="h-24 w-full rounded-xl object-cover" /><Button type="button" variant="destructive" size="icon-sm" className="absolute right-1 top-1 opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100" onClick={() => update("images", form.images.filter((_, imageIndex) => imageIndex !== index))} aria-label={`حذف صورة الشقة ${index + 1}`}><X className="h-3 w-3" aria-hidden="true" /></Button></div>)}</div>}
       </section>

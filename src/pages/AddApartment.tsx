@@ -1,11 +1,12 @@
 import { ApartmentForm } from "@/components/apartments/ApartmentForm";
 import { Navigation } from "@/components/Navigation";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { ApartmentFormValues } from "@/types/apartment";
 import { useAuth } from "@/hooks/use-auth";
+import { DEMO_MODE } from "@/lib/demo-data";
 import { KeyRound, ShieldCheck } from "lucide-react";
-import { useNavigate } from "react-router";
+import { Navigate, useNavigate } from "react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -33,14 +34,20 @@ const initialValues: ApartmentFormValues = {
 export default function AddApartment() {
   const navigate = useNavigate();
   const { role } = useAuth();
+  const myProfile = useQuery(api.users.myProfile, DEMO_MODE ? "skip" : undefined);
   const createApartment = useMutation(api.admin.createApartment);
   const becomeOwner = useMutation(api.users.becomeOwner);
   const [upgrading, setUpgrading] = useState(false);
 
+  // إكمال الملف الشخصي قبل إضافة شقة
+  if (myProfile !== undefined && !myProfile?.phone) {
+    return <Navigate to="/owner/profile" replace />;
+  }
+
   // ترقية تلقائية إلى "مالك" إذا كان المستخدم مسجلاً بدور عادي —
   // الإدارة تبقى تتحكم بالنشر عبر المراجعة، فالترقية تفتح الرفع فقط.
   useEffect(() => {
-    if (role && role !== "owner" && role !== "admin") {
+    if (role !== "owner" && role !== "admin") {
       setUpgrading(true);
       becomeOwner()
         .then(() => toast.success("تم تفعيل حسابك كمالك عقار"))

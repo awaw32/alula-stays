@@ -1,4 +1,5 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { v } from "convex/values";
 import { mutation, query, QueryCtx } from "./_generated/server";
 
 /**
@@ -56,5 +57,75 @@ export const becomeOwner = mutation({
 
     await ctx.db.patch(userId, { role: "owner" });
     return "owner";
+  },
+});
+
+/**
+ * قراءة بيانات الملف الشخصي للمستخدم (الاسم والجوال وغيرها).
+ * يستخدم في استمارة أول تسجيل لمالك العقار وفي لوحة المالك.
+ */
+export const myProfile = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) {
+      return null;
+    }
+
+    const profile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .unique();
+
+    return {
+      name: user.name ?? "",
+      email: user.email ?? "",
+      phone: profile?.phone ?? "",
+      city: profile?.city ?? "",
+      country: profile?.country ?? "",
+    };
+  },
+});
+
+/**
+ * حفظ الملف الشخصي لمالك العقار (الاسم ورقم الجوال وبيانات التواصل).
+ * تنشئ سجلاً في userProfiles إن لم يوجد، وتحدّث اسم المستخدم الأساسي.
+ */
+export const updateProfile = mutation({
+  args: {
+    name: v.string(),
+    phone: v.string(),
+    city: v.optional(v.string()),
+    country: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("يجب تسجيل الدخول أولاً");
+    }
+
+    await ctx.db.patch(userId, { name: args.name.trim() });
+
+    const existing = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        phone: args.phone,
+        city: args.city,
+        country: args.country,
+      });
+    } else {
+      await ctx.db.insert("userProfiles", {
+        userId,
+        phone: args.phone,
+        city: args.city,
+        country: args.country,
+      });
+    }
+
+    return "تم حفظ البيانات";
   },
 });

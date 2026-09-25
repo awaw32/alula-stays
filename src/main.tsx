@@ -19,6 +19,7 @@ const ApartmentDetail = lazy(() => import("./pages/ApartmentDetail.tsx"));
 const Favorites = lazy(() => import("./pages/Favorites.tsx"));
 const MyBookings = lazy(() => import("./pages/MyBookings.tsx"));
 const OwnerDashboard = lazy(() => import("./pages/OwnerDashboard.tsx"));
+const OwnerProfile = lazy(() => import("./pages/OwnerProfile.tsx"));
 const AddApartment = lazy(() => import("./pages/AddApartment.tsx"));
 const EditApartment = lazy(() => import("./pages/EditApartment.tsx"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard.tsx"));
@@ -179,11 +180,19 @@ function AppRoutes() {
             }
           />
           <Route
+            path="/owner/profile"
+            element={
+              <RequireAuth>
+                <OwnerProfile />
+              </RequireAuth>
+            }
+          />
+          <Route
             path="/owner/add"
             element={
-              <RequireRole roles={["owner", "admin"]}>
+              <RequireAuth>
                 <AddApartment />
-              </RequireRole>
+              </RequireAuth>
             }
           />
           <Route

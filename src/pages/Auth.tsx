@@ -42,7 +42,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
   const [searchParams] = useSearchParams();
   const ownerMode = searchParams.get("owner") === "1";
   const redirect = ownerMode && !searchParams.get("returnTo")
-    ? "/owner/add"
+    ? "/owner/profile"
     : resolveRedirectAfterAuth(
         searchParams.get("returnTo"),
         redirectAfterAuth,

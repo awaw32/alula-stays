@@ -6,7 +6,7 @@ import { DEMO_MODE } from "@/lib/demo-data";
 import { api } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import { useAuth } from "@/hooks/use-auth";
-import { useNavigate } from "react-router";
+import { useNavigate, Navigate } from "react-router";
 import {
   Home,
   Calendar,
@@ -34,6 +34,7 @@ const fadeUp = {
 export default function OwnerDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const myProfile = useQuery(api.users.myProfile, DEMO_MODE ? "skip" : undefined);
   const myApartments = useQuery(api.admin.ownerApartments, DEMO_MODE ? "skip" : undefined);
   const myBookings = useQuery(api.bookings.ownerBookings, DEMO_MODE ? "skip" : undefined);
   const deleteApartment = useMutation(api.admin.deleteApartment);
@@ -41,6 +42,11 @@ export default function OwnerDashboard() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [now] = useState(() => Date.now());
+
+  // إكمال الملف الشخصي قبل دخول اللوحة
+  if (myProfile !== undefined && !myProfile?.phone) {
+    return <Navigate to="/owner/profile" replace />;
+  }
 
   const handleDelete = async (id: string) => {
     setDeleting(id);
@@ -70,7 +76,10 @@ export default function OwnerDashboard() {
           <h1 className="text-2xl md:text-3xl font-bold text-[var(--foreground)] mb-2">
             لوحة تحكم المالك
           </h1>
-          <p className="text-[var(--muted-foreground)]">مرحباً {user?.name || "المالك"}</p>
+          <p className="text-[var(--muted-foreground)]">
+            مرحباً {user?.name || "المالك"}
+            {myProfile?.phone ? ` · جوال: ${myProfile.phone}` : ""}
+          </p>
         </motion.div>
 
         {/* Stats */}
@@ -109,6 +118,10 @@ export default function OwnerDashboard() {
         {/* Apartments Tab */}
         {activeTab === "apartments" && (
           <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={2}>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="text-lg font-bold text-[var(--foreground)]">شققي ({myApartments?.length ?? 0})</h2>
+              <button onClick={() => navigate("/owner/add")} className="clay-btn text-sm">إضافة شقة</button>
+            </div>
             {myApartments === undefined ? (
               <div className="clay p-6 animate-pulse h-40" />
             ) : myApartments.length === 0 ? (

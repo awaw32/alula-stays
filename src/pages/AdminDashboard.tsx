@@ -46,7 +46,7 @@ export default function AdminDashboard() {
   const handleVerify = async (id: string, verified: boolean) => {
     try {
       await verifyApartment({ apartmentId: id as Id<"apartments">, verified });
-      toast.success(verified ? "تم توثيق الشقة" : "تم إلغاء توثيق الشقة");
+      toast.success(verified ? "تم قبول الشقة ونشرها" : "تم رفض الشقة وإخفاؤها من الموقع");
     } catch (error) {
       toast.error(getErrorMessage(error, "تعذر تحديث حالة التوثيق"));
     }
@@ -142,9 +142,9 @@ export default function AdminDashboard() {
                       <p className="text-sm text-[var(--muted-foreground)]">{getApartmentLocation(apt)} · {apt.price.toLocaleString("ar-SA")} ر.س/ليلة</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <button type="button" onClick={() => handleVerify(apt._id, !apt.isVerified)} className={`clay-sm flex items-center gap-1 px-3 py-1.5 text-xs font-medium ${apt.isVerified ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-600"}`} aria-label={apt.isVerified ? "إلغاء توثيق الشقة" : "توثيق الشقة"}>
-                        {apt.isVerified ? <CheckCircle className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
-                        {apt.isVerified ? "موثقة" : "توثيق"}
+                      <button type="button" onClick={() => handleVerify(apt._id, !apt.isVerified)} className={`clay-sm flex items-center gap-1 px-3 py-1.5 text-xs font-medium ${apt.isVerified ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`} aria-label={apt.isVerified ? "رفض الشقة وإخفاؤها" : "قبول الشقة ونشرها"}>
+                        {apt.isVerified ? <XCircle className="w-3.5 h-3.5" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                        {apt.isVerified ? "رفض" : "قبول"}
                       </button>
                       <button type="button" onClick={() => handleFeature(apt._id, !apt.isFeatured)} className={`clay-sm flex items-center gap-1 px-3 py-1.5 text-xs font-medium ${apt.isFeatured ? "bg-amber-50 text-amber-700" : "bg-gray-100 text-gray-600"}`} aria-label={apt.isFeatured ? "إلغاء تمييز الشقة" : "تمييز الشقة"}>
                         <Star className={`w-3.5 h-3.5 ${apt.isFeatured ? "fill-amber-400" : ""}`} />
