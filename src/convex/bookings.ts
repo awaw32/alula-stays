@@ -8,6 +8,8 @@ import {
   requireRole,
   requireUser,
 } from "./lib/authorization";
+import { isApartmentLive } from "./admin";
+import { overlapsBlockedDates } from "./calendar";
 import {
   validateBookingDates,
   validateGuests,
@@ -100,7 +102,7 @@ export const checkAvailability = query({
     }
 
     const apartment = await ctx.db.get(args.apartmentId);
-    if (!apartment || apartment.available === false || !apartment.isVerified) {
+    if (!apartment || !isApartmentLive(apartment)) {
       return { available: false };
     }
 
@@ -116,7 +118,14 @@ export const checkAvailability = query({
         args.checkOut > booking.checkIn,
     );
 
-    return { available: !hasOverlap };
+    if (hasOverlap) {
+      return { available: false };
+    }
+
+    // التواريخ المحجوبة يدوياً من المالك
+    const blocked = await overlapsBlockedDates(ctx, args.apartmentId, args.checkIn, args.checkOut);
+
+    return { available: !blocked };
   },
 });
 
@@ -149,8 +158,8 @@ export const create = mutation({
         throw new ValidationError(ERROR_MESSAGES.APARTMENT_UNAVAILABLE);
       }
 
-      // التحقق من أن الشقة موثقة/مفعّلة
-      if (!apartment.isVerified) {
+      // التحقق من أن الشقة معتمدة ومنشورة (حالة دورة الحياة الجديدة أو isVerified للشقق القديمة)
+      if (!isApartmentLive(apartment)) {
         throw new ValidationError(ERROR_MESSAGES.APARTMENT_NOT_VERIFIED);
       }
 
@@ -182,6 +191,17 @@ export const create = mutation({
       );
 
       if (hasOverlap) {
+        throw new ValidationError(ERROR_MESSAGES.BOOKING_DATES_UNAVAILABLE);
+      }
+
+      // التحقق من عدم التقاطع مع تواريخ حجبها المالك (صيانة/حظر)
+      const blockedOverlap = await overlapsBlockedDates(
+        ctx,
+        args.apartmentId,
+        args.checkIn,
+        args.checkOut,
+      );
+      if (blockedOverlap) {
         throw new ValidationError(ERROR_MESSAGES.BOOKING_DATES_UNAVAILABLE);
       }
 

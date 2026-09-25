@@ -32,6 +32,10 @@ const schema = defineSchema(
       isAnonymous: v.optional(v.boolean()), // is the user anonymous. do not remove
 
       role: v.optional(roleValidator), // role of the user. do not remove
+
+      // تعطيل الحساب من الأدمن
+      isDisabled: v.optional(v.boolean()),
+      disabledReason: v.optional(v.string()),
     }).index("email", ["email"]), // index for the email. do not remove or modify
 
     // Apartments / Listings
@@ -60,6 +64,21 @@ const schema = defineSchema(
       rulesAr: v.optional(v.array(v.string())),
       ownerId: v.optional(v.id("users")),
       available: v.optional(v.boolean()),
+
+      // دورة حياة الشقة: بانتظار المراجعة → مقبولة/مرفوضة/تحتاج تعديلات → موقوفة
+      status: v.optional(
+        v.union(
+          v.literal("pending"),
+          v.literal("approved"),
+          v.literal("rejected"),
+          v.literal("needs_changes"),
+          v.literal("suspended"),
+        ),
+      ),
+      reviewNotes: v.optional(v.string()), // سبب الرفض أو ملاحظات الأدمن
+      reviewedBy: v.optional(v.id("users")), // الأدمن الذي راجع الشقة
+      reviewedAt: v.optional(v.number()), // تاريخ آخر مراجعة
+      resubmissionCount: v.optional(v.number()), // عدد مرات إعادة الإرسال بعد الرفض
     })
       .index("by_location", ["location"])
       .index("by_price", ["price"])
@@ -109,6 +128,46 @@ const schema = defineSchema(
       .index("by_status", ["status"])
       .index("by_checkin", ["checkIn"])
       .index("by_payment_session", ["paymentSessionId"]),
+
+    // التواريخ المحجوبة يدوياً من المالك (صيانة، حظر أيام، إلخ)
+    blockedDates: defineTable({
+      apartmentId: v.id("apartments"),
+      startDate: v.number(), // بداية الفترة المحجوبة (timestamp، بداية اليوم)
+      endDate: v.number(), // نهاية الفترة المحجوبة (timestamp، نهاية اليوم)
+      reason: v.optional(v.string()), // سبب الحجب (صيانة، استخدام شخصي...)
+      ownerId: v.id("users"),
+      createdAt: v.number(),
+    })
+      .index("by_apartment", ["apartmentId"])
+      .index("by_owner", ["ownerId"]),
+
+    // ━━━ نظام مستحقات المالكين ━━━
+
+    // بيانات التحويل البنكي للمالك
+    ownerPayoutAccounts: defineTable({
+      ownerId: v.id("users"),
+      iban: v.string(),
+      accountHolderName: v.string(),
+      bankName: v.optional(v.string()),
+      updatedAt: v.number(),
+    })
+      .index("by_owner", ["ownerId"]),
+
+    // سجل تحويلات المستحقات (يُسجّل يدوياً من الأدمن حتى ربط مزود تحويل)
+    payouts: defineTable({
+      ownerId: v.id("users"),
+      amount: v.number(),
+      bookingIds: v.optional(v.array(v.id("bookings"))), // الحجوزات المشمولة
+      method: v.union(v.literal("manual_transfer"), v.literal("bank")),
+      reference: v.optional(v.string()), // رقم المرجع/الحوالة
+      status: v.union(v.literal("pending"), v.literal("completed"), v.literal("failed")),
+      note: v.optional(v.string()),
+      recordedBy: v.id("users"), // الأدمن الذي سجل التحويل
+      createdAt: v.number(),
+      completedAt: v.optional(v.number()),
+    })
+      .index("by_owner", ["ownerId"])
+      .index("by_status", ["status"]),
 
     // Favorites
     favorites: defineTable({

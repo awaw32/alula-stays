@@ -1,6 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { query, type QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
+import { isApartmentLive } from "./admin";
 
 /**
  * جلب دور المستخدم الحالي إن كان مسجلاً (null للزوار).
@@ -26,10 +27,10 @@ export const list = query({
     const canSeeUnverified = viewerRole === "owner" || viewerRole === "admin";
     let apartments = await ctx.db.query("apartments").collect();
 
-    // الزائر العادي والمستأجر يرون المنشور (الموثق) فقط —
-    // المالك يرى شققه غير الموثقة ليتابع حالتها، والإدارة ترى الكل.
+    // الزائر العادي والمستأجر يرون المنشور (المعتمد) فقط —
+    // المالك يرى شققه بكل حالاتها ليتابعها، والإدارة ترى الكل.
     if (!canSeeUnverified) {
-      apartments = apartments.filter((a) => a.isVerified);
+      apartments = apartments.filter((a) => isApartmentLive(a));
     }
 
     if (args.location && args.location !== "all") {
@@ -77,8 +78,8 @@ export const get = query({
     const apartment = await ctx.db.get(args.apartmentId);
     if (!apartment) return null;
 
-    // منع عرض الشقق غير الموثقة على الزوار والمستأجرين
-    if (!apartment.isVerified) {
+    // منع عرض الشقق غير المعتمدة على الزوار والمستأجرين
+    if (!isApartmentLive(apartment)) {
       const viewerRole = await getViewerRole(ctx);
       if (viewerRole === "owner" || viewerRole === "admin") return apartment;
       const userId = await getAuthUserId(ctx);
@@ -93,21 +94,21 @@ export const get = query({
 export const featured = query({
   handler: async (ctx) => {
     const all = await ctx.db.query("apartments").collect();
-    return all.filter((a) => a.isFeatured && a.isVerified).slice(0, 6);
+    return all.filter((a) => a.isFeatured && isApartmentLive(a)).slice(0, 6);
   },
 });
 
 export const locations = query({
   handler: async (ctx) => {
     const all = await ctx.db.query("apartments").collect();
-    const locs = [...new Set(all.filter((a) => a.isVerified).map((a) => a.location))];
+    const locs = [...new Set(all.filter((a) => isApartmentLive(a)).map((a) => a.location))];
     return locs;
   },
 });
 
 export const stats = query({
   handler: async (ctx) => {
-    const all = (await ctx.db.query("apartments").collect()).filter((a) => a.isVerified);
+    const all = (await ctx.db.query("apartments").collect()).filter((a) => isApartmentLive(a));
     return {
       total: all.length,
       avgPrice: all.length
