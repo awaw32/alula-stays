@@ -96,6 +96,9 @@ export default function Landing() {
   const featuredApartments = DEMO_MODE ? DEMO_APARTMENTS.slice(0, 3) : liveFeatured;
   const stats = DEMO_MODE ? DEMO_STATS : liveStats;
 
+  // إعدادات التواصل الرسمية — يديرها الأدمن من تبويب الإعدادات
+  const siteSettings = useQuery(api.settings.get, {});
+
   // حالة شريط البحث
   const navigate = useNavigate();
   const [searchLocation, setSearchLocation] = useState("");
@@ -446,8 +449,9 @@ export default function Landing() {
               <h4 className="font-bold text-[var(--foreground)] mb-4">تواصل معنا</h4>
               <div className="flex flex-col gap-2 text-sm text-[var(--muted-foreground)]">
                 <span>📍 العلا، المملكة العربية السعودية</span>
-                <span>📧 info@soqaqalaula.world</span>
-                <span>📱 +966-XX-XXX-XXXX</span>
+                <span>📧 {siteSettings?.contactEmail || "info@soqaqalaula.world"}</span>
+                <span>📱 {siteSettings?.contactPhone || "+966-XX-XXX-XXXX"}</span>
+                {siteSettings?.whatsapp && <span>💬 {siteSettings.whatsapp}</span>}
               </div>
             </div>
           </div>

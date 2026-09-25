@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/error-message";
 import { CalendarBlockManager } from "@/components/owner/CalendarBlockManager";
 import { OwnerFinance } from "@/components/owner/OwnerFinance";
+import { OwnerIdentityVerification } from "@/components/owner/OwnerIdentityVerification";
 
 const OWNER_STATUS_LABELS: Record<string, { label: string; className: string }> = {
   pending: { label: "بانتظار مراجعة الإدارة", className: "bg-amber-100 text-amber-700" },
@@ -95,6 +96,11 @@ export default function OwnerDashboard() {
             مرحباً {user?.name || "المالك"}
             {myProfile?.phone ? ` · جوال: ${myProfile.phone}` : ""}
           </p>
+        </motion.div>
+
+        {/* Identity Verification */}
+        <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={0} className="mb-6">
+          <OwnerIdentityVerification />
         </motion.div>
 
         {/* Stats */}

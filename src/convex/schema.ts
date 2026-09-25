@@ -297,6 +297,58 @@ const schema = defineSchema(
       .index("by_user", ["userId"]),
 
     // جداول أخرى احتياطية
+    // إعدادات المنصة (تواصل، مفاتيح API) — سجل واحد يُدار من الأدمن
+    siteSettings: defineTable({
+      key: v.string(), // "general" سجل وحيد
+      contactEmail: v.optional(v.string()),
+      contactPhone: v.optional(v.string()),
+      whatsapp: v.optional(v.string()),
+      instagram: v.optional(v.string()),
+      twitter: v.optional(v.string()),
+      brandName: v.optional(v.string()),
+      // مفاتيح API (تُخزن للعرض الجزئي فقط — المفاتيح الحقيقية في env)
+      paymentProvider: v.optional(v.string()), // moyasar | tap | stripe
+      paymentApiKeyLast4: v.optional(v.string()), // آخر 4 خانات للعرض
+      emailProvider: v.optional(v.string()), // sendgrid | mailgun | none
+      emailApiKeyLast4: v.optional(v.string()),
+      mapsProvider: v.optional(v.string()), // openstreetmap | google
+      notes: v.optional(v.string()),
+      updatedAt: v.number(),
+      updatedBy: v.optional(v.id("users")),
+    }),
+
+    // طلبات التحقق من هوية المالك
+    identityVerifications: defineTable({
+      userId: v.id("users"),
+      ownerType: v.union(v.literal("individual"), v.literal("company"), v.literal("property_manager")),
+      fullName: v.string(),
+      documentType: v.union(v.literal("national_id"), v.literal("commercial_register")),
+      documentStorageId: v.string(), // صورة الهوية/السجل
+      status: v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected")),
+      rejectionReason: v.optional(v.string()),
+      reviewedBy: v.optional(v.id("users")),
+      reviewedAt: v.optional(v.number()),
+      createdAt: v.number(),
+    })
+      .index("by_user", ["userId"])
+      .index("by_status", ["status"]),
+
+    // البلاغات (شقة، تقييم، مستخدم)
+    reports: defineTable({
+      reporterId: v.id("users"),
+      targetType: v.union(v.literal("apartment"), v.literal("review"), v.literal("user")),
+      targetId: v.string(),
+      reason: v.union(v.literal("inaccurate"), v.literal("inappropriate_images"), v.literal("misleading"), v.literal("scam"), v.literal("other")),
+      details: v.optional(v.string()),
+      status: v.union(v.literal("pending"), v.literal("resolved"), v.literal("dismissed")),
+      resolutionNote: v.optional(v.string()),
+      resolvedBy: v.optional(v.id("users")),
+      resolvedAt: v.optional(v.number()),
+      createdAt: v.number(),
+    })
+      .index("by_status", ["status"])
+      .index("by_target", ["targetType", "targetId"]),
+
     backups: defineTable({
       name: v.string(),
       timestamp: v.number(),

@@ -128,6 +128,7 @@ export default function ApartmentDetail() {
   const reviews = DEMO_MODE ? [] : liveReviews;
   const isFavorited = DEMO_MODE ? false : liveFavorited;
   const toggleFavorite = useMutation(api.favorites.toggle);
+  const createReport = useMutation(api.reports.create);
   const createBooking = useMutation(api.bookings.create);
   const createReview = useMutation(api.reviews.create);
   const createCheckoutSession = useAction(api.payments.createCheckoutSession);
@@ -333,8 +334,37 @@ export default function ApartmentDetail() {
                 <div className="flex items-start justify-between gap-4 mb-4">
                   <div>
                     <h1 className="mb-2 text-2xl font-bold text-[var(--foreground)] md:text-3xl">{getApartmentTitle(apartment)}</h1>
-                     <div className="flex items-center gap-2 text-[var(--muted-foreground)]">
+                     <div className="flex flex-wrap items-center gap-2 text-[var(--muted-foreground)]">
                        <MapPin className="h-4 w-4" aria-hidden="true" /><span>{getApartmentLocation(apartment)}</span>
+                      {(apartment as { latitude?: number; longitude?: number }).latitude != null && (apartment as { longitude?: number }).longitude != null && (
+                        <a
+                          href={`https://www.openstreetmap.org/?mlat=${(apartment as { latitude?: number }).latitude}&mlon=${(apartment as { longitude?: number }).longitude}#map=15/${(apartment as { latitude?: number }).latitude}/${(apartment as { longitude?: number }).longitude}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-[var(--clay-accent)] underline"
+                        >
+                          عرض على الخريطة ↗
+                        </a>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!apartmentId) return;
+                          const reason = window.prompt("سبب البلاغ (بيانات غير دقيقة، صور غير لائقة، وصف مضلل، احتيال...):");
+                          if (!reason?.trim()) return;
+                          createReport({
+                            targetType: "apartment",
+                            targetId: apartmentId,
+                            reason: "other",
+                            details: reason.trim(),
+                          })
+                            .then((r) => toast.success(r.message))
+                            .catch((err) => toast.error(getErrorMessage(err, "تعذر إرسال البلاغ")));
+                        }}
+                        className="text-xs text-[var(--muted-foreground)] hover:text-red-600 underline"
+                      >
+                        إبلاغ ⚑
+                      </button>
                       {apartment.isVerified && (
                         <span className="flex items-center gap-1 text-emerald-600 text-xs font-medium">
                           <CheckCircle className="w-3.5 h-3.5" />موثقة

@@ -25,6 +25,10 @@ import {
 // CheckCircle/XCircle مستخدمان في أزرار الشقق أدناه
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { AdminPayouts } from "@/components/admin/AdminPayouts";
+import { AdminSettings } from "@/components/admin/AdminSettings";
+import { AdminVerifications } from "@/components/admin/AdminVerifications";
+import { AdminReports } from "@/components/admin/AdminReports";
 
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   pending: { label: "بانتظار المراجعة", className: "bg-amber-100 text-amber-700" },
@@ -73,7 +77,7 @@ export default function AdminDashboard() {
       toast.error(getErrorMessage(error, "تعذر تحديث حالة الحساب"));
     }
   };
-  const [activeTab, setActiveTab] = useState<"stats" | "apartments" | "users" | "bookings" | "finance" | "activity">("stats");
+  const [activeTab, setActiveTab] = useState<"stats" | "apartments" | "users" | "bookings" | "finance" | "activity" | "settings" | "verifications" | "reports">("stats");
   const adminBookings = useQuery(api.bookings.adminList, DEMO_MODE || activeTab !== "bookings" ? "skip" : {});
   const activityLog = useQuery(api.admin.adminActivityLog, DEMO_MODE || activeTab !== "activity" ? "skip" : { limit: 80 });
   const [reviewTarget, setReviewTarget] = useState<{ id: string; title: string; action: Exclude<ReviewAction, null> } | null>(null);
@@ -173,7 +177,7 @@ export default function AdminDashboard() {
 
         {/* Tabs */}
         <div className="mb-6 flex gap-2" role="tablist" aria-label="أقسام لوحة الإدارة">
-          {(["stats", "apartments", "bookings", "users", "finance", "activity"] as const).map((tab) => (
+          {(["stats", "apartments", "bookings", "users", "finance", "verifications", "reports", "settings", "activity"] as const).map((tab) => (
             <button
               key={tab}
               type="button"
@@ -182,7 +186,7 @@ export default function AdminDashboard() {
               onClick={() => setActiveTab(tab)}
               className={`clay-sm px-5 py-2.5 text-sm font-medium transition-all ${activeTab === tab ? "!bg-[var(--clay-accent)] !text-white" : "text-[var(--muted-foreground)]"}`}
             >
-              {tab === "stats" ? "نظرة عامة" : tab === "apartments" ? "الشقق" : tab === "bookings" ? "الحجوزات" : tab === "users" ? "المستخدمون" : tab === "finance" ? "المالية" : "سجل النشاط"}
+              {tab === "stats" ? "نظرة عامة" : tab === "apartments" ? "الشقق" : tab === "bookings" ? "الحجوزات" : tab === "users" ? "المستخدمون" : tab === "finance" ? "المالية" : tab === "verifications" ? "توثيق الهويات" : tab === "reports" ? "البلاغات" : tab === "settings" ? "الإعدادات" : "سجل النشاط"}
             </button>
           ))}
         </div>
@@ -373,16 +377,28 @@ export default function AdminDashboard() {
         {/* Finance Tab */}
         {activeTab === "finance" && (
           <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={2}>
-            <div className="clay p-6 text-center">
-              <DollarSign className="w-8 h-8 mx-auto text-[var(--muted-foreground)] mb-3" />
-              <h3 className="font-bold mb-2">الإدارة المالية</h3>
-              <p className="text-sm text-[var(--muted-foreground)] mb-4">
-                تسجيل تحويلات مستحقات المالكين ومتابعة أرصدتهم — يعرض إيرادات المنصة أعلاه في بطاقات النظرة العامة.
-              </p>
-              <p className="text-xs text-[var(--muted-foreground)]">
-                واجهة تسجيل التحويلات الكاملة تُدار من دالة adminRecordPayout — جاهزة للربط بواجهة تفصيلية في المرحلة القادمة.
-              </p>
-            </div>
+            <AdminPayouts users={allUsers ?? []} />
+          </motion.div>
+        )}
+
+        {/* Identity Verifications */}
+        {activeTab === "verifications" && (
+          <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={2}>
+            <AdminVerifications />
+          </motion.div>
+        )}
+
+        {/* Reports */}
+        {activeTab === "reports" && (
+          <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={2}>
+            <AdminReports />
+          </motion.div>
+        )}
+
+        {/* Settings */}
+        {activeTab === "settings" && (
+          <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={2}>
+            <AdminSettings />
           </motion.div>
         )}
 
