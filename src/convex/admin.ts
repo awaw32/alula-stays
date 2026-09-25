@@ -160,6 +160,24 @@ export const createApartment = mutation({
 
     await notifyOwnerStatusChange(ctx, user._id, apartmentId, "pending", args.titleAr || args.title);
 
+    // إشعار كل الأدمن بوجود شقة جديدة بانتظار المراجعة
+    const admins = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("role"), "admin"))
+      .collect();
+    for (const admin of admins) {
+      await ctx.db.insert("notifications", {
+        userId: admin._id,
+        type: "apartment_pending_review",
+        title: "🆕 شقة جديدة بانتظار المراجعة",
+        message: `رفع ${user.name ?? "مالك"} شقة "${args.titleAr || args.title}" — بانتظار قرارك`,
+        relatedApartmentId: apartmentId,
+        actionUrl: "/admin",
+        read: false,
+        createdAt: Date.now(),
+      });
+    }
+
     return apartmentId;
   },
 });
