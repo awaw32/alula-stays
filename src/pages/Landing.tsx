@@ -1,10 +1,11 @@
 import { motion } from "framer-motion";
+import { useState } from "react";
 import { Navigation } from "@/components/Navigation";
 import { ApartmentCard } from "@/components/ApartmentCard";
 import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { DEMO_MODE, DEMO_APARTMENTS, DEMO_STATS } from "@/lib/demo-data";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import type { ApartmentRecord } from "@/types/apartment";
 import {
   Search,
@@ -88,8 +89,19 @@ export default function Landing() {
     api.apartments.stats,
     DEMO_MODE ? "skip" : undefined,
   );
+  const liveLocations = useQuery(
+    api.apartments.locations,
+    DEMO_MODE ? "skip" : undefined,
+  );
   const featuredApartments = DEMO_MODE ? DEMO_APARTMENTS.slice(0, 3) : liveFeatured;
   const stats = DEMO_MODE ? DEMO_STATS : liveStats;
+
+  // حالة شريط البحث
+  const navigate = useNavigate();
+  const [searchLocation, setSearchLocation] = useState("");
+  const [searchCheckIn, setSearchCheckIn] = useState("");
+  const [searchCheckOut, setSearchCheckOut] = useState("");
+  const [searchGuests, setSearchGuests] = useState(2);
 
   return (
     <div className="min-h-screen bg-[var(--background)] pb-24 md:pb-0">
@@ -139,22 +151,76 @@ export default function Landing() {
               تجربة إقامة لا تُنسى في أقدم منطقة أثرية في العالم
             </motion.p>
 
-            {/* Search Bar */}
+            {/* Search Bar — بحث فعلي بالتواريخ والضيوف */}
             <motion.div variants={fadeUp} custom={3}>
-              <Link
-                to="/apartments"
-                className="clay inline-flex items-center gap-3 px-6 py-4 md:px-8 md:py-5 w-full max-w-2xl hover:-translate-y-0.5 transition-all group"
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const params = new URLSearchParams();
+                  if (searchLocation) params.set("location", searchLocation);
+                  if (searchCheckIn) params.set("checkIn", searchCheckIn);
+                  if (searchCheckOut) params.set("checkOut", searchCheckOut);
+                  if (searchGuests > 1) params.set("guests", String(searchGuests));
+                  navigate(`/apartments${params.toString() ? `?${params.toString()}` : ""}`);
+                }}
+                className="clay p-3 w-full max-w-3xl mx-auto"
               >
-                <Search className="w-5 h-5 text-[var(--muted-foreground)] group-hover:text-[var(--clay-accent)] transition-colors" />
-                <div className="flex-1 text-right">
-                  <span className="text-[var(--muted-foreground)] text-sm md:text-base">
-                    ابحث عن شقة مثالية في العلا...
-                  </span>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-2 items-end">
+                  <div className="col-span-2 md:col-span-1">
+                    <label htmlFor="hero-search-location" className="text-[10px] text-[var(--muted-foreground)] block mb-1">الموقع</label>
+                    <select
+                      id="hero-search-location"
+                      value={searchLocation}
+                      onChange={(e) => setSearchLocation(e.target.value)}
+                      className="clay-input w-full text-sm"
+                    >
+                      <option value="">كل المواقع</option>
+                      {(liveLocations ?? []).map((loc) => (
+                        <option key={loc} value={loc}>{loc}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="hero-search-checkin" className="text-[10px] text-[var(--muted-foreground)] block mb-1">الوصول</label>
+                    <input
+                      id="hero-search-checkin"
+                      type="date"
+                      value={searchCheckIn}
+                      min={new Date().toISOString().split("T")[0]}
+                      onChange={(e) => setSearchCheckIn(e.target.value)}
+                      className="clay-input w-full text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="hero-search-checkout" className="text-[10px] text-[var(--muted-foreground)] block mb-1">المغادرة</label>
+                    <input
+                      id="hero-search-checkout"
+                      type="date"
+                      value={searchCheckOut}
+                      min={searchCheckIn || new Date().toISOString().split("T")[0]}
+                      onChange={(e) => setSearchCheckOut(e.target.value)}
+                      className="clay-input w-full text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="hero-search-guests" className="text-[10px] text-[var(--muted-foreground)] block mb-1">الضيوف</label>
+                    <select
+                      id="hero-search-guests"
+                      value={searchGuests}
+                      onChange={(e) => setSearchGuests(Number(e.target.value))}
+                      className="clay-input w-full text-sm"
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                        <option key={n} value={n}>{n} {n === 1 ? "ضيف" : "ضيوف"}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button type="submit" className="clay-btn text-sm py-2.5 px-4 flex items-center justify-center gap-2 md:col-span-1 col-span-2">
+                    <Search className="w-4 h-4" />
+                    بحث
+                  </button>
                 </div>
-                <div className="clay-btn text-sm py-2 px-4 md:py-2.5 md:px-6">
-                  ابحث
-                </div>
-              </Link>
+              </form>
             </motion.div>
 
             {/* Stats */}
@@ -380,14 +446,30 @@ export default function Landing() {
               <h4 className="font-bold text-[var(--foreground)] mb-4">تواصل معنا</h4>
               <div className="flex flex-col gap-2 text-sm text-[var(--muted-foreground)]">
                 <span>📍 العلا، المملكة العربية السعودية</span>
-                <span>📧 info@alula-apartments.com</span>
-                <span>📱 +966 50 123 4567</span>
+                <span>📧 info@soqaqalaula.world</span>
+                <span>📱 +966-XX-XXX-XXXX</span>
               </div>
             </div>
           </div>
 
-          <div className="mt-10 pt-6 border-t border-[var(--border)] text-center text-xs text-[var(--muted-foreground)]">
-            © 2024 شقق العلا. جميع الحقوق محفوظة.
+          <div className="mt-8 flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs">
+            {[
+              ["/legal/about", "من نحن"],
+              ["/legal/terms", "شروط الاستخدام"],
+              ["/legal/privacy", "سياسة الخصوصية"],
+              ["/legal/cancellation", "الإلغاء والاسترداد"],
+              ["/legal/owners", "سياسة المالكين"],
+              ["/legal/faq", "الأسئلة الشائعة"],
+              ["/legal/complaints", "الشكاوى"],
+            ].map(([to, label]) => (
+              <Link key={to} to={to} className="text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
+                {label}
+              </Link>
+            ))}
+          </div>
+
+          <div className="mt-6 pt-6 border-t border-[var(--border)] text-center text-xs text-[var(--muted-foreground)]">
+            © {new Date().getFullYear()} شقق العلا. جميع الحقوق محفوظة.
           </div>
         </div>
       </footer>

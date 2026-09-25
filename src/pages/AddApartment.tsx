@@ -39,11 +39,6 @@ export default function AddApartment() {
   const becomeOwner = useMutation(api.users.becomeOwner);
   const [upgrading, setUpgrading] = useState(false);
 
-  // إكمال الملف الشخصي قبل إضافة شقة
-  if (myProfile !== undefined && !myProfile?.phone) {
-    return <Navigate to="/owner/profile" replace />;
-  }
-
   // ترقية تلقائية إلى "مالك" إذا كان المستخدم مسجلاً بدور عادي —
   // الإدارة تبقى تتحكم بالنشر عبر المراجعة، فالترقية تفتح الرفع فقط.
   useEffect(() => {
@@ -55,6 +50,11 @@ export default function AddApartment() {
         .finally(() => setUpgrading(false));
     }
   }, [role, becomeOwner]);
+
+  // إكمال الملف الشخصي قبل إضافة شقة (بعد الـ hooks لضمان ترتيب ثابت)
+  if (myProfile !== undefined && !myProfile?.phone) {
+    return <Navigate to="/owner/profile" replace />;
+  }
 
   const handleSubmit = async (values: ApartmentFormValues) => {
     const id = await createApartment({

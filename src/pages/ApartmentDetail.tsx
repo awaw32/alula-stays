@@ -144,6 +144,12 @@ export default function ApartmentDetail() {
       : { apartmentId, checkIn: checkIn.getTime(), checkOut: checkOut.getTime() },
   );
   const availability = DEMO_MODE ? { available: true } : liveAvailability;
+
+  // التواريخ غير المتاحة (محجوزة أو محجوبة من المالك) — لتحذير الضيف قبل الاختيار
+  const liveUnavailable = useQuery(
+    api.calendar.unavailableDates,
+    DEMO_MODE || !apartmentId ? "skip" : { apartmentId },
+  );
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [bookingSuccess, setBookingSuccess] = useState<BookingSuccess | null>(null);
@@ -509,6 +515,21 @@ export default function ApartmentDetail() {
                            <input type="date" className="clay-input w-full text-center text-sm" min={checkIn ? formatDateInput(checkIn) : formatDateInput(new Date())} value={formatDateInput(checkOut)} onChange={(e) => setCheckOut(parseDateInput(e.target.value))} aria-label="تاريخ المغادرة" />
                         </div>
                       </div>
+                      {liveUnavailable && liveUnavailable.unavailableDays.length > 0 && (
+                        <details className="text-xs text-[var(--muted-foreground)]">
+                          <summary className="cursor-pointer select-none">
+                            <AlertCircle className="w-3.5 h-3.5 inline ml-1" />
+                            أيام غير متاحة ({Math.min(liveUnavailable.unavailableDays.length, 90)} يوماً قادماً) — اضغط للعرض
+                          </summary>
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {liveUnavailable.unavailableDays.slice(0, 90).map((day) => (
+                              <span key={day} className="bg-red-50 text-red-700 rounded-md px-1.5 py-0.5 text-[10px]">
+                                {new Date(day).toLocaleDateString("ar-SA", { day: "numeric", month: "short" })}
+                              </span>
+                            ))}
+                          </div>
+                        </details>
+                      )}
                     </div>
 
                     {/* Guests */}

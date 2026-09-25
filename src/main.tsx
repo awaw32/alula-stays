@@ -19,6 +19,7 @@ const ApartmentDetail = lazy(() => import("./pages/ApartmentDetail.tsx"));
 const Favorites = lazy(() => import("./pages/Favorites.tsx"));
 const MyBookings = lazy(() => import("./pages/MyBookings.tsx"));
 const OwnerDashboard = lazy(() => import("./pages/OwnerDashboard.tsx"));
+const Legal = lazy(() => import("./pages/Legal.tsx"));
 const OwnerProfile = lazy(() => import("./pages/OwnerProfile.tsx"));
 const AddApartment = lazy(() => import("./pages/AddApartment.tsx"));
 const EditApartment = lazy(() => import("./pages/EditApartment.tsx"));
@@ -185,6 +186,12 @@ function AppRoutes() {
               <RequireAuth>
                 <OwnerProfile />
               </RequireAuth>
+            }
+          />
+          <Route
+            path="/legal/:section"
+            element={
+              <Legal />
             }
           />
           <Route
