@@ -188,7 +188,9 @@ node scripts/deploy-ftp.mjs
 git add -A; git commit -m "..."; git push origin main
 ```
 
-> ملاحظة: deployment الإنتاج الحالي: `adorable-tortoise-624` (راجع .env.local لو تغيّر).
+> ⚠️ **deployment الإنتاج الرسمي: `wry-mosquito-572`** — عليه متغيرات المصادقة (JWT/JWKS) والسجل الحي.
+> انتبه: `adorable-tortoise-624` deployment شقيق بلا متغيرات مصادقة — لا تبِن الواجهة عليه وإلا انهار auth:signIn (حدث فعلاً وأُصلح).
+> بناء الواجهة للنشر: `VITE_CONVEX_URL=https://wry-mosquito-572.convex.cloud` دائماً.
 
 ---
 

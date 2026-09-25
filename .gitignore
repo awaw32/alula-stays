@@ -15,3 +15,6 @@ src/convex/_generated
 .jwt-pub.pem
 .freebuff/
 *.log
+env_*.txt
+logs.txt
+build.log
