@@ -51,6 +51,8 @@ export const ERROR_MESSAGES = {
   // الشقق
   APARTMENT_NOT_FOUND: "الشقة غير موجودة",
   APARTMENT_UNAVAILABLE: "الشقة غير متاحة حالياً",
+  APARTMENT_NOT_VERIFIED: "الشقة غير مفعّلة للحجز حالياً",
+  APARTMENT_OWN_BOOKING: "لا يمكنك حجز شقتك الخاصة",
 
   // الحجوزات
   BOOKING_NOT_FOUND: "الحجز غير موجود",

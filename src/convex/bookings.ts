@@ -100,7 +100,7 @@ export const checkAvailability = query({
     }
 
     const apartment = await ctx.db.get(args.apartmentId);
-    if (!apartment || apartment.available === false) {
+    if (!apartment || apartment.available === false || !apartment.isVerified) {
       return { available: false };
     }
 
@@ -147,6 +147,16 @@ export const create = mutation({
       // التحقق من أن الشقة متاحة
       if (apartment.available === false) {
         throw new ValidationError(ERROR_MESSAGES.APARTMENT_UNAVAILABLE);
+      }
+
+      // التحقق من أن الشقة موثقة/مفعّلة
+      if (!apartment.isVerified) {
+        throw new ValidationError(ERROR_MESSAGES.APARTMENT_NOT_VERIFIED);
+      }
+
+      // منع المالك من حجز شقته الخاصة
+      if (apartment.ownerId === user._id) {
+        throw new ValidationError(ERROR_MESSAGES.APARTMENT_OWN_BOOKING);
       }
 
       // التحقق من صحة السعر
