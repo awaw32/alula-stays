@@ -100,30 +100,48 @@
 
 ---
 
-## 4) التدفقات الرئيسية (كيف تعمل)
+## 4) التدفقات الرئيسية (محدثة سبتمبر 2026)
 
-### 4.1 تدفق المالك (أهم ما طُلب أخيراً)
-1. «تسجيل دخول مالك عقار» في صفحة الدخول → `/auth?owner=1` → تسجيل بريد → كود OTP ✅.
-2. عند نجاح التحقق يُوجَّه إلى **`/owner/profile`** (استمارة الاسم/الجوال/المدينة/البلد).
-   - الصفحة ترفّع الدور تلقائياً إلى `owner` (عبر `becomeOwner`) إذا كان `user`.
-   - إذا اكتمل الملف مسبقاً ودوره `owner/admin` ينقل للمالك للوحة `/owner`.
-3. الحفظ (`updateProfile`) → يكتب الاسم في `users` والجوال في `userProfiles` → ينتقل إلى `/owner`.
-4. لوحة المالك عرض: الاحصائيات، تبويب «شققي» مع زر «إضافة شقة» دائم، حالة كل شقة (منشورة/بانتظار المراجعة)، وتبويب الحجوزات.
-5. إضافة شقة (`/owner/add` محمية بـ `RequireAuth` فقط، لا `RequireRole`) → استمارة تتضمن زر «رفع الصور من جهازك».
-   - الوصول إليها بدور غير مكتمل الملف → يردّ إلى `/owner/profile` (حارس داخل الصفحة).
-6. `createApartment` (خلفي): يجعل الشقة `isVerified: false`، ويرقّي أتوماتيكياً أي مستخدم مسجّل إلى `owner` لو لازم.
-7. **الظهور**: `src/convex/apartments.ts` يخفي غير الموثقة عن الزوار والمستأجرين (`list`, `get`, `featured`, `locations`, `stats`).
+### 4.1 تدفق المالك
+1. تسجيل دخول مالك عقار → `/auth?owner=1` → OTP → `/owner/profile`.
+2. الحفظ → `/owner` (لوحة المالك).
+3. لوحة المالك بها 4 تبويبات: **شققي** (شارات الحالة + سبب الرفض بالأحمر)، **الحجوزات** (ضيوف/عمولة/صافي مستحق)، **تقويم التوفر**، **المالية** (أرباح + IBAN + سجل تحويلات). وفوقها قسم **توثيق الهوية** (هوية/سجل تجاري ← مراجعة أدمن).
 
-### 4.2 تدفق قبول/رفض الأدمن
-- الأدمن من `/admin` تبويب «الشقق» يرى كل الشقق (الموثقة وغير الموثقة).
-- زر **«قبول»** → `adminVerifyApartment(verified=true)` → `isVerified=true` → تظهر للعموم فوراً.
-- زر **«رفض»** → `verified=false` → تختفي/تبقى مخفية.
-- مؤشر «بانتظار التوثيق» في بطاقات الإحصائيات يحسب من `adminDashboardStats`.
+### 4.2 دورة حياة الشقة (النظام الجديد)
+- حالات: `pending / approved / rejected / needs_changes / suspended` على حقل `apartments.status`.
+- الأدمن من `/admin` تبويب الشقق: **قبول** مباشر، **رفض/طلب تعديلات/إيقاف** عبر نافذة **تفرض كتابة السبب**. يُحفظ `reviewNotes/reviewedBy/reviewedAt` ويُرسل إشعار للمالك.
+- دالة موحدة `isApartmentLive()` (في admin.ts) تحدد "منشورة" — تدعم الشقق القديمة عبر `isVerified`.
+- تعديل شقة مرفوضة يعيدها تلقائياً لـ pending؛ `resubmitApartment` لإعادة الإرسال.
 
-### 4.3 تدفق الحجز (مختصر)
-- الضيف يفتح الشقة → يحجز تواريخ → `bookings.create` يتحقق من التعارض (التواريخ الحرة) ومن أن الشقة موثقة.
-- خطوات إضافية: `checkAvailability`، تأكيد/إلغاء من قبل الأدمن أو صاحب الشقة، رسوم منصة `platformFee` (10%).
-- **تحصين أُضيف**: لا يمكن حجز شقة غير موثقة، ولا يمكن للمالك حجز شقته بنفسه (`APARTMENT_NOT_VERIFIED`, `APARTMENT_OWN_BOOKING` في `errors.ts`).
+### 4.3 التقويم والتسعير
+- جدول `blockedDates`: حجب يدوي من المالك (صيانة/حظر) — ملف `src/convex/calendar.ts`.
+- **منع تعارض مزدوج** في `bookings.create` و`checkAvailability`: حجوزات فعالة + تواريخ محجوبة (`overlapsBlockedDates`).
+- **تسعير لكل ليلة**: `src/lib/pricing.ts` (مشترك واجهة/خلفية) — ليلة الخميس/الجمعة بسعر `weekendPrice`، والباقي بالأساسي + فحص `minNights`.
+- تقويم 60 يوماً في لوحة المالك + الأيام غير المتاحة معروضة للضيف في صفحة الشقة (قسم قابل للطي).
+
+### 4.4 الحجز والدفع
+- `bookings.create`: تحقق كامل (تسجيل دخول، شقة approved، عدم حجز شقتك، سعر، تواريخ، ضيوف، تعارض، الحد الأدنى) ثم Stripe Checkout من الخادم (`payments.ts`).
+- **Webhook**: `http.ts` على `/stripe-webhook` بتحقق توقيع — `checkout.session.completed` → `bookings.markPaid`، `expired` → `bookings.expireUnpaidSession` (إلغاء الحجز غير المدفوع).
+- الاسترداد محسوب تلقائياً عند الإلغاء (100% قبل 24 ساعة / 50% / بلا) في `calculateRefund`.
+
+### 4.5 الرسائل مالك ↔ ضيف
+- ملف `src/convex/messages.ts` + جدولا `conversations/messages`.
+- زر «مراسلة المالك» في صفحة الشقة → محادثة لكل (ضيف، شقة) → صفحة `/messages` للطرفين.
+- **إخفاء الجوال**: `contactRevealed()` يكشف رقم المالك من `userProfiles` فقط عند وجود حجز confirmed/completed — تنبيه داخل المحادثة يوضح الحالة.
+
+### 4.6 بلاغات وتوثيق هوية
+- `reports.ts`: زر «إبلاغ ⚑» في صفحة الشقة → تبويب «البلاغات» بالأدمن (معالجة/تجاهل) — ضد السبام (بلاغ/ساعة).
+- `identity.ts`: رفع هوية/سجل تجاري من لوحة المالك → تبويب «توثيق الهويات» بالأدمن (قبول يعلّم `userProfiles.identityVerified`).
+
+### 4.7 إعدادات المنصة
+- `settings.ts` + جدول `siteSettings` (سجل وحيد key="general").
+- تبويب **«الإعدادات»** بالأدمن: البريد/الجوال/واتساب/إنستغرام/X/اسم العلامة + مزود الدفع/البريد/الخرائط — والرئيسية تقرأ منها مباشرة.
+- المفاتيح الحقيقية في Convex Dashboard ← Environment Variables (وليس في قاعدة البيانات).
+
+### 4.8 صلاحيات وسجل
+- `requireUser` يمنع الحسابات المعطلة (`users.isDisabled`) من كل الكتابة.
+- الأدمن لا يعطّل نفسه ولا يزيل دوره.
+- كل إجراء حساس يُسجل في `activityLog` (lib/activityLog.ts) — تبويب «سجل النشاط» بالأدمن.
 
 ---
 
@@ -133,69 +151,73 @@
 |---|---|---|
 | بيانات FTP | `.env.ftp` | تستخدمها `deploy-ftp.mjs` فقط |
 | متغيرات Convex المحلية | `.env.local` | `CONVEX_DEPLOYMENT` / `VITE_CONVEX_URL` |
-| بيانات Convex الإنتاج | لوحة Convex dashboard | `JWKS`, `JWT_PRIVATE_KEY` (سر), `JWT_PUBLIC_KEY`, `SITE_URL=https://soqaqalaula.world`, `VLY_CONVEX_AUTH_ISSUER=https://freebuff.com` |
+| مفاتيح Stripe | Convex Dashboard ← Env Vars | `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` (واحد الويبهوك من لوحة Stripe) |
+| مفاتيح Moyasar/Tap (لما تفعّل) | Convex Dashboard ← Env Vars | لا تُخزن في DB |
 | تسجيل دخول Convex CLI | `~/.convex/config.json` | accessToken شخصي |
 
-**تذكير**: إدارة الحزم الموحّدة = **Bun** (`bun.lock` متتبع). `package-lock.json` **مُستبعد** من git (في `.gitignore`) وتُرّك محلياً فقط للنوافذ (npm).
+**تذكير**: إدارة الحزم = **Bun** (`bun.lock` متتبع). `package-lock.json` مستبعد من git.
 
 ---
 
 ## 6) قواعد ذهبية عند التعديل (لا تُخالفها)
 
-1. **لا تعدّل** `src/convex/schema.ts` — لا تحذف/تعيد تسمية جدولاً أو حقلاً أو فهرساً. الإضافة المسموح بها فقط: حقول `v.optional(...)` جديدة داخل جدول قائم.
-2. **لا تغيّر** أسماء دوال Convex ولا معاملاتها ولا أنواعها — الواجهة والـ bindings (`_generated`) تعتمد عليها. إضافة دوال جديدة مسموحة.
-3. **لا تغيّر** التصميم/الاتجاه (RTL) ولا ملفات `dist/` يدوياً ولا Base paths في `vite.config`.
-4. **لا ترفع أسراراً**: `.env.*`، `_generated/` في gitignore. لا تضع كلمة مرور/توكن في كود يُلتزم.
-5. `_generated/` مولّدة وليست متعقبة بغيت — بعد تغيير Convex نفّذ:
-   ```bash
-   $env:CONVEX_DEPLOYMENT="wry-mosquito-572"; npx convex codegen --typecheck disable
-   ```
-6. على ويندوز، `npm.ps1` محجوب بحزمة Execution Policy — استخدم `cmd /c "npm ... 2>&1"` أو `npx.cmd`.
-7. بعد تعديل خلفي أو واجهة يجب إعادة النشر (قسم 7) كي يصبح المحلي = GitHub = الاستضافة.
+1. في `schema.ts`: الإضافة مسموحة، الحذف/إعادة التسمية ممنوعة (حقول جديدة كـ `v.optional`).
+2. لا تغيّر أسماء دوال Convex أو معاملاتها — الواجهة و`_generated` تعتمد عليها.
+3. التطبيق **عربي RTL** — لا تغيّر الاتجاه ولا نمط Claymorphism (`--clay-*`).
+4. ملفات `payments.ts` بـ `"use node"`: **actions فقط** — الـ mutations انقلها لملفات أخرى (سبب نقل `expireUnpaidSession` إلى bookings.ts).
+5. استعلامات Convex للقراءة فقط — التعليم/التعديل في mutation منفصلة (سبب `markRead` في messages).
+6. على ويندوز استخدم `npx.cmd` أو `cmd /c "npm ..."`.
+7. بعد أي تعديل خلفي: `npx convex dev --once` للرفع، ثم build، ثم FTP، ثم git push.
 
 ---
 
 ## 7) دليل النشر خطوة بخطوة (يعمل الآن)
 
 ```powershell
-# 1) توليد bindings للخلفية (مطلوب بعد تعديل convex)
-$env:CONVEX_DEPLOYMENT="wry-mosquito-572"
-npx convex codegen --typecheck disable
+# 1) رفع الخلفية (schema + دوال) إلى Production
+npx convex dev --once
 
-# 2) نشر الخلفية إلى Production
-npx convex deploy --typecheck disable
-
-# 3) بناء الواجهة مع رابط الإنتاج (لا تنسَ تجاوز .env.local)
-$env:VITE_CONVEX_URL="https://wry-mosquito-572.convex.cloud"
+# 2) بناء الواجهة
+$env:VITE_CONVEX_URL="https://adorable-tortoise-624.convex.cloud"
 cmd /c "npm run build"
 
-# 4) رفع dist/ إلى الاستضافة (يقرأ .env.ftp)
+# 3) رفع dist/ إلى الاستضافة (يقرأ .env.ftp)
 node scripts/deploy-ftp.mjs
 
-# 5) التزام وتفريغ إلى GitHub
-git add -A
-git commit -m "وصف التغيير"
-git push origin main
+# 4) التزام ودفع إلى GitHub
+git add -A; git commit -m "..."; git push origin main
 ```
 
----
-
-## 8) أعمال مكتملة مؤخراً (ملخص التغييرات الأخيرة)
-
-1. **حماية الحجوزات**: رفض حجز شقة غير موثقة، ومنع المالك من حجز شقته (خلفي + رسائل أخطاء).
-2. **إدارة أحادي للحزم**: استبقاء `bun.lock` (CI يعتمد عليه)، واستبعاد `package-lock.json`.
-3. **موارد الاستضافة/SEO**: `.htaccess`, `robots.txt`, `sitemap.xml` أُضيفت وأُعيد رفعها.
-4. **إصلاح بوابة المالك**: تدفق `becomeOwner` أصبح يعمل للمستخدم الجديد (كان يعيده للوحة المستخدم).
-5. **تدفق المالك الكامل**: استمارة بيانات أولية + لوحة مالك متكاملة + توجيه سليم بعد OTP.
-6. **رفع الصور**: زر «رفع الصور من جهازك» في نموذج الشقة عبر تخزين Convex.
-7. **وضوح قبول/رفض الأدمن**: أزرار لوحة الإدارة أصبحت «قبول» / «رفض».
-8. **مزامنة القنوات**: المحلي = GitHub = الاستضافة (تحقق بايت-بايت).
+> ملاحظة: deployment الإنتاج الحالي: `adorable-tortoise-624` (راجع .env.local لو تغيّر).
 
 ---
 
-## 9) ملاحظات ومهام مستقبلية محتملة
+## 8) سجل الإنجازات (أحدث الأنظمة — سبتمبر 2026)
 
-- لا يوجد **نظام دفع حقيقي** — حالة `paymentStatus` وهمية/يدوية حالياً.
-- ضغط الصور عند الرفع (قياس/تحويل) غير مفعّل بعد (لا يوجد نظام رفع أُضيف سابقاً لواجهة عامة) — `apartmentImages`/`saveApartmentImage` جاهزة كبنية لكن الواجهة الحالية ترفع مباشرة إلى `apartments.images` كروابط.
-- `alulastay.com` لا يزال (GoDaddy parking) — النطاق الفعّال `soqaqalaula.world`.
-- الترقيب المستقبلي: إشعارات، مراجعات، دفع.
+| النظام | الملفات | الحالة |
+|---|---|---|
+| حالات الشقق + أسباب الرفض + إشعارات | admin.ts, schema | ✅ |
+| التقويم + حجب تواريخ + منع تعارض مزدوج | calendar.ts, bookings.ts, CalendarBlockManager | ✅ |
+| تسعير نهاية الأسبوع + حد أدنى للليالي | lib/pricing.ts, bookings.ts | ✅ |
+| حقول الشقة الموسعة (نوع عقار، تنظيف، تأمين، أوقات، قوانين) | schema, ApartmentForm | ✅ |
+| حماية الصور (5MB/10 صور/Magic Numbers/ضغط 1920px) | ApartmentForm | ✅ |
+| مستحقات المالكين (IBAN + أرصدة + تحويلات + واجهة أدمن) | payouts.ts, OwnerFinance, AdminPayouts | ✅ |
+| Stripe Webhook + إنهاء الجلسات المنتهية | http.ts, bookings.ts | ✅ (ينقص STRIPE_WEBHOOK_SECRET فعلي) |
+| الصفحات القانونية الثمانية + بحث الرئيسية | Legal.tsx, Landing.tsx | ✅ |
+| سجل العمليات الإدارية activityLog | lib/activityLog.ts, admin.ts | ✅ |
+| تعطيل الحسابات + حماية الأدوار | admin.ts, authorization.ts | ✅ |
+| إعدادات المنصة من الأدمن (تواصل/مزودات) | settings.ts, AdminSettings | ✅ |
+| توثيق هوية المالك (رفع + مراجعة) | identity.ts, OwnerIdentityVerification, AdminVerifications | ✅ |
+| البلاغات (زر إبلاغ + معالجة أدمن) | reports.ts, AdminReports | ✅ |
+| الرسائل مالك↔ضيف + إخفاء الجوال حتى الحجز | messages.ts, Messages.tsx | ✅ |
+| رابط خريطة من الإحداثيات | ApartmentDetail | ✅ |
+
+## 9) المتبقي (لا يمنع الإطلاق)
+
+1. **بيانات حقيقية منك**: رقم الجوال الرسمي (من تبويب الإعدادات)، حساب Moyasar/Tap أو Stripe + `STRIPE_WEBHOOK_SECRET` في Env Vars، خدمة بريد (SendGrid/Mailgun)، صورة Open Graph.
+2. Pagination للاستعلامات (كلها `.collect()` — أجّلها حتى نمو البيانات).
+3. أسعار المواسم/الفعاليات (نهاية الأسبوع جاهزة كأساس).
+4. تفاصيل الأسرّة، الإضافة على مراحل مع مسودة، شارة رسائل في الترويسة.
+5. `schemaValidation: true` (يتطلب تنظيف بيانات قديمة أولاً).
+6. اختبارات آلية للحموايات (حالياً تحقق يدوي عبر القواعد في 6).
+7. المرحلة المتقدمة: الإنجليزية، كوبونات، iCal، Google/Apple Sign-in، SMS/WhatsApp.
