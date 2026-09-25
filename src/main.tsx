@@ -20,6 +20,7 @@ const Favorites = lazy(() => import("./pages/Favorites.tsx"));
 const MyBookings = lazy(() => import("./pages/MyBookings.tsx"));
 const OwnerDashboard = lazy(() => import("./pages/OwnerDashboard.tsx"));
 const Legal = lazy(() => import("./pages/Legal.tsx"));
+const Messages = lazy(() => import("./pages/Messages.tsx"));
 const OwnerProfile = lazy(() => import("./pages/OwnerProfile.tsx"));
 const AddApartment = lazy(() => import("./pages/AddApartment.tsx"));
 const EditApartment = lazy(() => import("./pages/EditApartment.tsx"));
@@ -185,6 +186,22 @@ function AppRoutes() {
             element={
               <RequireAuth>
                 <OwnerProfile />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/messages"
+            element={
+              <RequireAuth>
+                <Messages />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/messages/:conversationId"
+            element={
+              <RequireAuth>
+                <Messages />
               </RequireAuth>
             }
           />

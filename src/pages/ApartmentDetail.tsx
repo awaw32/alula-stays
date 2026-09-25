@@ -129,6 +129,7 @@ export default function ApartmentDetail() {
   const isFavorited = DEMO_MODE ? false : liveFavorited;
   const toggleFavorite = useMutation(api.favorites.toggle);
   const createReport = useMutation(api.reports.create);
+  const getOrCreateConversation = useMutation(api.messages.getOrCreate);
   const createBooking = useMutation(api.bookings.create);
   const createReview = useMutation(api.reviews.create);
   const createCheckoutSession = useAction(api.payments.createCheckoutSession);
@@ -365,6 +366,19 @@ export default function ApartmentDetail() {
                       >
                         إبلاغ ⚑
                       </button>
+                      {!DEMO_MODE && apartment.ownerId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            getOrCreateConversation({ apartmentId })
+                              .then((cid) => { window.location.assign(`/messages/${cid}`); })
+                              .catch((err) => toast.error(getErrorMessage(err, "تعذر بدء المحادثة")));
+                          }}
+                          className="text-xs text-[var(--clay-accent)] underline"
+                        >
+                          💬 مراسلة المالك
+                        </button>
+                      )}
                       {apartment.isVerified && (
                         <span className="flex items-center gap-1 text-emerald-600 text-xs font-medium">
                           <CheckCircle className="w-3.5 h-3.5" />موثقة

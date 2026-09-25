@@ -297,6 +297,32 @@ const schema = defineSchema(
       .index("by_user", ["userId"]),
 
     // جداول أخرى احتياطية
+    // محادثات المالك والضيف — المحادثة مرتبطة بشقة (ومن إنشائها يحدد الدورين)
+    conversations: defineTable({
+      apartmentId: v.id("apartments"),
+      guestId: v.id("users"),
+      ownerId: v.id("users"),
+      lastMessageAt: v.number(),
+      lastMessagePreview: v.optional(v.string()),
+      createdAt: v.number(),
+    })
+      .index("by_apartment", ["apartmentId"])
+      .index("by_guest", ["guestId"])
+      .index("by_owner", ["ownerId"])
+      .index("by_last_message", ["lastMessageAt"]),
+
+    // رسائل المحادثة
+    messages: defineTable({
+      conversationId: v.id("conversations"),
+      senderId: v.id("users"),
+      body: v.string(),
+      readByGuest: v.boolean(),
+      readByOwner: v.boolean(),
+      createdAt: v.number(),
+    })
+      .index("by_conversation", ["conversationId"])
+      .index("by_sender", ["senderId"]),
+
     // إعدادات المنصة (تواصل، مفاتيح API) — سجل واحد يُدار من الأدمن
     siteSettings: defineTable({
       key: v.string(), // "general" سجل وحيد
