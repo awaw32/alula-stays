@@ -249,6 +249,50 @@ export function ApartmentForm({ mode, initialValues, loading = false, disabled =
           <div><Label htmlFor="price">السعر / ليلة (ر.س) *</Label><Input id="price" type="number" min={50} value={form.price} onChange={(event) => update("price", Number(event.target.value))} className="clay-input mt-1 w-full" required /></div>
           <div><Label htmlFor="weekendPrice">سعر ليلة نهاية الأسبوع (ر.س)</Label><Input id="weekendPrice" type="number" min={0} value={form.weekendPrice || ""} onChange={(event) => update("weekendPrice", Number(event.target.value) || 0)} placeholder={`افتراضي: ${form.price}`} className="clay-input mt-1 w-full" /><p className="text-[10px] text-[var(--muted-foreground)] mt-1">الخميس والجمعة — اتركه فارغاً لاستخدام السعر الأساسي</p></div>
           <div><Label htmlFor="minNights">الحد الأدنى للليالي</Label><Input id="minNights" type="number" min={1} max={30} value={form.minNights || 1} onChange={(event) => update("minNights", Number(event.target.value) || 1)} className="clay-input mt-1 w-full" /></div>
+          <div><Label htmlFor="cleaningFee">رسوم التنظيف (ر.س)</Label><Input id="cleaningFee" type="number" min={0} value={form.cleaningFee || ""} onChange={(event) => update("cleaningFee", Number(event.target.value) || 0)} placeholder="0" className="clay-input mt-1 w-full" /></div>
+          <div><Label htmlFor="deposit">مبلغ التأمين (ر.س)</Label><Input id="deposit" type="number" min={0} value={form.deposit || ""} onChange={(event) => update("deposit", Number(event.target.value) || 0)} placeholder="مسترد بعد المغادرة" className="clay-input mt-1 w-full" /></div>
+          <div><Label htmlFor="checkInTime">وقت تسجيل الدخول</Label><Input id="checkInTime" type="time" value={form.checkInTime || "15:00"} onChange={(event) => update("checkInTime", event.target.value)} className="clay-input mt-1 w-full" /></div>
+          <div><Label htmlFor="checkOutTime">وقت تسجيل الخروج</Label><Input id="checkOutTime" type="time" value={form.checkOutTime || "12:00"} onChange={(event) => update("checkOutTime", event.target.value)} className="clay-input mt-1 w-full" /></div>
+          <div>
+            <Label htmlFor="propertyType">نوع العقار</Label>
+            <select
+              id="propertyType"
+              value={form.propertyType || "apartment"}
+              onChange={(event) => update("propertyType", event.target.value as ApartmentFormValues["propertyType"])}
+              className="clay-input mt-1 w-full"
+            >
+              <option value="apartment">شقة</option>
+              <option value="chalet">شاليه</option>
+              <option value="villa">فيلا</option>
+              <option value="camp">مخيم</option>
+            </select>
+          </div>
+        </div>
+
+        {/* القوانين */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {([
+            ["petsAllowed", "يسمح بالحيوانات الأليفة"],
+            ["smokingAllowed", "يسمح بالتدخين"],
+            ["elevator", "يوجد مصعد"],
+            ["wheelchairAccessible", "وصول لذوي الإعاقة"],
+          ] as const).map(([key, label]) => (
+            <label key={key} className="flex items-center gap-2 cursor-pointer clay-sm px-3 py-2.5 text-sm select-none">
+              <input
+                type="checkbox"
+                checked={Boolean(form[key])}
+                onChange={(event) => update(key, event.target.checked)}
+                className="w-4 h-4 accent-[var(--clay-accent)]"
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+      </section>
+
+      <section className="clay space-y-4 p-6">
+        <h2 className="flex items-center gap-2 text-lg font-bold text-[var(--foreground)]"><Home className="h-5 w-5" aria-hidden="true" />التفاصيل الأساسية</h2>
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           <div><Label htmlFor="bedrooms"><Bed className="ml-1 inline h-4 w-4" aria-hidden="true" />الغرف</Label><Input id="bedrooms" type="number" min={1} max={10} value={form.bedrooms} onChange={(event) => update("bedrooms", Number(event.target.value))} className="clay-input mt-1 w-full" /></div>
           <div><Label htmlFor="bathrooms"><Bath className="ml-1 inline h-4 w-4" aria-hidden="true" />الحمامات</Label><Input id="bathrooms" type="number" min={1} max={10} value={form.bathrooms} onChange={(event) => update("bathrooms", Number(event.target.value))} className="clay-input mt-1 w-full" /></div>
           <div><Label htmlFor="maxGuests"><Users className="ml-1 inline h-4 w-4" aria-hidden="true" />الضيوف</Label><Input id="maxGuests" type="number" min={1} max={20} value={form.maxGuests} onChange={(event) => update("maxGuests", Number(event.target.value))} className="clay-input mt-1 w-full" /></div>

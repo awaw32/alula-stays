@@ -47,6 +47,22 @@ const schema = defineSchema(
       price: v.number(), // SAR per night
       weekendPrice: v.optional(v.number()), // سعر ليلة نهاية الأسبوع (الخميس/الجمعة) — إن اختلفت عن الأساسي
       minNights: v.optional(v.number()), // الحد الأدنى لعدد الليالي
+      propertyType: v.optional(
+        v.union(
+          v.literal("apartment"),
+          v.literal("chalet"),
+          v.literal("villa"),
+          v.literal("camp"),
+        ),
+      ), // نوع العقار
+      cleaningFee: v.optional(v.number()), // رسوم التنظيف (مرة واحدة)
+      deposit: v.optional(v.number()), // مبلغ التأمين المسترد
+      checkInTime: v.optional(v.string()), // وقت تسجيل الدخول مثل "15:00"
+      checkOutTime: v.optional(v.string()), // وقت تسجيل الخروج مثل "12:00"
+      petsAllowed: v.optional(v.boolean()), // الحيوانات الأليفة
+      smokingAllowed: v.optional(v.boolean()), // التدخين
+      elevator: v.optional(v.boolean()), // مصعد
+      wheelchairAccessible: v.optional(v.boolean()), // وصول ذوي الإعاقة
       bedrooms: v.number(),
       bathrooms: v.number(),
       maxGuests: v.number(),

@@ -362,6 +362,40 @@ export default function ApartmentDetail() {
               <div className="clay p-6">
                 <h2 className="text-lg font-bold text-[var(--foreground)] mb-3">عن الشقة</h2>
                 <p className="whitespace-pre-line leading-relaxed text-[var(--muted-foreground)]">{getApartmentDescription(apartment)}</p>
+
+                {/* تفاصيل الإقامة: أوقات، رسوم، قوانين */}
+                {(() => {
+                  const apt = apartment as typeof apartment & {
+                    propertyType?: string; cleaningFee?: number; deposit?: number;
+                    checkInTime?: string; checkOutTime?: string;
+                    petsAllowed?: boolean; smokingAllowed?: boolean;
+                    elevator?: boolean; wheelchairAccessible?: boolean;
+                  };
+                  const propertyLabels: Record<string, string> = {
+                    apartment: "شقة", chalet: "شاليه", villa: "فيلا", camp: "مخيم",
+                  };
+                  const details: string[] = [];
+                  if (apt.propertyType) details.push(`النوع: ${propertyLabels[apt.propertyType] ?? "شقة"}`);
+                  if (apt.checkInTime) details.push(`تسجيل الوصول: ${apt.checkInTime}`);
+                  if (apt.checkOutTime) details.push(`تسجيل المغادرة: ${apt.checkOutTime}`);
+                  if (apt.cleaningFee) details.push(`رسوم التنظيف: ${apt.cleaningFee.toLocaleString()} ر.س (لمرة واحدة)`);
+                  if (apt.deposit) details.push(`التأمين: ${apt.deposit.toLocaleString()} ر.س (مسترد)`);
+                  if (apt.petsAllowed !== undefined) details.push(apt.petsAllowed ? "✓ يسمح بالحيوانات الأليفة" : "✗ لا يسمح بالحيوانات الأليفة");
+                  if (apt.smokingAllowed !== undefined) details.push(apt.smokingAllowed ? "✓ يسمح بالتدخين" : "✗ ممنوع التدخين");
+                  if (apt.elevator) details.push("✓ يوجد مصعد");
+                  if (apt.wheelchairAccessible) details.push("✓ وصول لذوي الإعاقة");
+                  const minN = (apartment as { minNights?: number }).minNights;
+                  if (minN && minN > 1) details.push(`الحد الأدنى للإقامة: ${minN} ليالٍ`);
+                  return details.length > 0 ? (
+                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-2 border-t border-[var(--border)] pt-4">
+                      {details.map((d) => (
+                        <span key={d} className="text-sm text-[var(--muted-foreground)] flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-[var(--clay-accent)] shrink-0" />{d}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null;
+                })()}
               </div>
             </motion.div>
 

@@ -51,8 +51,8 @@ http.route({
       case "checkout.session.completed": {
         const session = event.data.object;
         const bookingId = session.metadata?.bookingId as string | undefined;
-        const sessionId = session.id;
-        if (!bookingId) {
+        const sessionId = (session.id ?? "") as string;
+        if (!bookingId || !sessionId) {
           return new Response(JSON.stringify({ received: true, skipped: "no bookingId" }), { status: 200 });
         }
         try {
@@ -71,9 +71,9 @@ http.route({
         const bookingId = session.metadata?.bookingId as string | undefined;
         if (bookingId) {
           try {
-            await ctx.runMutation(internal.payments.expireUnpaidSession, {
+            await ctx.runMutation(internal.bookings.expireUnpaidSession, {
               bookingId: bookingId as never,
-              sessionId: session.id,
+              sessionId: (session.id ?? "") as string,
             });
           } catch (err) {
             console.error("Webhook expire error:", err);

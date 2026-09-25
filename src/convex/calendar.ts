@@ -1,5 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query, type QueryCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { ERROR_MESSAGES, ValidationError } from "./lib/errors";
 
@@ -28,7 +29,7 @@ export function rangesOverlap(
  */
 export async function overlapsBlockedDates(
   ctx: QueryCtx,
-  apartmentId: string,
+  apartmentId: Id<"apartments">,
   checkIn: number,
   checkOut: number,
 ): Promise<boolean> {

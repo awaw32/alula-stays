@@ -6,10 +6,24 @@
  */
 
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { mutation, query, type MutationCtx } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { ERROR_MESSAGES, ValidationError } from "./lib/errors";
 import { logActivity } from "./lib/activityLog";
+
+/** فحص صلاحيات الأدمن — يعمل في query وmutation */
+async function requireAdmin(ctx: QueryCtx | MutationCtx) {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) {
+    throw new ValidationError(ERROR_MESSAGES.MUST_LOGIN);
+  }
+  const user = await ctx.db.get(userId);
+  if (user?.role !== "admin") {
+    throw new ValidationError(ERROR_MESSAGES.UNAUTHORIZED);
+  }
+  return user;
+}
 
 const IBAN_REGEX = /^SA\d{22}$/; // IBAN سعودي: SA + 22 رقماً
 
@@ -303,15 +317,3 @@ export const adminRecordPayout = mutation({
     return { payoutId, message: "تم تسجيل التحويل" };
   },
 });
-
-async function requireAdmin(ctx: MutationCtx) {
-  const userId = await getAuthUserId(ctx);
-  if (!userId) {
-    throw new ValidationError(ERROR_MESSAGES.MUST_LOGIN);
-  }
-  const user = await ctx.db.get(userId);
-  if (user?.role !== "admin") {
-    throw new ValidationError(ERROR_MESSAGES.UNAUTHORIZED);
-  }
-  return user;
-}

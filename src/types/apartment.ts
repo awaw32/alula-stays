@@ -1,3 +1,5 @@
+export type PropertyType = "apartment" | "chalet" | "villa" | "camp";
+
 export type ApartmentFormMode = "create" | "edit";
 
 export interface ApartmentRecord {
@@ -9,6 +11,15 @@ export interface ApartmentRecord {
   price: number;
   weekendPrice?: number;
   minNights?: number;
+  propertyType?: PropertyType;
+  cleaningFee?: number;
+  deposit?: number;
+  checkInTime?: string;
+  checkOutTime?: string;
+  petsAllowed?: boolean;
+  smokingAllowed?: boolean;
+  elevator?: boolean;
+  wheelchairAccessible?: boolean;
   bedrooms: number;
   bathrooms: number;
   maxGuests: number;
@@ -37,6 +48,15 @@ export interface ApartmentFormValues {
   price: number;
   weekendPrice: number;
   minNights: number;
+  propertyType: PropertyType;
+  cleaningFee: number;
+  deposit: number;
+  checkInTime: string;
+  checkOutTime: string;
+  petsAllowed: boolean;
+  smokingAllowed: boolean;
+  elevator: boolean;
+  wheelchairAccessible: boolean;
   bedrooms: number;
   bathrooms: number;
   maxGuests: number;
