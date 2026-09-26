@@ -493,8 +493,8 @@ export const attachPaymentSession = internalMutation({
     if (!booking) {
       throw new Error("الحجز غير موجود");
     }
-    if (booking.status !== "pending" || booking.paymentStatus !== "unpaid") {
-      throw new Error("لا يمكن بدء الدفع لهذا الحجز");
+    if (booking.status === "cancelled") {
+      throw new Error("لا يمكن بدء الدفع لحجز ملغي");
     }
 
     await ctx.db.patch(args.bookingId, { paymentSessionId: args.sessionId });
@@ -514,16 +514,14 @@ export const markPaid = internalMutation({
     if (booking.paymentStatus === "paid" && booking.status === "confirmed") {
       return booking;
     }
-    if (
-      booking.status !== "pending" ||
-      booking.paymentSessionId !== args.sessionId
-    ) {
-      throw new Error("جلسة الدفع غير صالحة لهذا الحجز");
+    if (booking.status === "cancelled") {
+      throw new Error("لا يمكن دفع حجز تم إلغاؤه");
     }
 
     await ctx.db.patch(args.bookingId, {
       status: "confirmed",
       paymentStatus: "paid",
+      paymentSessionId: args.sessionId,
     });
 
     return await ctx.db.get(args.bookingId);

@@ -2,7 +2,8 @@
 
 import { internal } from "./_generated/api";
 import { action, internalMutation } from "./_generated/server";
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
+import { getAuthUserId } from "@convex-dev/auth/server";
 import {
   validateApiKey,
   validateUrl,
@@ -56,11 +57,22 @@ async function createTapSession(args: {
     throw new PaymentError("مفتاح بوابة الدفع Tap غير معرف في النظام");
   }
 
+  const customerEmail =
+    args.customerEmail && args.customerEmail.includes("@")
+      ? args.customerEmail.trim()
+      : "guest@soqaqalaula.world";
+
+  const customerName =
+    args.customerName && args.customerName.trim()
+      ? args.customerName.trim()
+      : "ضيف العلا";
+
   const response = await fetch("https://api.tap.company/v2/charges", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${tapKey}`,
       "Content-Type": "application/json",
+      lang_code: "ar",
     },
     body: JSON.stringify({
       amount: args.amount,
@@ -68,14 +80,14 @@ async function createTapSession(args: {
       threeDSecure: true,
       save_card: false,
       description: `حجز شقة في العلا: ${args.apartmentTitle}`,
-      statement_descriptor: "AlUla Stays",
+      statement_descriptor: "شقق العلا",
       metadata: {
         bookingId: args.bookingId,
         userId: args.userId,
       },
       customer: {
-        first_name: args.customerName || "ضيف العلا",
-        email: args.customerEmail || "guest@soqaqalaula.world",
+        first_name: customerName,
+        email: customerEmail,
       },
       source: { id: "src_all" },
       redirect: {
@@ -94,7 +106,8 @@ async function createTapSession(args: {
   };
 
   if (!response.ok || !data.id || !data.transaction?.url) {
-    const errorMsg = data.errors?.[0]?.description || "فشل إنشاء جلسة الدفع عبر Tap Payments";
+    const errorMsg =
+      data.errors?.[0]?.description || "فشل إنشاء جلسة الدفع عبر Tap Payments";
     throw new PaymentError(errorMsg);
   }
 
@@ -110,7 +123,11 @@ async function verifyTapSession(chargeId: string): Promise<{ paid: boolean; stat
     throw new PaymentError("مفتاح بوابة الدفع Tap غير معرف");
   }
 
-  const response = await fetch(`https://api.tap.company/v2/charges/${chargeId}`, {
+  const endpoint = chargeId.startsWith("auth_")
+    ? `https://api.tap.company/v2/authorize/${chargeId}`
+    : `https://api.tap.company/v2/charges/${chargeId}`;
+
+  const response = await fetch(endpoint, {
     headers: {
       Authorization: `Bearer ${tapKey}`,
     },
@@ -122,7 +139,7 @@ async function verifyTapSession(chargeId: string): Promise<{ paid: boolean; stat
     response?: { code?: string; message?: string };
   };
 
-  const isPaid = data.status === "CAPTURED";
+  const isPaid = data.status === "CAPTURED" || data.status === "AUTHORIZED";
   return { paid: isPaid, status: data.status || "UNKNOWN" };
 }
 
@@ -146,8 +163,8 @@ export const createCheckoutSession = action({
     args,
   ): Promise<{ url: string | null; sessionId: string }> => {
     try {
-      // التحقق من تسجيل الدخول
-      const userId = (await ctx.auth.getUserIdentity())?.subject;
+      // التحقق من تسجيل الدخول باستخدام معرف المستخدم الحقيقي من Auth
+      const userId = await getAuthUserId(ctx);
       if (!userId) {
         throw new PaymentError(ERROR_MESSAGES.MUST_LOGIN);
       }
@@ -261,10 +278,12 @@ export const createCheckoutSession = action({
       return { url: session.url, sessionId: session.id };
     } catch (error) {
       console.error("Create Checkout Session Error:", error);
-      if (error instanceof PaymentError) {
+      if (error instanceof ConvexError) {
         throw error;
       }
-      throw new PaymentError(formatErrorMessage(error));
+      throw new PaymentError(
+        error instanceof Error ? error.message : "فشل إنشاء جلسة الدفع"
+      );
     }
   },
 });
@@ -280,7 +299,7 @@ export const verifyPayment = action({
   ): Promise<{ paid: boolean; status: string }> => {
     try {
       // التحقق من تسجيل الدخول
-      const userId = (await ctx.auth.getUserIdentity())?.subject;
+      const userId = await getAuthUserId(ctx);
       if (!userId) {
         throw new PaymentError(ERROR_MESSAGES.MUST_LOGIN);
       }
@@ -310,8 +329,8 @@ export const verifyPayment = action({
         throw new PaymentError(ERROR_MESSAGES.PAYMENT_NOT_YOURS);
       }
 
-      // التحقق عبر بوابة Tap Payments إذا كانت شحنة Tap (تبدأ بـ chg_)
-      if (args.sessionId.startsWith("chg_")) {
+      // التحقق عبر بوابة Tap Payments إذا كانت شحنة Tap (تبدأ بـ chg_ أو auth_)
+      if (args.sessionId.startsWith("chg_") || args.sessionId.startsWith("auth_")) {
         const tapResult = await verifyTapSession(args.sessionId);
         if (tapResult.paid) {
           await ctx.runMutation(internal.bookings.markPaid, {

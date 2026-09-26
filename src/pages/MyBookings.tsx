@@ -35,6 +35,8 @@ export default function MyBookings() {
   const bookings = DEMO_MODE ? [] : liveBookings;
   const cancelBooking = useMutation(api.bookings.cancel);
   const verifyPayment = useAction(api.payments.verifyPayment);
+  const createCheckoutSession = useAction(api.payments.createCheckoutSession);
+  const [payingBookingId, setPayingBookingId] = useState<string | null>(null);
 
   const sessionId = searchParams.get("tap_id") || searchParams.get("session_id");
   const bookingId = searchParams.get("booking");
@@ -46,7 +48,7 @@ export default function MyBookings() {
     void verifyPayment({ bookingId: bookingId as Id<"bookings">, sessionId })
       .then((result) => {
         if (!active) return;
-        toast[result.paid ? "success" : "warning"](result.paid ? "تم الدفع وتأكيد الحجز" : "لم يكتمل الدفع");
+        toast[result.paid ? "success" : "warning"](result.paid ? "تم الدفع وتأكيد الحجز بنجاح" : "لم يكتمل الدفع");
         navigate("/my-bookings", { replace: true });
       })
       .catch((error) => {
@@ -62,6 +64,25 @@ export default function MyBookings() {
     if (activeTab === "past") return booking.status === "completed" || booking.checkOut < now || booking.status === "cancelled";
     return true;
   });
+
+  const handlePayNow = async (bId: Id<"bookings">) => {
+    setPayingBookingId(bId);
+    try {
+      toast.loading("جارٍ فتح بوابة الدفع الآمنة...", { id: "pay-now" });
+      const checkout = await createCheckoutSession({ bookingId: bId });
+      if (checkout.url) {
+        window.location.assign(checkout.url);
+      } else {
+        toast.dismiss("pay-now");
+        toast.error("تعذر فتح بوابة الدفع حالياً. يرجى المحاولة لاحقاً");
+      }
+    } catch (err) {
+      toast.dismiss("pay-now");
+      toast.error(getErrorMessage(err, "فشل بدء عملية الدفع"));
+    } finally {
+      setPayingBookingId(null);
+    }
+  };
 
   const handleCancel = async (id: string) => {
     setCancelling(id);
@@ -127,8 +148,39 @@ export default function MyBookings() {
                           </div>
                           <span className={`flex shrink-0 items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${status.color}`}><StatusIcon className="h-3.5 w-3.5" aria-hidden="true" />{status.label}</span>
                         </div>
-                        <div className="mt-3 flex flex-wrap gap-4 text-sm text-[var(--muted-foreground)]"><span className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" aria-hidden="true" />{formatArabicDate(booking.checkIn)} — {formatArabicDate(booking.checkOut)}</span><span>{booking.totalNights} ليلة</span><span>{booking.guests} ضيوف</span><span className="font-bold text-[var(--clay-accent)]">{booking.totalPrice.toLocaleString("ar-SA")} ر.س</span></div>
-                        {booking.status === "pending" && <div className="mt-3"><button type="button" onClick={() => setCancelTarget(booking._id)} disabled={cancelling === booking._id} className="clay-sm flex items-center gap-1 px-4 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50" aria-label={`إلغاء حجز ${title}`}>{cancelling === booking._id ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" /> : <XCircle className="h-3 w-3" aria-hidden="true" />}إلغاء الحجز</button></div>}
+                        {booking.status === "pending" && (
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            {booking.paymentStatus === "unpaid" && (
+                              <button
+                                type="button"
+                                onClick={() => void handlePayNow(booking._id)}
+                                disabled={payingBookingId === booking._id}
+                                className="clay-btn flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold shadow-sm"
+                              >
+                                {payingBookingId === booking._id ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                                ) : (
+                                  <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                                )}
+                                ادفع الآن (مدى / Apple Pay)
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setCancelTarget(booking._id)}
+                              disabled={cancelling === booking._id}
+                              className="clay-sm flex items-center gap-1 px-4 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+                              aria-label={`إلغاء حجز ${title}`}
+                            >
+                              {cancelling === booking._id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+                              ) : (
+                                <XCircle className="h-3 w-3" aria-hidden="true" />
+                              )}
+                              إلغاء الحجز
+                            </button>
+                          </div>
+                        )}
                         {booking.status === "confirmed" && booking.checkIn > now && <div className="clay-inset mt-3 inline-flex items-center gap-2 px-4 py-2 text-sm"><CheckCircle className="h-4 w-4 text-emerald-500" aria-hidden="true" /><span className="text-[var(--muted-foreground)]">رقم الحجز: {booking._id.slice(-8).toUpperCase()}</span></div>}
                         {booking.status === "confirmed" && booking.checkIn > now && <div className="mt-2 flex items-center gap-1 text-xs text-[var(--muted-foreground)]"><AlertCircle className="h-3 w-3" aria-hidden="true" />{(() => { const hoursUntil = (booking.checkIn - now) / (1000 * 60 * 60); if (hoursUntil > 72) return "يمكنك الإلغاء باسترداد كامل"; if (hoursUntil > 24) return "يمكنك الإلغاء باسترداد 50%"; return "لا يمكن الاسترداد (أقل من 24 ساعة)"; })()}</div>}
                       </div>

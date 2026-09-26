@@ -163,7 +163,8 @@ export default function ApartmentDetail() {
   );
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
-  const [bookingSuccess, setBookingSuccess] = useState<BookingSuccess | null>(null);
+  const [redirectingToPayment, setRedirectingToPayment] = useState(false);
+  const [createdBookingId, setCreatedBookingId] = useState<Id<"bookings"> | null>(null);
 
   // Review form
   const [showReviewForm, setShowReviewForm] = useState(false);
@@ -223,21 +224,35 @@ export default function ApartmentDetail() {
 
     setBookingLoading(true);
     setBookingError(null);
+    setCreatedBookingId(null);
     try {
+      // 1. إنشاء الحجز كحجز معلق
       const result = await createBooking({
         apartmentId,
         checkIn: checkIn.getTime(),
         checkOut: checkOut.getTime(),
         guests,
       });
-      setBookingSuccess(result);
-      toast.success("تم إنشاء الحجز، جارٍ تحويلك إلى الدفع");
+
+      setCreatedBookingId(result.bookingId);
+      setRedirectingToPayment(true);
+      toast.loading("جارٍ تحويلك إلى بوابة الدفع الآمنة (مدى / Apple Pay)...", { id: "booking-flow" });
+
+      // 2. استخراج جلسة الدفع عبر Tap Payments
       const checkout = await createCheckoutSession({ bookingId: result.bookingId });
+
       if (checkout.url) {
+        toast.success("تم تجهيز الدفع، جارٍ التحويل...", { id: "booking-flow" });
         window.location.assign(checkout.url);
+      } else {
+        toast.dismiss("booking-flow");
+        toast.error("تعذر فتح بوابة الدفع تلقائياً. يمكنك إتمام الدفع من صفحة حجوزاتي");
+        navigate(`/my-bookings?booking=${result.bookingId}`);
       }
     } catch (error) {
-      const message = getErrorMessage(error, "حدث خطأ أثناء إنشاء الحجز");
+      toast.dismiss("booking-flow");
+      setRedirectingToPayment(false);
+      const message = getErrorMessage(error, "حدث خطأ أثناء إنشاء الحجز أو الانتقال لبوابة الدفع");
       setBookingError(message);
       toast.error(message);
     } finally {
@@ -630,15 +645,22 @@ export default function ApartmentDetail() {
                   <span className="text-sm text-[var(--muted-foreground)]">· {apartment.reviewCount} تقييم</span>
                 </div>
 
-                {/* Booking Success */}
-                {bookingSuccess ? (
-                  <div className="clay-inset p-4 text-center mb-4">
-                    <CheckCircle className="w-12 h-12 mx-auto text-emerald-500 mb-3" />
-                    <h3 className="font-bold text-lg text-[var(--foreground)] mb-2">تم الحجز بنجاح!</h3>
-                    <p className="text-sm text-[var(--muted-foreground)] mb-1">عدد الليالي: {bookingSuccess.totalNights}</p>
-                    <p className="text-sm text-[var(--muted-foreground)] mb-1">المبلغ الإجمالي: {bookingSuccess.totalPrice.toLocaleString()} ر.س</p>
-                    <p className="text-sm text-[var(--muted-foreground)]">رسوم المنصة: {bookingSuccess.platformFee.toLocaleString()} ر.س</p>
-                    <Link to="/" className="clay-btn text-sm mt-4 inline-block">العودة للرئيسية</Link>
+                {/* Booking Redirection State */}
+                {redirectingToPayment ? (
+                  <div className="clay-inset p-6 text-center mb-4 space-y-3">
+                    <Loader2 className="w-10 h-10 mx-auto text-[var(--clay-accent)] animate-spin" />
+                    <h3 className="font-bold text-lg text-[var(--foreground)]">جارٍ توجيهك إلى بوابة الدفع...</h3>
+                    <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
+                      يتم الآن نقلك إلى بوابة الدفع الآمنة (مدى، Apple Pay، فيزا/ماستركارد) لإتمام الحجز.
+                    </p>
+                    {createdBookingId && (
+                      <Link
+                        to={`/my-bookings?booking=${createdBookingId}`}
+                        className="clay-btn-outline text-xs inline-block mt-2 py-2 px-4"
+                      >
+                        الانتقال إلى حجوزاتي للدفع
+                      </Link>
+                    )}
                   </div>
                 ) : (
                   <>
@@ -731,7 +753,20 @@ export default function ApartmentDetail() {
                     )}
 
                     {bookingError && (
-                      <p className="mb-3 flex items-center gap-1 text-sm text-red-500" role="alert" aria-live="assertive"><AlertCircle className="h-4 w-4" aria-hidden="true" />{bookingError}</p>
+                      <div className="mb-3 space-y-2">
+                        <p className="flex items-center gap-1 text-sm text-red-500" role="alert" aria-live="assertive">
+                          <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                          {bookingError}
+                        </p>
+                        {createdBookingId && (
+                          <Link
+                            to={`/my-bookings?booking=${createdBookingId}`}
+                            className="clay-btn-outline block text-center text-xs py-2"
+                          >
+                            الانتقال إلى حجوزاتي لإتمام الدفع
+                          </Link>
+                        )}
+                      </div>
                     )}
 
                     {/* CTA */}
@@ -757,11 +792,11 @@ export default function ApartmentDetail() {
                         className="clay-btn flex w-full items-center justify-center gap-2 py-3.5 text-center text-lg disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {bookingLoading ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : <Calendar className="h-5 w-5" aria-hidden="true" />}
-                        {bookingLoading ? "جاري الحجز..." : "احجز الآن"}
+                        {bookingLoading ? "جارٍ التحويل إلى الدفع..." : "احجز الآن وادفع"}
                       </button>
                     )}
 
-                    <p className="text-xs text-center text-[var(--muted-foreground)] mt-3">لن يتم خصم أي مبلغ حتى تأكيد الحجز</p>
+                    <p className="text-xs text-center text-[var(--muted-foreground)] mt-3">دفع إلكتروني آمن عبر مدى، Apple Pay، فيزا وماستركارد</p>
                   </>
                 )}
 
