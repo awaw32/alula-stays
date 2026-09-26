@@ -7,10 +7,11 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { getApartmentLocation, getApartmentTitle, formatArabicDate } from "@/lib/apartment-content";
 import { getErrorMessage } from "@/lib/error-message";
 import { motion } from "framer-motion";
-import { Calendar, MapPin, Clock, CheckCircle, XCircle, Loader2, AlertCircle, Search } from "lucide-react";
+import { Calendar, MapPin, Clock, CheckCircle, XCircle, Loader2, AlertCircle, Search, FileText, Phone, MessageCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
+import { InvoiceModal, type InvoiceData } from "@/components/InvoiceModal";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -19,7 +20,7 @@ const fadeUp = {
 
 const statusConfig = {
   pending: { label: "قيد الانتظار", color: "bg-amber-100 text-amber-700", icon: Clock },
-  confirmed: { label: "مؤكد", color: "bg-emerald-100 text-emerald-700", icon: CheckCircle },
+  confirmed: { label: "مؤكد ومسدد", color: "bg-emerald-100 text-emerald-700", icon: CheckCircle },
   cancelled: { label: "ملغى", color: "bg-red-100 text-red-700", icon: XCircle },
   completed: { label: "مكتمل", color: "bg-blue-100 text-blue-700", icon: CheckCircle },
 } as const;
@@ -28,6 +29,7 @@ export default function MyBookings() {
   const [activeTab, setActiveTab] = useState<"all" | "active" | "past">("all");
   const [cancelTarget, setCancelTarget] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<string | null>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<InvoiceData | null>(null);
   const [now] = useState(() => Date.now());
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -158,28 +160,71 @@ export default function MyBookings() {
                           </div>
                           <span className={`flex shrink-0 items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${status.color}`}><StatusIcon className="h-3.5 w-3.5" aria-hidden="true" />{status.label}</span>
                         </div>
-                        {booking.status === "pending" && (
-                          <div className="mt-3 flex flex-wrap items-center gap-2">
-                            {booking.paymentStatus === "unpaid" && (
-                              <button
-                                type="button"
-                                onClick={() => void handlePayNow(booking._id)}
-                                disabled={payingBookingId === booking._id}
-                                className="clay-btn flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold shadow-sm"
-                              >
-                                {payingBookingId === booking._id ? (
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-                                ) : (
-                                  <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
-                                )}
-                                ادفع الآن (مدى / Apple Pay)
-                              </button>
-                            )}
+                        <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-[var(--muted-foreground)]">
+                          <span>رقم الفاتورة: <strong className="font-mono text-[var(--foreground)]">#{booking.invoiceNumber}</strong></span>
+                          <span>•</span>
+                          <span>المبلغ: <strong className="text-[var(--clay-accent)]">{(booking.totalPrice + booking.platformFee).toLocaleString()} ر.س</strong></span>
+                          <span>•</span>
+                          <span>{new Date(booking.checkIn).toLocaleDateString("ar-SA")} إلى {new Date(booking.checkOut).toLocaleDateString("ar-SA")}</span>
+                        </div>
+
+                        {/* أزرار الإجراءات والفاتورة */}
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSelectedInvoice({
+                                invoiceNumber: booking.invoiceNumber || `INV-${booking._id.slice(-6).toUpperCase()}`,
+                                bookingId: booking._id,
+                                status: booking.status,
+                                paymentStatus: booking.paymentStatus,
+                                apartmentTitle: title,
+                                apartmentLocation: booking.apartment ? getApartmentLocation(booking.apartment) : "",
+                                guestName: (booking as any).guest?.name || "ضيف العلا",
+                                guestPhone: (booking as any).guest?.phone,
+                                guestEmail: (booking as any).guest?.email,
+                                ownerName: (booking as any).owner?.name,
+                                ownerPhone: (booking as any).owner?.phone,
+                                checkIn: booking.checkIn,
+                                checkOut: booking.checkOut,
+                                totalNights: booking.totalNights,
+                                guests: booking.guests,
+                                pricePerNight: booking.pricePerNight,
+                                totalPrice: booking.totalPrice,
+                                platformFee: booking.platformFee,
+                                paymentSessionId: booking.paymentSessionId,
+                                paidAt: (booking as any).paidAt,
+                                createdAt: booking.createdAt,
+                              })
+                            }
+                            className="clay-sm flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium hover:bg-[var(--clay-accent-soft)]"
+                          >
+                            <FileText className="h-3.5 w-3.5 text-[var(--clay-accent)]" />
+                            عرض الفاتورة
+                          </button>
+
+                          {booking.status === "pending" && booking.paymentStatus === "unpaid" && (
+                            <button
+                              type="button"
+                              onClick={() => void handlePayNow(booking._id)}
+                              disabled={payingBookingId === booking._id}
+                              className="clay-btn flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold shadow-sm"
+                            >
+                              {payingBookingId === booking._id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                              ) : (
+                                <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                              )}
+                              ادفع الآن (مدى / Apple Pay)
+                            </button>
+                          )}
+
+                          {booking.status !== "cancelled" && booking.status !== "completed" && (
                             <button
                               type="button"
                               onClick={() => setCancelTarget(booking._id)}
                               disabled={cancelling === booking._id}
-                              className="clay-sm flex items-center gap-1 px-4 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+                              className="clay-sm flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
                               aria-label={`إلغاء حجز ${title}`}
                             >
                               {cancelling === booking._id ? (
@@ -189,10 +234,65 @@ export default function MyBookings() {
                               )}
                               إلغاء الحجز
                             </button>
+                          )}
+                        </div>
+
+                        {/* كارت معلومات المالك والتواصل للضيف بعد تأكيد الحجز */}
+                        {booking.status === "confirmed" && (
+                          <div className="mt-3 rounded-xl border border-emerald-200/60 bg-emerald-50/60 p-3 text-xs dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div>
+                                <span className="block font-bold text-emerald-900 dark:text-emerald-300">
+                                  بيانات المستضيف والتواصل:
+                                </span>
+                                <span className="text-emerald-800 dark:text-emerald-400">
+                                  {(booking as any).owner?.name || "مالك الشقة"}
+                                  {(booking as any).owner?.phone ? ` · جوال: ${(booking as any).owner.phone}` : ""}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {(booking as any).owner?.phone && (
+                                  <>
+                                    <a
+                                      href={`https://wa.me/${(booking as any).owner.phone.replace(/[^0-9]/g, "")}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="clay-sm flex items-center gap-1 bg-white px-2.5 py-1 text-emerald-700 hover:bg-emerald-100 font-semibold"
+                                    >
+                                      <MessageCircle className="h-3.5 w-3.5" />
+                                      واتساب
+                                    </a>
+                                    <a
+                                      href={`tel:${(booking as any).owner.phone}`}
+                                      className="clay-sm flex items-center gap-1 bg-white px-2.5 py-1 text-emerald-700 hover:bg-emerald-100 font-semibold"
+                                    >
+                                      <Phone className="h-3.5 w-3.5" />
+                                      اتصال
+                                    </a>
+                                  </>
+                                )}
+                                <Link
+                                  to="/messages"
+                                  className="clay-sm bg-white px-2.5 py-1 text-[var(--clay-accent)] hover:bg-[var(--clay-accent-soft)]"
+                                >
+                                  محادثة المنصة
+                                </Link>
+                              </div>
+                            </div>
                           </div>
                         )}
-                        {booking.status === "confirmed" && booking.checkIn > now && <div className="clay-inset mt-3 inline-flex items-center gap-2 px-4 py-2 text-sm"><CheckCircle className="h-4 w-4 text-emerald-500" aria-hidden="true" /><span className="text-[var(--muted-foreground)]">رقم الحجز: {booking._id.slice(-8).toUpperCase()}</span></div>}
-                        {booking.status === "confirmed" && booking.checkIn > now && <div className="mt-2 flex items-center gap-1 text-xs text-[var(--muted-foreground)]"><AlertCircle className="h-3 w-3" aria-hidden="true" />{(() => { const hoursUntil = (booking.checkIn - now) / (1000 * 60 * 60); if (hoursUntil > 72) return "يمكنك الإلغاء باسترداد كامل"; if (hoursUntil > 24) return "يمكنك الإلغاء باسترداد 50%"; return "لا يمكن الاسترداد (أقل من 24 ساعة)"; })()}</div>}
+
+                        {booking.status === "confirmed" && booking.checkIn > now && (
+                          <div className="mt-2 flex items-center gap-1 text-xs text-[var(--muted-foreground)]">
+                            <AlertCircle className="h-3 w-3" aria-hidden="true" />
+                            {(() => {
+                              const hoursUntil = (booking.checkIn - now) / (1000 * 60 * 60);
+                              if (hoursUntil > 72) return "سياسة الإلغاء: استرداد كامل (أكثر من 72 ساعة)";
+                              if (hoursUntil > 24) return "سياسة الإلغاء: استرداد 50% (بين 24 و 72 ساعة)";
+                              return "سياسة الإلغاء: لا يمكن الاسترداد (أقل من 24 ساعة)";
+                            })()}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </article>
@@ -202,7 +302,28 @@ export default function MyBookings() {
           </div>
         )}
       </main>
-      <ConfirmDialog open={Boolean(cancelTarget)} title="إلغاء الحجز؟" description="سيتم تطبيق سياسة الإلغاء بحسب الوقت المتبقي قبل الوصول." confirmLabel="إلغاء الحجز" destructive onOpenChange={(open) => { if (!open) setCancelTarget(null); }} onConfirm={async () => { if (cancelTarget) await handleCancel(cancelTarget); }} />
+
+      <InvoiceModal
+        open={Boolean(selectedInvoice)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedInvoice(null);
+        }}
+        invoice={selectedInvoice}
+      />
+
+      <ConfirmDialog
+        open={Boolean(cancelTarget)}
+        title="إلغاء الحجز؟"
+        description="سيتم تطبيق سياسة الإلغاء بحسب الوقت المتبقي قبل الوصول."
+        confirmLabel="إلغاء الحجز"
+        destructive
+        onOpenChange={(open) => {
+          if (!open) setCancelTarget(null);
+        }}
+        onConfirm={async () => {
+          if (cancelTarget) await handleCancel(cancelTarget);
+        }}
+      />
     </div>
   );
 }

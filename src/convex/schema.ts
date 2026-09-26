@@ -139,13 +139,19 @@ const schema = defineSchema(
         v.literal("refunded"),
       ),
       paymentSessionId: v.optional(v.string()),
+      invoiceNumber: v.optional(v.string()),
+      guestName: v.optional(v.string()),
+      guestPhone: v.optional(v.string()),
+      guestEmail: v.optional(v.string()),
+      paidAt: v.optional(v.number()),
       createdAt: v.number(),
     })
       .index("by_apartment", ["apartmentId"])
       .index("by_user", ["userId"])
       .index("by_status", ["status"])
       .index("by_checkin", ["checkIn"])
-      .index("by_payment_session", ["paymentSessionId"]),
+      .index("by_payment_session", ["paymentSessionId"])
+      .index("by_invoice", ["invoiceNumber"]),
 
     // التواريخ المحجوبة يدوياً من المالك (صيانة، حظر أيام، إلخ)
     blockedDates: defineTable({
@@ -385,6 +391,17 @@ const schema = defineSchema(
         v.literal("failed")
       ),
     }),
+
+    // تتبع الزوار والزيارات اليومية
+    siteVisits: defineTable({
+      path: v.string(),
+      visitorId: v.string(),
+      userId: v.optional(v.id("users")),
+      referrer: v.optional(v.string()),
+      createdAt: v.number(),
+    })
+      .index("by_created", ["createdAt"])
+      .index("by_visitor", ["visitorId"]),
   },
   {
     schemaValidation: false,

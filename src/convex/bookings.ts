@@ -55,7 +55,44 @@ export function isBookingActive(booking: Doc<"bookings">, now: number = Date.now
 
 async function enrichBooking(ctx: DatabaseCtx, booking: Doc<"bookings">) {
   const apartment = await ctx.db.get(booking.apartmentId);
-  return { ...booking, apartment };
+  const guestUser = await ctx.db.get(booking.userId);
+  const guestProfile = await ctx.db
+    .query("userProfiles")
+    .withIndex("by_user", (q) => q.eq("userId", booking.userId))
+    .unique();
+
+  let ownerName: string | undefined;
+  let ownerPhone: string | undefined;
+
+  if (apartment?.ownerId) {
+    const ownerId = apartment.ownerId;
+    const ownerUser = await ctx.db.get(ownerId);
+    const ownerProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", ownerId))
+      .unique();
+    ownerName = ownerUser?.name;
+    ownerPhone = ownerProfile?.phone;
+  }
+
+  const invoiceNumber =
+    booking.invoiceNumber ||
+    `INV-${new Date(booking.createdAt).getFullYear()}-${booking._id.slice(-6).toUpperCase()}`;
+
+  return {
+    ...booking,
+    invoiceNumber,
+    apartment,
+    guest: {
+      name: booking.guestName || guestUser?.name || "ضيف العلا",
+      phone: booking.guestPhone || guestProfile?.phone || "",
+      email: booking.guestEmail || guestUser?.email || "",
+    },
+    owner: {
+      name: ownerName || "مالك الشقة",
+      phone: ownerPhone || "",
+    },
+  };
 }
 
 /**
@@ -268,6 +305,15 @@ export const create = mutation({
       const totalPrice = stayPrice.totalPrice;
       const platformFee = calculatePlatformFee(totalPrice, 10); // 10% رسوم
 
+      const userProfile = await ctx.db
+        .query("userProfiles")
+        .withIndex("by_user", (q) => q.eq("userId", user._id))
+        .unique();
+
+      const year = new Date().getFullYear();
+      const randomSeq = Math.floor(100000 + Math.random() * 900000);
+      const invoiceNumber = `INV-${year}-${randomSeq}`;
+
       // إنشاء الحجز
       const bookingId = await ctx.db.insert("bookings", {
         apartmentId: args.apartmentId,
@@ -281,8 +327,27 @@ export const create = mutation({
         platformFee,
         status: "pending",
         paymentStatus: "unpaid",
+        invoiceNumber,
+        guestName: user.name || "ضيف العلا",
+        guestPhone: userProfile?.phone || "",
+        guestEmail: user.email || "",
         createdAt: Date.now(),
       });
+
+      // إشعار فوري لمالك الشقة
+      if (apartment.ownerId) {
+        await ctx.db.insert("notifications", {
+          userId: apartment.ownerId,
+          type: "booking_created",
+          title: "طلب حجز جديد 🛎️",
+          message: `طلب حجز جديد لشقتك "${apartment.titleAr || apartment.title}" من ${user.name || "ضيف"} بانتظار إتمام الدفع (فاتورة #${invoiceNumber})`,
+          relatedBookingId: bookingId,
+          relatedApartmentId: args.apartmentId,
+          actionUrl: "/owner",
+          read: false,
+          createdAt: Date.now(),
+        });
+      }
 
       return { bookingId, totalPrice, platformFee, totalNights };
     } catch (error) {
@@ -518,13 +583,51 @@ export const markPaid = internalMutation({
       throw new Error("لا يمكن دفع حجز تم إلغاؤه");
     }
 
+    const now = Date.now();
     await ctx.db.patch(args.bookingId, {
       status: "confirmed",
       paymentStatus: "paid",
       paymentSessionId: args.sessionId,
+      paidAt: now,
     });
 
-    return await ctx.db.get(args.bookingId);
+    const updatedBooking = await ctx.db.get(args.bookingId);
+    if (updatedBooking) {
+      const apartment = await ctx.db.get(updatedBooking.apartmentId);
+      const invoiceNum =
+        updatedBooking.invoiceNumber ||
+        `INV-${new Date().getFullYear()}-${updatedBooking._id.slice(-6).toUpperCase()}`;
+
+      // إشعار فوري للضيف
+      await ctx.db.insert("notifications", {
+        userId: updatedBooking.userId,
+        type: "payment_confirmed",
+        title: "🎉 تم تأكيد حجزك ودفع المبلغ بنجاح!",
+        message: `تم سداد حجزك لشقة "${apartment?.titleAr || apartment?.title || "العلا"}" بنجاح (فاتورة #${invoiceNum}). يمكنك الآن التواصل مع المالك وعرض بيانات الوصول.`,
+        relatedBookingId: args.bookingId,
+        relatedApartmentId: updatedBooking.apartmentId,
+        actionUrl: `/my-bookings?booking=${args.bookingId}`,
+        read: false,
+        createdAt: now,
+      });
+
+      // إشعار فوري لمالك الشقة
+      if (apartment?.ownerId) {
+        await ctx.db.insert("notifications", {
+          userId: apartment.ownerId,
+          type: "booking_paid",
+          title: "💰 حجز مؤكد ومسدد!",
+          message: `تم استلام دفع حجز شقتك "${apartment.titleAr || apartment.title}" من الضيف ${updatedBooking.guestName || "ضيف"} بمبلغ ${(updatedBooking.totalPrice - updatedBooking.platformFee).toLocaleString()} ر.س (فاتورة #${invoiceNum}). يمكنك التواصل معه الآن.`,
+          relatedBookingId: args.bookingId,
+          relatedApartmentId: updatedBooking.apartmentId,
+          actionUrl: "/owner",
+          read: false,
+          createdAt: now,
+        });
+      }
+    }
+
+    return updatedBooking;
   },
 });
 
@@ -546,6 +649,28 @@ export const applyCancellation = internalMutation({
       status: "cancelled",
       paymentStatus: args.paymentStatus,
     });
+
+    const now = Date.now();
+    const apartment = await ctx.db.get(booking.apartmentId);
+    const invoiceNum =
+      booking.invoiceNumber ||
+      `INV-${new Date().getFullYear()}-${booking._id.slice(-6).toUpperCase()}`;
+
+    // إشعار فوري للمالك بإلغاء الحجز
+    if (apartment?.ownerId) {
+      await ctx.db.insert("notifications", {
+        userId: apartment.ownerId,
+        type: "booking_cancelled",
+        title: "إلغاء حجز ⚠️",
+        message: `تم إلغاء حجز شقتك "${apartment.titleAr || apartment.title}" (فاتورة #${invoiceNum}). أصبحت التواريخ متاحة مجدداً.`,
+        relatedBookingId: args.bookingId,
+        relatedApartmentId: booking.apartmentId,
+        actionUrl: "/owner",
+        read: false,
+        createdAt: now,
+      });
+    }
+
     return await ctx.db.get(args.bookingId);
   },
 });

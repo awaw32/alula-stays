@@ -29,6 +29,8 @@ import { AdminPayouts } from "@/components/admin/AdminPayouts";
 import { AdminSettings } from "@/components/admin/AdminSettings";
 import { AdminVerifications } from "@/components/admin/AdminVerifications";
 import { AdminReports } from "@/components/admin/AdminReports";
+import { AdminInvoices } from "@/components/admin/AdminInvoices";
+import { FileText, CreditCard, Search as SearchIcon, ArrowUpRight, Phone, Mail } from "lucide-react";
 
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   pending: { label: "بانتظار المراجعة", className: "bg-amber-100 text-amber-700" },
@@ -77,7 +79,21 @@ export default function AdminDashboard() {
       toast.error(getErrorMessage(error, "تعذر تحديث حالة الحساب"));
     }
   };
-  const [activeTab, setActiveTab] = useState<"stats" | "apartments" | "users" | "bookings" | "finance" | "activity" | "settings" | "verifications" | "reports">("stats");
+  const [activeTab, setActiveTab] = useState<
+    | "stats"
+    | "invoices"
+    | "apartments"
+    | "users"
+    | "bookings"
+    | "finance"
+    | "verifications"
+    | "reports"
+    | "settings"
+    | "activity"
+  >("stats");
+  const [timeRange, setTimeRange] = useState<"today" | "week" | "month" | "year" | "all">("today");
+  const [userSearch, setUserSearch] = useState<string>("");
+  const [userFilter, setUserFilter] = useState<"all" | "paid" | "pending" | "owners">("all");
   const adminBookings = useQuery(api.bookings.adminList, DEMO_MODE || activeTab !== "bookings" ? "skip" : {});
   const activityLog = useQuery(api.admin.adminActivityLog, DEMO_MODE || activeTab !== "activity" ? "skip" : { limit: 80 });
   const [reviewTarget, setReviewTarget] = useState<{ id: string; title: string; action: Exclude<ReviewAction, null> } | null>(null);
@@ -151,45 +167,193 @@ export default function AdminDashboard() {
           </div>
         </motion.div>
 
-        {/* Stats Cards */}
+        {/* Stats Cards with Time Range Filter */}
         {stats && (
-          <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={1} className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 mb-8">
-            {[
-              { icon: Users, label: "المستخدمون", value: stats.totalUsers, color: "bg-blue-50 text-blue-600" },
-              { icon: Home, label: "الشقق", value: stats.totalApartments, color: "bg-emerald-50 text-emerald-600" },
-              { icon: Calendar, label: "الحجوزات", value: stats.totalBookings, color: "bg-purple-50 text-purple-600" },
-              { icon: DollarSign, label: "إيرادات المنصة", value: `${stats.platformRevenue.toLocaleString()} ر.س`, color: "bg-amber-50 text-amber-600" },
-              { icon: TrendingUp, label: "الحجوزات الشهر", value: stats.monthlyBookings, color: "bg-pink-50 text-pink-600" },
-              { icon: Star, label: "متوسط التقييم", value: stats.avgRating, color: "bg-yellow-50 text-yellow-600" },
-              { icon: AlertCircle, label: "بانتظار التوثيق", value: stats.pendingVerification, color: "bg-orange-50 text-orange-600" },
-              { icon: Eye, label: "التقييمات", value: stats.totalReviews, color: "bg-teal-50 text-teal-600" },
-            ].map((stat) => (
-              <div key={stat.label} className="clay p-4">
-                <div className={`w-10 h-10 rounded-xl ${stat.color} flex items-center justify-center mb-2`}>
-                  <stat.icon className="w-5 h-5" />
-                </div>
-                <div className="text-xl font-bold text-[var(--foreground)]">{stat.value}</div>
-                <div className="text-xs text-[var(--muted-foreground)]">{stat.label}</div>
+          <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={1} className="mt-6 mb-8 space-y-4">
+            {/* Period Selector Header */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[var(--card)] p-4 rounded-2xl border border-[var(--border)]">
+              <div>
+                <h3 className="text-sm font-bold text-[var(--foreground)]">إحصائيات المنصة والأرباح وحركة الزوار</h3>
+                <p className="text-xs text-[var(--muted-foreground)]">بيانات حية ومباشرة للزوار والإيرادات وعمليات الدفع</p>
               </div>
-            ))}
+              <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="فترة الإحصائيات">
+                {[
+                  { id: "today", label: "اليوم" },
+                  { id: "week", label: "آخر 7 أيام" },
+                  { id: "month", label: "آخر 30 يوماً" },
+                  { id: "year", label: "هذا العام" },
+                  { id: "all", label: "الإجمالي" },
+                ].map((range) => (
+                  <button
+                    key={range.id}
+                    type="button"
+                    onClick={() => setTimeRange(range.id as any)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                      timeRange === range.id
+                        ? "bg-[var(--clay-accent)] text-white shadow-sm"
+                        : "bg-[var(--clay-surface)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                    }`}
+                  >
+                    {range.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Dynamic Period Metrics */}
+            {(() => {
+              const current = (stats as any)?.[timeRange] || stats?.all || {};
+              const periodLabel = timeRange === "today" ? "اليوم" : timeRange === "week" ? "الأسبوع" : timeRange === "month" ? "الشهر" : timeRange === "year" ? "السنة" : "الكل";
+
+              return (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {/* الزوار */}
+                  <div className="clay p-4">
+                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-2">
+                      <Users className="w-5 h-5" />
+                    </div>
+                    <div className="text-2xl font-bold text-[var(--foreground)]">
+                      {(current.uniqueVisitors ?? 0).toLocaleString()}
+                    </div>
+                    <div className="text-xs text-[var(--muted-foreground)]">
+                      زوار فريدون ({periodLabel})
+                    </div>
+                    <div className="text-[11px] text-zinc-400 mt-1 font-mono">
+                      {(current.pageViews ?? 0).toLocaleString()} مشاهدة صفحة
+                    </div>
+                  </div>
+
+                  {/* إجمالي المبيعات */}
+                  <div className="clay p-4">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-2">
+                      <DollarSign className="w-5 h-5" />
+                    </div>
+                    <div className="text-2xl font-bold text-emerald-600">
+                      {(current.revenue ?? 0).toLocaleString()} ر.س
+                    </div>
+                    <div className="text-xs text-[var(--muted-foreground)]">
+                      مبيعات الحجوزات ({periodLabel})
+                    </div>
+                    <div className="text-[11px] text-emerald-700 mt-1 font-medium">
+                      عمولة المنصة (10%): +{(current.platformProfit ?? 0).toLocaleString()} ر.س
+                    </div>
+                  </div>
+
+                  {/* الحجوزات المسددة */}
+                  <div className="clay p-4">
+                    <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center mb-2">
+                      <Calendar className="w-5 h-5" />
+                    </div>
+                    <div className="text-2xl font-bold text-[var(--foreground)]">
+                      {current.paidBookingsCount ?? 0}
+                    </div>
+                    <div className="text-xs text-[var(--muted-foreground)]">
+                      حجوزات مسددة ومؤكدة
+                    </div>
+                    <div className="text-[11px] text-zinc-400 mt-1">
+                      إجمالي الطلبات: {current.bookingsCount ?? 0}
+                    </div>
+                  </div>
+
+                  {/* محاولات الدفع والمعلقة */}
+                  <div className="clay p-4">
+                    <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mb-2">
+                      <TrendingUp className="w-5 h-5" />
+                    </div>
+                    <div className="text-2xl font-bold text-amber-600">
+                      {current.pendingBookingsCount ?? 0}
+                    </div>
+                    <div className="text-xs text-[var(--muted-foreground)]">
+                      محاولات دفع معلقة
+                    </div>
+                    <div className="text-[11px] text-red-500 mt-1">
+                      ملغية / مستردة: {current.cancelledBookingsCount ?? 0}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Platform Overall Overview */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="clay p-3 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                  <Users className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-base font-bold text-[var(--foreground)]">{stats.totalUsers}</div>
+                  <div className="text-[11px] text-[var(--muted-foreground)]">المستخدمون المسجلون</div>
+                </div>
+              </div>
+
+              <div className="clay p-3 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center shrink-0">
+                  <Home className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-base font-bold text-[var(--foreground)]">{stats.totalApartments}</div>
+                  <div className="text-[11px] text-[var(--muted-foreground)]">الشقق المسجلة</div>
+                </div>
+              </div>
+
+              <div className="clay p-3 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
+                  <AlertCircle className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-base font-bold text-orange-600">{stats.pendingVerification}</div>
+                  <div className="text-[11px] text-[var(--muted-foreground)]">بانتظار مراجعة الإدارة</div>
+                </div>
+              </div>
+
+              <div className="clay p-3 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-yellow-50 text-yellow-600 flex items-center justify-center shrink-0">
+                  <Star className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-base font-bold text-[var(--foreground)]">{stats.avgRating} ★</div>
+                  <div className="text-[11px] text-[var(--muted-foreground)]">متوسط تقييم الشقق</div>
+                </div>
+              </div>
+            </div>
           </motion.div>
         )}
 
         {/* Tabs */}
-        <div className="mb-6 flex gap-2" role="tablist" aria-label="أقسام لوحة الإدارة">
-          {(["stats", "apartments", "bookings", "users", "finance", "verifications", "reports", "settings", "activity"] as const).map((tab) => (
+        <div className="mb-6 flex flex-wrap gap-2" role="tablist" aria-label="أقسام لوحة الإدارة">
+          {[
+            ["stats", "نظرة عامة والزوار"],
+            ["invoices", "الفواتير وأوامر الشراء"],
+            ["apartments", "الشقق"],
+            ["bookings", "الحجوزات"],
+            ["users", "المستخدمون والزوار"],
+            ["finance", "المالية"],
+            ["verifications", "توثيق الهويات"],
+            ["reports", "البلاغات"],
+            ["settings", "الإعدادات"],
+            ["activity", "سجل النشاط"],
+          ].map(([tab, label]) => (
             <button
               key={tab}
               type="button"
               role="tab"
               aria-selected={activeTab === tab}
-              onClick={() => setActiveTab(tab)}
-              className={`clay-sm px-5 py-2.5 text-sm font-medium transition-all ${activeTab === tab ? "!bg-[var(--clay-accent)] !text-white" : "text-[var(--muted-foreground)]"}`}
+              onClick={() => setActiveTab(tab as any)}
+              className={`clay-sm px-4 py-2 text-xs font-semibold transition-all ${
+                activeTab === tab ? "!bg-[var(--clay-accent)] !text-white" : "text-[var(--muted-foreground)]"
+              }`}
             >
-              {tab === "stats" ? "نظرة عامة" : tab === "apartments" ? "الشقق" : tab === "bookings" ? "الحجوزات" : tab === "users" ? "المستخدمون" : tab === "finance" ? "المالية" : tab === "verifications" ? "توثيق الهويات" : tab === "reports" ? "البلاغات" : tab === "settings" ? "الإعدادات" : "سجل النشاط"}
+              {label}
             </button>
           ))}
         </div>
+
+        {/* Invoices Management Tab */}
+        {activeTab === "invoices" && (
+          <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={2}>
+            <AdminInvoices />
+          </motion.div>
+        )}
 
         {/* Apartments Management */}
         {activeTab === "apartments" && (
@@ -293,42 +457,160 @@ export default function AdminDashboard() {
 
         {/* Users Management */}
         {activeTab === "users" && (
-          <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={2}>
-            {allUsers === undefined ? (
-              <div className="clay p-6 animate-pulse h-40" />
-            ) : (
-              <div className="space-y-3">
-                {allUsers.map((u) => (
-                  <div key={u._id} className="clay p-4 flex flex-col md:flex-row gap-4 items-center">
-                    <div className="w-10 h-10 rounded-full bg-[var(--clay-accent-soft)] flex items-center justify-center text-sm font-bold text-[var(--clay-accent)] shrink-0">
-                      {(u.name || u.email || "?").charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-[var(--foreground)]">{u.name || "بدون اسم"}</h3>
-                      <p className="text-sm text-[var(--muted-foreground)]">{u.email || "بدون بريد"}</p>
-                    </div>
-                    <div className="shrink-0 flex items-center gap-2">
-                      {u.isDisabled && (
-                        <span className="rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-semibold">معطّل</span>
-                      )}
-                      <select value={u.role || "user"} onChange={(e) => handleRoleChange(u._id, e.target.value as UserRole)} className="clay-input px-3 py-1.5 text-xs" aria-label={`دور ${u.name || u.email || "المستخدم"}`}>
-                        <option value="user">مستخدم</option>
-                        <option value="owner">مالك</option>
-                        <option value="member">عضو</option>
-                        <option value="admin">مدير</option>
-                      </select>
-                      <button
-                        type="button"
-                        onClick={() => handleToggleDisable(u._id, !u.isDisabled, u.name || u.email || "")}
-                        className={`clay-sm px-3 py-1.5 text-xs font-medium ${u.isDisabled ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}
-                      >
-                        {u.isDisabled ? "تفعيل" : "تعطيل"}
-                      </button>
-                    </div>
-                  </div>
+          <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={2} className="space-y-4">
+            {/* User Search & Filter Header */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[var(--card)] p-4 rounded-2xl border border-[var(--border)]">
+              <div className="flex flex-wrap gap-1.5" role="tablist">
+                {[
+                  { id: "all", label: "كافة المسجلين" },
+                  { id: "paid", label: "أصحاب الحجوزات المسددة" },
+                  { id: "pending", label: "محاولات الدفع المعلقة" },
+                  { id: "owners", label: "ملاك العقارات" },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setUserFilter(tab.id as any)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                      userFilter === tab.id
+                        ? "bg-[var(--clay-accent)] text-white shadow-sm"
+                        : "bg-[var(--clay-surface)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
                 ))}
               </div>
-            )}
+
+              <div className="relative min-w-[240px]">
+                <SearchIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)]" />
+                <input
+                  type="text"
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  placeholder="بحث باسم المستخدم، الإيميل، الجوال..."
+                  className="clay-input pr-9 pl-3 py-1.5 text-xs w-full"
+                />
+              </div>
+            </div>
+
+            {allUsers === undefined ? (
+              <div className="clay p-6 animate-pulse h-40" />
+            ) : (() => {
+              const filteredUsers = allUsers.filter((u) => {
+                if (userFilter === "paid" && !(u as any).paidBookingsCount) return false;
+                if (userFilter === "pending" && !(u as any).pendingBookingsCount) return false;
+                if (userFilter === "owners" && u.role !== "owner") return false;
+                if (userSearch.trim()) {
+                  const term = userSearch.trim().toLowerCase();
+                  const matchName = u.name?.toLowerCase().includes(term);
+                  const matchEmail = u.email?.toLowerCase().includes(term);
+                  const matchPhone = (u as any).phone?.includes(term);
+                  return matchName || matchEmail || matchPhone;
+                }
+                return true;
+              });
+
+              if (filteredUsers.length === 0) {
+                return (
+                  <div className="clay p-12 text-center text-zinc-500">
+                    <Users className="w-12 h-12 mx-auto mb-3 text-[var(--muted-foreground)]" />
+                    <h3 className="font-bold text-base text-[var(--foreground)]">لا يوجد مستخدمون مطابقون</h3>
+                    <p className="text-xs text-[var(--muted-foreground)] mt-1">جرّب تغيير عبارة البحث أو التصفية</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-3">
+                  {filteredUsers.map((u) => {
+                    const phone = (u as any).phone;
+                    const paidCount = (u as any).paidBookingsCount || 0;
+                    const pendingCount = (u as any).pendingBookingsCount || 0;
+                    const totalSpent = (u as any).totalSpent || 0;
+
+                    return (
+                      <div key={u._id} className="clay p-4 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+                        <div className="flex items-start gap-3.5 min-w-0">
+                          <div className="w-10 h-10 rounded-full bg-[var(--clay-accent-soft)] flex items-center justify-center text-sm font-bold text-[var(--clay-accent)] shrink-0 mt-0.5">
+                            {(u.name || u.email || "?").charAt(0).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-1">
+                              <h3 className="font-bold text-sm text-[var(--foreground)]">{u.name || "بدون اسم"}</h3>
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-[var(--muted-foreground)]">
+                                {u.role === "admin" ? "مدير نظام" : u.role === "owner" ? "مالك عقار" : "مستخدم / ضيف"}
+                              </span>
+                              {u.isDisabled && (
+                                <span className="rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-semibold">معطّل</span>
+                              )}
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--muted-foreground)]">
+                              {u.email && (
+                                <span className="flex items-center gap-1">
+                                  <Mail className="w-3 h-3" /> {u.email}
+                                </span>
+                              )}
+                              {phone && (
+                                <span className="flex items-center gap-1 font-mono dir-ltr">
+                                  <Phone className="w-3 h-3 text-emerald-600" /> {phone}
+                                </span>
+                              )}
+                              {(u as any).city && <span>{(u as any).city}</span>}
+                            </div>
+
+                            {/* سجل الدفع والحجوزات */}
+                            <div className="flex flex-wrap items-center gap-2 mt-2 text-[11px]">
+                              <span className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 font-medium">
+                                مدفوع: {totalSpent.toLocaleString()} ر.س ({paidCount} حجز)
+                              </span>
+                              {pendingCount > 0 && (
+                                <span className="px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 font-medium">
+                                  {pendingCount} محاولة دفع لم تكتمل
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Controls & Actions */}
+                        <div className="shrink-0 flex flex-wrap items-center gap-2 self-end md:self-center">
+                          {phone && (
+                            <a
+                              href={`https://wa.me/${phone.replace(/[^0-9]/g, "")}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="clay-sm px-2.5 py-1.5 text-xs text-emerald-700 bg-emerald-50 hover:bg-emerald-100 font-semibold flex items-center gap-1"
+                            >
+                              واتساب
+                            </a>
+                          )}
+                          <select
+                            value={u.role || "user"}
+                            onChange={(e) => handleRoleChange(u._id, e.target.value as UserRole)}
+                            className="clay-input px-3 py-1.5 text-xs"
+                            aria-label={`دور ${u.name || u.email || "المستخدم"}`}
+                          >
+                            <option value="user">مستخدم</option>
+                            <option value="owner">مالك</option>
+                            <option value="member">عضو</option>
+                            <option value="admin">مدير</option>
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleDisable(u._id, !u.isDisabled, u.name || u.email || "")}
+                            className={`clay-sm px-3 py-1.5 text-xs font-medium ${u.isDisabled ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}
+                          >
+                            {u.isDisabled ? "تفعيل" : "تعطيل"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </motion.div>
         )}
 

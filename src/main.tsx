@@ -140,10 +140,18 @@ function DemoBanner() {
   );
 }
 
+import { useVisitorTracker } from "@/hooks/use-visitor-tracker";
+
+function VisitorTracker() {
+  useVisitorTracker();
+  return null;
+}
+
 function AppRoutes() {
   return (
     <BrowserRouter basename={routerBasename}>
       <RouteSyncer />
+      <VisitorTracker />
       <DemoBanner />
       <Suspense fallback={<RouteLoading />}>
         <Routes>

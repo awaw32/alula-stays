@@ -310,7 +310,35 @@ export const allUsers = query({
   args: {},
   handler: async (ctx) => {
     await requireRole(ctx, "admin");
-    return await ctx.db.query("users").collect();
+    const users = await ctx.db.query("users").collect();
+    const profiles = await ctx.db.query("userProfiles").collect();
+    const profileMap = new Map(profiles.map((p) => [p.userId, p]));
+    const bookings = await ctx.db.query("bookings").collect();
+
+    return users.map((u) => {
+      const p = profileMap.get(u._id);
+      const userBookings = bookings.filter((b) => b.userId === u._id);
+      const paidBookings = userBookings.filter((b) => b.paymentStatus === "paid");
+      const pendingBookings = userBookings.filter(
+        (b) => b.status === "pending" && b.paymentStatus === "unpaid",
+      );
+      const cancelledBookings = userBookings.filter(
+        (b) => b.status === "cancelled",
+      );
+      const totalSpent = paidBookings.reduce((sum, b) => sum + b.totalPrice, 0);
+
+      return {
+        ...u,
+        phone: p?.phone || "",
+        city: p?.city || "",
+        country: p?.country || "",
+        bookingsCount: userBookings.length,
+        paidBookingsCount: paidBookings.length,
+        pendingBookingsCount: pendingBookings.length,
+        cancelledBookingsCount: cancelledBookings.length,
+        totalSpent,
+      };
+    });
   },
 });
 
@@ -519,28 +547,55 @@ export const adminDashboardStats = query({
     const apartments = await ctx.db.query("apartments").collect();
     const bookings = await ctx.db.query("bookings").collect();
     const reviews = await ctx.db.query("reviews").collect();
+    const visits = await ctx.db.query("siteVisits").collect();
 
     const now = Date.now();
-    const monthStart = new Date(
-      new Date().getFullYear(),
-      new Date().getMonth(),
-      1,
-    ).getTime();
+    const todayStart = new Date().setHours(0, 0, 0, 0);
+    const weekStart = now - 7 * 24 * 60 * 60 * 1000;
+    const monthStart = now - 30 * 24 * 60 * 60 * 1000;
+    const yearStart = now - 365 * 24 * 60 * 60 * 1000;
 
-    const monthlyBookings = bookings.filter(
-      (b) => b.createdAt >= monthStart,
-    );
+    const calcPeriod = (since: number) => {
+      const bList = bookings.filter((b) => b.createdAt >= since);
+      const paidList = bList.filter((b) => b.paymentStatus === "paid");
+      const cancelledList = bList.filter((b) => b.status === "cancelled");
+      const pendingList = bList.filter(
+        (b) => b.status === "pending" && b.paymentStatus === "unpaid",
+      );
+      const revenue = paidList.reduce((sum, b) => sum + b.totalPrice, 0);
+      const platformProfit = paidList.reduce(
+        (sum, b) => sum + b.platformFee,
+        0,
+      );
+      const ownerPayouts = revenue - platformProfit;
+
+      const vList = visits.filter((v) => v.createdAt >= since);
+      const uniqueVisitors = new Set(vList.map((v) => v.visitorId)).size;
+
+      return {
+        revenue,
+        platformProfit,
+        ownerPayouts,
+        bookingsCount: bList.length,
+        paidBookingsCount: paidList.length,
+        cancelledBookingsCount: cancelledList.length,
+        pendingBookingsCount: pendingList.length,
+        uniqueVisitors,
+        pageViews: vList.length,
+      };
+    };
+
+    const todayStats = calcPeriod(todayStart);
+    const weekStats = calcPeriod(weekStart);
+    const monthStats = calcPeriod(monthStart);
+    const yearStats = calcPeriod(yearStart);
+    const allStats = calcPeriod(0);
+
     const activeBookings = bookings.filter(
       (b) => b.status === "confirmed" && b.checkOut > now,
     );
-    const totalRevenue = bookings
-      .filter((b) => b.paymentStatus === "paid")
-      .reduce((sum, b) => sum + b.totalPrice, 0);
-    const platformRevenue = bookings
-      .filter((b) => b.paymentStatus === "paid")
-      .reduce((sum, b) => sum + b.platformFee, 0);
 
-    // بانتظار المراجعة أو تحتاج تعديلات (مع دعم الشقق القديمة قبل إضافة status)
+    // بانتظار المراجعة أو تحتاج تعديلات
     const pendingApartments = apartments.filter(
       (a) =>
         a.status === "pending" ||
@@ -548,14 +603,40 @@ export const adminDashboardStats = query({
         (a.status === undefined && !a.isVerified),
     );
 
+    // تفصيل الفواتير
+    const paidInvoices = bookings.filter((b) => b.paymentStatus === "paid");
+    const cancelledInvoices = bookings.filter((b) => b.status === "cancelled");
+    const pendingInvoices = bookings.filter(
+      (b) => b.status === "pending" && b.paymentStatus === "unpaid",
+    );
+
     return {
+      // إحصائيات زمنية
+      today: todayStats,
+      week: weekStats,
+      month: monthStats,
+      year: yearStats,
+      all: allStats,
+
+      // ملخص الفواتير
+      invoicesSummary: {
+        totalCount: bookings.length,
+        paidCount: paidInvoices.length,
+        paidTotal: paidInvoices.reduce((s, b) => s + b.totalPrice, 0),
+        cancelledCount: cancelledInvoices.length,
+        cancelledTotal: cancelledInvoices.reduce((s, b) => s + b.totalPrice, 0),
+        pendingCount: pendingInvoices.length,
+        pendingTotal: pendingInvoices.reduce((s, b) => s + b.totalPrice, 0),
+      },
+
+      // للتوافق مع الواجهات القائمة
       totalUsers: users.length,
       totalApartments: apartments.length,
       totalBookings: bookings.length,
       activeBookings: activeBookings.length,
-      totalRevenue,
-      platformRevenue,
-      monthlyBookings: monthlyBookings.length,
+      totalRevenue: allStats.revenue,
+      platformRevenue: allStats.platformProfit,
+      monthlyBookings: monthStats.bookingsCount,
       pendingVerification: pendingApartments.length,
       totalReviews: reviews.length,
       avgRating:
@@ -567,5 +648,93 @@ export const adminDashboardStats = query({
             ) / 10
           : 0,
     };
+  },
+});
+
+export const adminInvoicesList = query({
+  args: {
+    status: v.optional(v.string()),
+    search: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await requireRole(ctx, "admin");
+    const bookings = await ctx.db.query("bookings").order("desc").collect();
+    const apartments = await ctx.db.query("apartments").collect();
+    const aptMap = new Map(apartments.map((a) => [a._id, a]));
+    const users = await ctx.db.query("users").collect();
+    const userMap = new Map(users.map((u) => [u._id, u]));
+    const profiles = await ctx.db.query("userProfiles").collect();
+    const profileMap = new Map(profiles.map((p) => [p.userId, p]));
+
+    const invoices = bookings.map((b) => {
+      const apt = aptMap.get(b.apartmentId);
+      const guestUser = userMap.get(b.userId);
+      const guestProfile = profileMap.get(b.userId);
+
+      let ownerName = "مالك";
+      let ownerPhone = "";
+      if (apt?.ownerId) {
+        ownerName = userMap.get(apt.ownerId)?.name || "مالك";
+        ownerPhone = profileMap.get(apt.ownerId)?.phone || "";
+      }
+
+      const invoiceNumber =
+        b.invoiceNumber ||
+        `INV-${new Date(b.createdAt).getFullYear()}-${b._id.slice(-6).toUpperCase()}`;
+
+      const guestName = b.guestName || guestUser?.name || "ضيف العلا";
+      const guestPhone = b.guestPhone || guestProfile?.phone || "";
+      const guestEmail = b.guestEmail || guestUser?.email || "";
+
+      return {
+        _id: b._id,
+        invoiceNumber,
+        bookingId: b._id,
+        status: b.status,
+        paymentStatus: b.paymentStatus,
+        apartmentId: b.apartmentId,
+        apartmentTitle: apt?.titleAr || apt?.title || "شقة",
+        apartmentLocation: apt?.locationAr || apt?.location || "العلا",
+        guestName,
+        guestPhone,
+        guestEmail,
+        ownerName,
+        ownerPhone,
+        checkIn: b.checkIn,
+        checkOut: b.checkOut,
+        totalNights: b.totalNights,
+        guests: b.guests,
+        pricePerNight: b.pricePerNight,
+        totalPrice: b.totalPrice,
+        platformFee: b.platformFee,
+        ownerNet: b.totalPrice - b.platformFee,
+        paymentSessionId: b.paymentSessionId || "",
+        paidAt: b.paidAt,
+        createdAt: b.createdAt,
+      };
+    });
+
+    let filtered = invoices;
+    if (args.status && args.status !== "all") {
+      filtered = filtered.filter(
+        (inv) => inv.paymentStatus === args.status || inv.status === args.status,
+      );
+    }
+
+    if (args.search && args.search.trim()) {
+      const term = args.search.trim().toLowerCase();
+      filtered = filtered.filter(
+        (inv) =>
+          inv.invoiceNumber.toLowerCase().includes(term) ||
+          inv.guestName.toLowerCase().includes(term) ||
+          inv.guestPhone.includes(term) ||
+          inv.guestEmail.toLowerCase().includes(term) ||
+          inv.apartmentTitle.toLowerCase().includes(term) ||
+          (inv.paymentSessionId &&
+            inv.paymentSessionId.toLowerCase().includes(term)),
+      );
+    }
+
+    return filtered;
   },
 });

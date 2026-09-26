@@ -16,6 +16,9 @@ import {
   Trash2,
   Eye,
   Loader2,
+  FileText,
+  MessageCircle,
+  Phone,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -23,6 +26,7 @@ import { getErrorMessage } from "@/lib/error-message";
 import { CalendarBlockManager } from "@/components/owner/CalendarBlockManager";
 import { OwnerFinance } from "@/components/owner/OwnerFinance";
 import { OwnerIdentityVerification } from "@/components/owner/OwnerIdentityVerification";
+import { InvoiceModal, type InvoiceData } from "@/components/InvoiceModal";
 
 const OWNER_STATUS_LABELS: Record<string, { label: string; className: string }> = {
   pending: { label: "بانتظار مراجعة الإدارة", className: "bg-amber-100 text-amber-700" },
@@ -57,6 +61,7 @@ export default function OwnerDashboard() {
   const [activeTab, setActiveTab] = useState<"apartments" | "bookings" | "calendar" | "finance">("apartments");
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<InvoiceData | null>(null);
   const [now] = useState(() => Date.now());
 
   // إكمال الملف الشخصي قبل دخول اللوحة
@@ -204,35 +209,123 @@ export default function OwnerDashboard() {
               </div>
             ) : (
               <div className="space-y-3">
-                {myBookings.map((booking) => (
-                  <div key={booking._id} className="clay p-4 flex flex-col md:flex-row gap-4 items-start">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-[var(--foreground)] mb-1">{booking.apartment?.title || "شقة"}</h3>
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-[var(--muted-foreground)]">
-                        <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{new Date(booking.checkIn).toLocaleDateString("ar-SA")} — {new Date(booking.checkOut).toLocaleDateString("ar-SA")}</span>
-                        <span>{booking.totalNights} ليلة</span>
-                        <span>{booking.guests} ضيوف</span>
+                {myBookings.map((booking) => {
+                  const guestInfo = (booking as any).guest;
+                  const invoiceNum = booking.invoiceNumber || `INV-${booking._id.slice(-6).toUpperCase()}`;
+                  const isPaid = booking.paymentStatus === "paid" || booking.status === "confirmed";
+
+                  return (
+                    <div key={booking._id} className="clay p-4 flex flex-col gap-3">
+                      <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-bold text-[var(--foreground)]">{booking.apartment?.title || "شقة"}</h3>
+                            <span className="font-mono text-xs px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-[var(--muted-foreground)]">
+                              #{invoiceNum}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-[var(--muted-foreground)]">
+                            <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{new Date(booking.checkIn).toLocaleDateString("ar-SA")} — {new Date(booking.checkOut).toLocaleDateString("ar-SA")}</span>
+                            <span>{booking.totalNights} ليلة</span>
+                            <span>{booking.guests} ضيوف</span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-xs">
+                            <span className="text-[var(--muted-foreground)]">إجمالي الحجز: <span className="font-medium">{booking.totalPrice.toLocaleString()} ر.س</span></span>
+                            <span className="text-[var(--muted-foreground)]">عمولة المنصة: <span className="font-medium text-red-600">−{booking.platformFee.toLocaleString()} ر.س</span></span>
+                            <span className="text-emerald-700 font-semibold">صافي مستحقك: {(booking.totalPrice - booking.platformFee).toLocaleString()} ر.س</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                            booking.status === "confirmed" ? "bg-emerald-100 text-emerald-700" :
+                            booking.status === "pending" ? "bg-amber-100 text-amber-700" :
+                            booking.status === "cancelled" ? "bg-red-100 text-red-700" :
+                            "bg-blue-100 text-blue-700"
+                          }`}>
+                            {booking.status === "confirmed" ? "مؤكد ومسدد" :
+                             booking.status === "pending" ? "قيد الانتظار" :
+                             booking.status === "cancelled" ? "ملغى" : "مكتمل"}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-xs">
-                        <span className="text-[var(--muted-foreground)]">إجمالي الحجز: <span className="font-medium">{booking.totalPrice.toLocaleString()} ر.س</span></span>
-                        <span className="text-[var(--muted-foreground)]">عمولة المنصة: <span className="font-medium text-red-600">−{booking.platformFee.toLocaleString()} ر.س</span></span>
-                        <span className="text-emerald-700 font-semibold">صافي مستحقك: {(booking.totalPrice - booking.platformFee).toLocaleString()} ر.س</span>
+
+                      {/* شريط بيانات الضيف والتواصل والفاتورة */}
+                      <div className="pt-3 border-t border-[var(--border)] flex flex-wrap items-center justify-between gap-3 text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-[var(--foreground)]">الضيف:</span>
+                          <span className="font-semibold text-[var(--foreground)]">{guestInfo?.name || "ضيف العلا"}</span>
+                          {guestInfo?.phone && (
+                            <span className="text-[var(--muted-foreground)] dir-ltr font-mono">
+                              ({guestInfo.phone})
+                            </span>
+                          )}
+                          {guestInfo?.email && (
+                            <span className="text-[var(--muted-foreground)] hidden sm:inline">
+                              · {guestInfo.email}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {guestInfo?.phone && isPaid && (
+                            <>
+                              <a
+                                href={`https://wa.me/${guestInfo.phone.replace(/[^0-9]/g, "")}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="clay-sm px-2.5 py-1 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 flex items-center gap-1 font-semibold"
+                              >
+                                <MessageCircle className="w-3.5 h-3.5" />
+                                واتساب الضيف
+                              </a>
+                              <a
+                                href={`tel:${guestInfo.phone}`}
+                                className="clay-sm px-2.5 py-1 text-zinc-700 bg-zinc-50 hover:bg-zinc-100 flex items-center gap-1 font-semibold"
+                              >
+                                <Phone className="w-3.5 h-3.5" />
+                                اتصال
+                              </a>
+                            </>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSelectedInvoice({
+                                invoiceNumber: invoiceNum,
+                                bookingId: booking._id,
+                                status: booking.status,
+                                paymentStatus: booking.paymentStatus,
+                                apartmentTitle: booking.apartment?.title || "شقة",
+                                apartmentLocation: booking.apartment?.location || "العلا",
+                                guestName: guestInfo?.name || "ضيف العلا",
+                                guestPhone: guestInfo?.phone,
+                                guestEmail: guestInfo?.email,
+                                ownerName: user?.name || "المالك",
+                                ownerPhone: myProfile?.phone,
+                                checkIn: booking.checkIn,
+                                checkOut: booking.checkOut,
+                                totalNights: booking.totalNights,
+                                guests: booking.guests,
+                                pricePerNight: booking.pricePerNight,
+                                totalPrice: booking.totalPrice,
+                                platformFee: booking.platformFee,
+                                paymentSessionId: booking.paymentSessionId,
+                                paidAt: (booking as any).paidAt,
+                                createdAt: booking.createdAt,
+                              })
+                            }
+                            className="clay-sm px-2.5 py-1 text-xs font-medium flex items-center gap-1 hover:bg-[var(--clay-accent-soft)]"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-[var(--clay-accent)]" />
+                            عرض الفاتورة
+                          </button>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        booking.status === "confirmed" ? "bg-emerald-100 text-emerald-700" :
-                        booking.status === "pending" ? "bg-amber-100 text-amber-700" :
-                        booking.status === "cancelled" ? "bg-red-100 text-red-700" :
-                        "bg-blue-100 text-blue-700"
-                      }`}>
-                        {booking.status === "confirmed" ? "مؤكد" :
-                         booking.status === "pending" ? "قيد الانتظار" :
-                         booking.status === "cancelled" ? "ملغى" : "مكتمل"}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </motion.div>
@@ -254,6 +347,14 @@ export default function OwnerDashboard() {
           </motion.div>
         )}
       </div>
+      <InvoiceModal
+        open={Boolean(selectedInvoice)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedInvoice(null);
+        }}
+        invoice={selectedInvoice}
+      />
+
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         title="حذف الشقة؟"
