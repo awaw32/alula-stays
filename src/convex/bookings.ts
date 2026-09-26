@@ -527,3 +527,26 @@ export const markPaid = internalMutation({
     return await ctx.db.get(args.bookingId);
   },
 });
+
+export const applyCancellation = internalMutation({
+  args: {
+    bookingId: v.id("bookings"),
+    paymentStatus: v.union(
+      v.literal("unpaid"),
+      v.literal("paid"),
+      v.literal("refunded"),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const booking = await ctx.db.get(args.bookingId);
+    if (!booking) {
+      throw new Error("الحجز غير موجود");
+    }
+    await ctx.db.patch(args.bookingId, {
+      status: "cancelled",
+      paymentStatus: args.paymentStatus,
+    });
+    return await ctx.db.get(args.bookingId);
+  },
+});
+

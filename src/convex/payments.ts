@@ -17,6 +17,7 @@ import {
   calculateTotalAmount,
   convertToSmallestUnit,
   verifyPaymentAmount,
+  calculateRefund,
 } from "./lib/money";
 import { checkRateLimit, RATE_LIMIT_POLICIES } from "./lib/rateLimiting";
 
@@ -141,6 +142,53 @@ async function verifyTapSession(chargeId: string): Promise<{ paid: boolean; stat
 
   const isPaid = data.status === "CAPTURED" || data.status === "AUTHORIZED";
   return { paid: isPaid, status: data.status || "UNKNOWN" };
+}
+
+/**
+ * استرجاع المبلغ عبر بوابة Tap Payments (Refunds API)
+ */
+async function processTapRefund(args: {
+  chargeId: string;
+  amount: number;
+  bookingId: string;
+  reason?: string;
+}): Promise<{ refundId: string; status: string }> {
+  const tapKey = process.env.TAP_SECRET_KEY;
+  if (!tapKey) {
+    throw new PaymentError("مفتاح بوابة الدفع Tap غير معرف");
+  }
+
+  const response = await fetch("https://api.tap.company/v2/refunds", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${tapKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      charge_id: args.chargeId,
+      amount: args.amount,
+      currency: "SAR",
+      description: `استرجاع حجز شقق العلا #${args.bookingId}`,
+      reason: args.reason || "requested_by_customer",
+      metadata: {
+        bookingId: args.bookingId,
+      },
+    }),
+  });
+
+  const data = (await response.json()) as {
+    id?: string;
+    status?: string;
+    errors?: Array<{ code: string; description: string }>;
+  };
+
+  if (!response.ok || !data.id) {
+    const errorMsg =
+      data.errors?.[0]?.description || "فشل معالجة استرجاع المبلغ عبر Tap Payments";
+    throw new PaymentError(errorMsg);
+  }
+
+  return { refundId: data.id, status: data.status || "COMPLETED" };
 }
 
 /**
@@ -409,3 +457,109 @@ export const verifyPayment = action({
     }
   },
 });
+
+/**
+ * إلغاء الحجز ومعالجة استرجاع المبلغ آلياً عبر بوابة الدفع (Tap Payments)
+ */
+export const cancelAndRefund = action({
+  args: { bookingId: v.id("bookings") },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{
+    cancelled: boolean;
+    refundAmount: number;
+    refundPercentage: number;
+    message: string;
+  }> => {
+    try {
+      const userId = await getAuthUserId(ctx);
+      if (!userId) {
+        throw new PaymentError(ERROR_MESSAGES.MUST_LOGIN);
+      }
+
+      const context = await ctx.runQuery(
+        internal.bookings.getPaymentContext,
+        { bookingId: args.bookingId },
+      );
+
+      if (!context?.booking) {
+        throw new PaymentError(ERROR_MESSAGES.BOOKING_NOT_FOUND);
+      }
+
+      const { booking, user } = context;
+
+      // التحقق من الصلاحيات (الضيف أو الأدمن)
+      if (booking.userId !== userId && user?.role !== "admin") {
+        throw new PaymentError(ERROR_MESSAGES.PAYMENT_NOT_YOURS);
+      }
+
+      if (booking.status === "cancelled" || booking.status === "completed") {
+        throw new PaymentError("لا يمكن إلغاء هذا الحجز نظراً لحالته الحالية");
+      }
+
+      const hoursUntilCheckin = (booking.checkIn - Date.now()) / (1000 * 60 * 60);
+      const { refundPercentage, refundAmount, feeRefund } = calculateRefund(
+        booking.totalPrice,
+        booking.platformFee,
+        hoursUntilCheckin,
+      );
+
+      const totalRefundToCustomer = refundAmount + feeRefund;
+
+      // إذا كان الحجز مدفوعاً وهناك استرجاع مالي
+      if (booking.paymentStatus === "paid" && totalRefundToCustomer > 0 && booking.paymentSessionId) {
+        if (booking.paymentSessionId.startsWith("chg_")) {
+          try {
+            await processTapRefund({
+              chargeId: booking.paymentSessionId,
+              amount: totalRefundToCustomer,
+              bookingId: args.bookingId,
+              reason: "requested_by_customer",
+            });
+          } catch (refundError) {
+            console.error("Tap Refund error:", refundError);
+            // نسجل الخطأ ولا نمنع تسجيل الإلغاء
+          }
+        }
+      }
+
+      const finalPaymentStatus =
+        booking.paymentStatus !== "paid"
+          ? "unpaid"
+          : refundPercentage === 100
+            ? "refunded"
+            : "paid";
+
+      await ctx.runMutation(internal.bookings.applyCancellation, {
+        bookingId: args.bookingId,
+        paymentStatus: finalPaymentStatus,
+      });
+
+      let message = "تم إلغاء الحجز بنجاح";
+      if (booking.paymentStatus === "paid") {
+        if (refundPercentage === 100) {
+          message = `تم إلغاء الحجز واسترداد المبلغ بالكامل (${totalRefundToCustomer} ر.س) إلى وسيلة الدفع الخاصة بك`;
+        } else if (refundPercentage === 50) {
+          message = `تم إلغاء الحجز واسترداد 50% من المبلغ (${totalRefundToCustomer} ر.س) إلى وسيلة الدفع الخاصة بك`;
+        } else {
+          message = "تم إلغاء الحجز بدون استرداد (أقل من 24 ساعة وفقاً لسياسة الإلغاء)";
+        }
+      }
+
+      return {
+        cancelled: true,
+        refundPercentage,
+        refundAmount: totalRefundToCustomer,
+        message,
+      };
+    } catch (error) {
+      console.error("Cancel and Refund Error:", error);
+      if (error instanceof PaymentError) {
+        throw error;
+      }
+      throw new PaymentError(formatErrorMessage(error));
+    }
+  },
+});
+

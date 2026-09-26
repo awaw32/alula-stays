@@ -34,6 +34,7 @@ export default function MyBookings() {
   const liveBookings = useQuery(api.bookings.list, DEMO_MODE ? "skip" : {});
   const bookings = DEMO_MODE ? [] : liveBookings;
   const cancelBooking = useMutation(api.bookings.cancel);
+  const cancelAndRefund = useAction(api.payments.cancelAndRefund);
   const verifyPayment = useAction(api.payments.verifyPayment);
   const createCheckoutSession = useAction(api.payments.createCheckoutSession);
   const [payingBookingId, setPayingBookingId] = useState<string | null>(null);
@@ -87,9 +88,18 @@ export default function MyBookings() {
   const handleCancel = async (id: string) => {
     setCancelling(id);
     try {
-      const result = await cancelBooking({ bookingId: id as Id<"bookings"> });
-      toast.success(result.message);
+      const targetBooking = bookings?.find((b) => b._id === id);
+      if (targetBooking?.paymentStatus === "paid") {
+        toast.loading("جارٍ معالجة الإلغاء والاسترداد المالي...", { id: "cancel-booking" });
+        const result = await cancelAndRefund({ bookingId: id as Id<"bookings"> });
+        toast.dismiss("cancel-booking");
+        toast.success(result.message);
+      } else {
+        const result = await cancelBooking({ bookingId: id as Id<"bookings"> });
+        toast.success(result.message);
+      }
     } catch (error) {
+      toast.dismiss("cancel-booking");
       toast.error(getErrorMessage(error, "حدث خطأ أثناء إلغاء الحجز"));
     } finally {
       setCancelling(null);
