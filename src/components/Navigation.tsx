@@ -1,5 +1,6 @@
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/hooks/use-auth";
+import { isAuthorizedAdmin } from "@/types/auth";
 import { cn } from "@/lib/utils";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -21,15 +22,17 @@ function isActivePath(pathname: string, href: string) {
 
 export function Navigation() {
   const location = useLocation();
-  const { isAuthenticated, role } = useAuth();
+  const { isAuthenticated, role, user } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const unreadCount = useQuery(
     api.messages.unreadCount,
     isAuthenticated && !DEMO_MODE ? {} : "skip",
   ) ?? 0;
 
-  const accountPath = role === "admin" ? "/admin" : role === "owner" ? "/owner" : "/dashboard";
-  const accountLabel = role === "admin" ? "الإدارة" : role === "owner" ? "لوحة المالك" : "حسابي";
+  // التحقق الحصري: لا يظهر زر الإدارة إطلاقاً إلا للحسابات المصرح بها حصراً
+  const isAdmin = isAuthorizedAdmin(role, user?.email);
+  const accountPath = isAdmin ? "/admin" : role === "owner" ? "/owner" : "/dashboard";
+  const accountLabel = isAdmin ? "الإدارة" : role === "owner" ? "لوحة المالك" : "حسابي";
   const authHref = (href: string, requiresAuth: boolean) =>
     requiresAuth && !isAuthenticated ? `/auth?returnTo=${encodeURIComponent(href)}` : href;
 

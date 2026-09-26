@@ -1,7 +1,7 @@
 import { useAuth } from "@/hooks/use-auth";
 import { DEMO_MODE } from "@/lib/demo-data";
 import { Link } from "react-router";
-import type { UserRole } from "@/types/auth";
+import { isAuthorizedAdmin, type UserRole } from "@/types/auth";
 import { Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router";
@@ -59,7 +59,7 @@ export function RequireRole({
   roles: readonly UserRole[];
   children: ReactNode;
 }) {
-  const { isLoading, isAuthenticated, role } = useAuth();
+  const { isLoading, isAuthenticated, role, user } = useAuth();
   const location = useLocation();
 
   if (DEMO_MODE) return <DemoLocked title="لوحة خاصة" />;
@@ -77,7 +77,12 @@ export function RequireRole({
     );
   }
 
-  if (!role || !roles.includes(role)) {
+  // إذا كانت الصفحة للإدارة فقط، تحقق من القائمة البيضاء للإيميلات المصرح بها حصراً
+  if (roles.includes("admin") && !roles.includes("owner")) {
+    if (!isAuthorizedAdmin(role, user?.email)) {
+      return <Navigate to="/dashboard?forbidden=1" replace />;
+    }
+  } else if (!role || !roles.includes(role)) {
     return <Navigate to="/dashboard?forbidden=1" replace />;
   }
 

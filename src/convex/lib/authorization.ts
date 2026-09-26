@@ -25,6 +25,19 @@ export async function requireUser(ctx: DatabaseCtx): Promise<Doc<"users">> {
   return user;
 }
 
+/**
+ * قائمة الإيميلات المصرح لها حصراً بصلاحيات الإدارة في المنصة
+ */
+export const AUTHORIZED_ADMIN_EMAILS = [
+  "majed4v4@gmail.com",
+  "koko4800pro@gmail.com",
+] as const;
+
+export function isAuthorizedAdminEmail(email?: string | null): boolean {
+  if (!email) return false;
+  return (AUTHORIZED_ADMIN_EMAILS as readonly string[]).includes(email.toLowerCase().trim());
+}
+
 export async function requireRole(
   ctx: DatabaseCtx,
   role: Role,
@@ -32,6 +45,9 @@ export async function requireRole(
   const user = await requireUser(ctx);
   if (user.role !== role) {
     throw new AuthorizationError("غير مصرح لك بالوصول");
+  }
+  if (role === "admin" && !isAuthorizedAdminEmail(user.email)) {
+    throw new AuthorizationError("غير مصرح لك بالوصول إلى لوحة الإدارة");
   }
 
   return user;
@@ -44,6 +60,9 @@ export async function requireAnyRole(
   const user = await requireUser(ctx);
   if (!user.role || !roles.includes(user.role)) {
     throw new AuthorizationError("غير مصرح لك بالوصول");
+  }
+  if (user.role === "admin" && !isAuthorizedAdminEmail(user.email)) {
+    throw new AuthorizationError("غير مصرح لك بالوصول إلى لوحة الإدارة");
   }
 
   return user;
