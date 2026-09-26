@@ -31,8 +31,22 @@ export function Navigation() {
 
   // التحقق الحصري: لا يظهر زر الإدارة إطلاقاً إلا للحسابات المصرح بها حصراً
   const isAdmin = isAuthorizedAdmin(role, user?.email);
-  const accountPath = isAdmin ? "/admin" : role === "owner" ? "/owner" : "/dashboard";
-  const accountLabel = isAdmin ? "الإدارة" : role === "owner" ? "لوحة المالك" : "حسابي";
+  const ownerStatus = useQuery(
+    api.owners.myOwnerStatus,
+    isAuthenticated && !DEMO_MODE ? {} : "skip",
+  );
+  const accountPath = isAdmin
+    ? "/admin"
+    : role === "owner" || ownerStatus?.status === "pending"
+    ? "/owner"
+    : "/dashboard";
+  const accountLabel = isAdmin
+    ? "الإدارة"
+    : role === "owner"
+    ? "لوحة المالك"
+    : ownerStatus?.status === "pending"
+    ? "طلب المالك (قيد المراجعة)"
+    : "حسابي";
   const authHref = (href: string, requiresAuth: boolean) =>
     requiresAuth && !isAuthenticated ? `/auth?returnTo=${encodeURIComponent(href)}` : href;
 

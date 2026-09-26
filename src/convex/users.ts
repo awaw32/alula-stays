@@ -1,6 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import { mutation, query, internalMutation, QueryCtx } from "./_generated/server";
+import { mutation, query, internalMutation, internalQuery, QueryCtx } from "./_generated/server";
 
 /**
  * Get the current signed in user. Returns null if the user is not signed in.
@@ -183,5 +183,38 @@ export const setAdminByEmail = internalMutation({
     return `تم ترقية المستخدم (${user.name || user.email}) كمدير بنجاح`;
   },
 });
+
+/**
+ * البحث عن البريد الإلكتروني المرتبط برقم جوال لإرسال رمز التحقق كنسخة احتياطية
+ */
+export const getEmailByPhone = internalQuery({
+  args: { phone: v.string() },
+  handler: async (ctx, args) => {
+    const raw = args.phone.trim().replace(/[^\d]/g, "");
+    if (!raw) return null;
+
+    // البحث في ملفات المستخدمين (userProfiles)
+    const profiles = await ctx.db.query("userProfiles").collect();
+    for (const p of profiles) {
+      const pClean = (p.phone || "").replace(/[^\d]/g, "");
+      if (pClean && (raw.endsWith(pClean) || pClean.endsWith(raw))) {
+        const u = await ctx.db.get(p.userId);
+        if (u?.email) return u.email;
+      }
+    }
+
+    // البحث في جدول المستخدمين (users)
+    const users = await ctx.db.query("users").collect();
+    for (const u of users) {
+      const uPhone = (u.phone || "").replace(/[^\d]/g, "");
+      if (uPhone && (raw.endsWith(uPhone) || uPhone.endsWith(raw))) {
+        if (u.email) return u.email;
+      }
+    }
+
+    return null;
+  },
+});
+
 
 

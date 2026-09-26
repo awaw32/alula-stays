@@ -385,6 +385,24 @@ const schema = defineSchema(
       .index("by_status", ["status"])
       .index("by_target", ["targetType", "targetId"]),
 
+    // طلبات الانضمام كمالك عقار مع دورة المراجعة والاعتماد
+    ownerRequests: defineTable({
+      userId: v.id("users"),
+      fullName: v.string(),
+      phone: v.string(),
+      city: v.string(),
+      propertyTypes: v.optional(v.string()), // شقق، شاليهات، إلخ
+      propertyCount: v.optional(v.number()), // عدد الوحدات المتوقعة
+      notes: v.optional(v.string()), // نبذة عن العقارات
+      status: v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected")),
+      reviewedBy: v.optional(v.id("users")),
+      reviewedAt: v.optional(v.number()),
+      rejectionReason: v.optional(v.string()),
+      createdAt: v.number(),
+    })
+      .index("by_user", ["userId"])
+      .index("by_status", ["status"]),
+
     backups: defineTable({
       name: v.string(),
       timestamp: v.number(),

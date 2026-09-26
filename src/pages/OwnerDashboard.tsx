@@ -27,6 +27,9 @@ import { CalendarBlockManager } from "@/components/owner/CalendarBlockManager";
 import { OwnerFinance } from "@/components/owner/OwnerFinance";
 import { OwnerIdentityVerification } from "@/components/owner/OwnerIdentityVerification";
 import { InvoiceModal, type InvoiceData } from "@/components/InvoiceModal";
+import { OwnerApplicationForm } from "@/components/owner/OwnerApplicationForm";
+import { OwnerPendingView } from "@/components/owner/OwnerPendingView";
+import { AlertCircle, RefreshCw } from "lucide-react";
 
 const OWNER_STATUS_LABELS: Record<string, { label: string; className: string }> = {
   pending: { label: "بانتظار مراجعة الإدارة", className: "bg-amber-100 text-amber-700" },
@@ -54,19 +57,102 @@ const fadeUp = {
 export default function OwnerDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const ownerStatus = useQuery(api.owners.myOwnerStatus, DEMO_MODE ? "skip" : undefined);
   const myProfile = useQuery(api.users.myProfile, DEMO_MODE ? "skip" : undefined);
-  const myApartments = useQuery(api.admin.ownerApartments, DEMO_MODE ? "skip" : undefined);
-  const myBookings = useQuery(api.bookings.ownerBookings, DEMO_MODE ? "skip" : undefined);
+  const myApartments = useQuery(
+    api.admin.ownerApartments,
+    DEMO_MODE || ownerStatus?.status !== "approved" ? "skip" : undefined
+  );
+  const myBookings = useQuery(
+    api.bookings.ownerBookings,
+    DEMO_MODE || ownerStatus?.status !== "approved" ? "skip" : undefined
+  );
   const deleteApartment = useMutation(api.admin.deleteApartment);
   const [activeTab, setActiveTab] = useState<"apartments" | "bookings" | "calendar" | "finance">("apartments");
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceData | null>(null);
   const [now] = useState(() => Date.now());
+  const [retryRejected, setRetryRejected] = useState(false);
 
-  // إكمال الملف الشخصي قبل دخول اللوحة
-  if (myProfile !== undefined && !myProfile?.phone) {
-    return <Navigate to="/owner/profile" replace />;
+  // حالة انتظار تحميل حالة المالك
+  if (ownerStatus === undefined) {
+    return (
+      <div className="min-h-screen bg-[var(--background)] flex flex-col">
+        <Navigation />
+        <div className="flex-1 flex flex-col items-center justify-center p-8">
+          <Loader2 className="w-8 h-8 animate-spin text-[var(--clay-accent)] mb-3" />
+          <p className="text-sm text-[var(--muted-foreground)]">جارٍ التحقق من بيانات المالك...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 1. إذا كان الطلب قيد المراجعة: عرض صفحة "تم رفع بياناتك للإدارة وسيتم قبول حسابك بأقرب وقت"
+  if (ownerStatus.status === "pending" && ownerStatus.application) {
+    return (
+      <div className="min-h-screen bg-[var(--background)] pb-24 md:pb-0">
+        <Navigation />
+        <OwnerPendingView application={ownerStatus.application} />
+      </div>
+    );
+  }
+
+  // 2. إذا لم يكن المالك قد قدّم طلباً بعد: عرض استمارة الانضمام كمالك عقار
+  if (ownerStatus.status === "none") {
+    return (
+      <div className="min-h-screen bg-[var(--background)] pb-24 md:pb-0">
+        <Navigation />
+        <OwnerApplicationForm
+          initialName={user?.name || ""}
+          initialPhone={myProfile?.phone || ""}
+        />
+      </div>
+    );
+  }
+
+  // 3. إذا كان الطلب مرفوضاً: عرض سبب الرفض وإتاحة إعادة التقديم
+  if (ownerStatus.status === "rejected") {
+    if (retryRejected) {
+      return (
+        <div className="min-h-screen bg-[var(--background)] pb-24 md:pb-0">
+          <Navigation />
+          <OwnerApplicationForm
+            initialName={ownerStatus.application?.fullName || user?.name || ""}
+            initialPhone={ownerStatus.application?.phone || myProfile?.phone || ""}
+            onSuccess={() => setRetryRejected(false)}
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div className="min-h-screen bg-[var(--background)] pb-24 md:pb-0">
+        <Navigation />
+        <div className="max-w-2xl mx-auto py-16 px-4 text-center" dir="rtl">
+          <div className="clay p-8 border border-red-500/20">
+            <div className="w-14 h-14 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4">
+              <AlertCircle className="w-8 h-8" />
+            </div>
+            <h2 className="text-xl font-bold text-[var(--foreground)] mb-2">ملاحظة بخصوص طلب الانضمام كمالك عقار</h2>
+            <p className="text-sm text-[var(--muted-foreground)] mb-4">
+              نعتذر، لم يتم اعتماد الطلب في الوقت الحالي نظراً للملاحظات التالية:
+            </p>
+            <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-xl p-3.5 text-xs text-red-700 dark:text-red-300 font-medium mb-6">
+              {ownerStatus.application?.rejectionReason || "البيانات المقدمة غير كافية أو بحاجة لتوثيق إضافي."}
+            </div>
+            <button
+              type="button"
+              onClick={() => setRetryRejected(true)}
+              className="clay-btn px-6 py-2.5 text-xs font-bold inline-flex items-center gap-2"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>تحديث البيانات وإعادة التقديم</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const handleDelete = async (id: string) => {

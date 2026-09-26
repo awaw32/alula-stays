@@ -189,9 +189,9 @@ function AppRoutes() {
           <Route
             path="/owner"
             element={
-              <RequireRole roles={["owner", "admin"]}>
+              <RequireAuth>
                 <OwnerDashboard />
-              </RequireRole>
+              </RequireAuth>
             }
           />
           <Route

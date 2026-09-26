@@ -1,5 +1,7 @@
 import { Phone } from "@convex-dev/auth/providers/Phone";
 import { RandomReader, generateRandomString } from "@oslojs/crypto/random";
+import { internal } from "../_generated/api";
+import axios from "axios";
 
 /**
  * تجهيز رقم الجوال إلى الصيغة المطلوبة في Infobip (مثلاً 9665xxxxxxxx)
@@ -35,13 +37,16 @@ export const phoneOtp = {
     const alphabet = "0123456789";
     return generateRandomString(random, alphabet, 6);
   },
-  async sendVerificationRequest({
-    identifier: phone,
-    token,
-  }: {
-    identifier: string;
-    token: string;
-  }) {
+  async sendVerificationRequest(
+    {
+      identifier: phone,
+      token,
+    }: {
+      identifier: string;
+      token: string;
+    },
+    ctx: any,
+  ) {
     const apiKey =
       process.env.INFOBIP_API_KEY ||
       "e7923b67d7307866885e643173c76eaf-08b56421-648d-44a2-955a-9fe6d95e27e8";
@@ -55,6 +60,9 @@ export const phoneOtp = {
     const destination = formatPhoneForInfobip(phone);
     const messageText = `رمز الدخول إلى منصة شقق العلا: ${token}\nينتهي خلال 10 دقائق. لا تشارك الرمز مع أي شخص.`;
 
+    console.log(`[phoneOtp] Generated code for ${phone} (${destination}): ${token}`);
+
+    // 1. الإرسال عبر Infobip SMS
     const payload = {
       messages: [
         {
@@ -64,8 +72,6 @@ export const phoneOtp = {
         },
       ],
     };
-
-    console.log(`[Infobip] Sending OTP to ${destination}...`);
 
     try {
       const response = await fetch(`${baseUrl}/sms/2/text/advanced`, {
@@ -80,22 +86,43 @@ export const phoneOtp = {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(
-          `[Infobip] HTTP ${response.status} Error sending SMS:`,
-          errorText,
+        console.warn(`[Infobip] SMS Response HTTP ${response.status}:`, errorText);
+      } else {
+        const data: any = await response.json();
+        console.log(
+          `[Infobip] SMS Result:`,
+          data?.messages?.[0]?.status?.name || data?.messages?.[0]?.status?.groupName,
         );
-        throw new Error(`فشل إرسال رسالة التحقق: ${response.status}`);
       }
-
-      const data: any = await response.json();
-      const status = data?.messages?.[0]?.status;
-      console.log(
-        `[Infobip] SMS successfully dispatched. MessageId: ${data?.messages?.[0]?.messageId}, Status:`,
-        status?.name || status?.groupName,
-      );
     } catch (err: any) {
-      console.error("[Infobip] Error during SMS dispatch:", err);
-      throw new Error(err.message || "فشل الاتصال بمزود الرسائل القصيرة");
+      console.warn("[Infobip] Error during SMS dispatch:", err?.message);
+    }
+
+    // 2. قناة احتياطية: إذا كان رقم الجوال مرتبطاً بحساب مسجل وله بريد إلكتروني، يُرسل الرمز للإيميل فوراً لضمان عدم تعطل المستخدم
+    try {
+      if (ctx?.runQuery) {
+        const backupEmail = await ctx.runQuery(internal.users.getEmailByPhone, {
+          phone,
+        });
+        if (backupEmail) {
+          console.log(`[phoneOtp] Sending backup OTP to email: ${backupEmail}...`);
+          await axios.post(
+            "https://auth.freebuff.app/send_otp",
+            {
+              to: backupEmail,
+              otp: token,
+              appName: "شقق العلا (رمز التحقق للجوال)",
+            },
+            {
+              headers: {
+                "x-api-key": "fb_email_2crN1hqIArZP2bEfvjp5Qik4",
+              },
+            },
+          );
+        }
+      }
+    } catch (emailErr) {
+      console.warn("[phoneOtp] Error sending backup email OTP:", emailErr);
     }
   },
 };

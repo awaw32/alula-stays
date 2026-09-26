@@ -93,7 +93,17 @@ export default function AdminDashboard() {
   >("stats");
   const [timeRange, setTimeRange] = useState<"today" | "week" | "month" | "year" | "all">("today");
   const [userSearch, setUserSearch] = useState<string>("");
-  const [userFilter, setUserFilter] = useState<"all" | "paid" | "pending" | "owners">("all");
+  const [userFilter, setUserFilter] = useState<"all" | "paid" | "pending" | "owners" | "requests">("all");
+  const ownerRequests = useQuery(
+    api.owners.adminListOwnerRequests,
+    DEMO_MODE ? "skip" : { status: "all" }
+  );
+  const approveOwnerRequest = useMutation(api.owners.adminApproveOwnerRequest);
+  const rejectOwnerRequest = useMutation(api.owners.adminRejectOwnerRequest);
+  const [processingOwnerReq, setProcessingOwnerReq] = useState<string | null>(null);
+  const [rejectOwnerTarget, setRejectOwnerTarget] = useState<{ id: Id<"ownerRequests">; name: string } | null>(null);
+  const [ownerRejectReason, setOwnerRejectReason] = useState("");
+  const pendingOwnerRequests = ownerRequests?.filter((r) => r.status === "pending") || [];
   const adminBookings = useQuery(api.bookings.adminList, DEMO_MODE || activeTab !== "bookings" ? "skip" : {});
   const activityLog = useQuery(api.admin.adminActivityLog, DEMO_MODE || activeTab !== "activity" ? "skip" : { limit: 80 });
   const [reviewTarget, setReviewTarget] = useState<{ id: string; title: string; action: Exclude<ReviewAction, null> } | null>(null);
@@ -326,7 +336,10 @@ export default function AdminDashboard() {
             ["invoices", "الفواتير وأوامر الشراء"],
             ["apartments", "الشقق"],
             ["bookings", "الحجوزات"],
-            ["users", "المستخدمون والزوار"],
+            [
+              "users",
+              `المستخدمون والزوار${pendingOwnerRequests.length > 0 ? ` (${pendingOwnerRequests.length} طلب جديد)` : ""}`,
+            ],
             ["finance", "المالية"],
             ["verifications", "توثيق الهويات"],
             ["reports", "البلاغات"],
@@ -455,17 +468,169 @@ export default function AdminDashboard() {
           </DialogContent>
         </Dialog>
 
+        {/* Dialog رفض طلب المالك */}
+        <Dialog open={rejectOwnerTarget !== null} onOpenChange={(open) => !open && setRejectOwnerTarget(null)}>
+          <DialogContent className="sm:max-w-md" dir="rtl">
+            <DialogHeader>
+              <DialogTitle>رفض طلب انضمام المالك: {rejectOwnerTarget?.name}</DialogTitle>
+            </DialogHeader>
+            <p className="text-xs text-[var(--muted-foreground)]">
+              اكتب سبب الرفض أو الملاحظات التي ستصل لمقدم الطلب في لوحته:
+            </p>
+            <textarea
+              value={ownerRejectReason}
+              onChange={(e) => setOwnerRejectReason(e.target.value)}
+              placeholder="مثال: يرجى تزويدنا برقم جوال بديل، أو العقار خارج النطاق المشمول حالياً..."
+              rows={3}
+              className="clay-input w-full text-xs resize-none"
+            />
+            <DialogFooter className="gap-2">
+              <button type="button" onClick={() => setRejectOwnerTarget(null)} className="clay-sm px-4 py-2 text-xs">
+                إلغاء
+              </button>
+              <button
+                type="button"
+                disabled={processingOwnerReq !== null}
+                onClick={async () => {
+                  if (!rejectOwnerTarget) return;
+                  setProcessingOwnerReq(rejectOwnerTarget.id);
+                  try {
+                    await rejectOwnerRequest({
+                      requestId: rejectOwnerTarget.id,
+                      reason: ownerRejectReason.trim() || undefined,
+                    });
+                    toast.success("تم تسجيل رفض الطلب وإشعار المستخدم");
+                    setRejectOwnerTarget(null);
+                  } catch (err) {
+                    toast.error(getErrorMessage(err, "تعذر رفض الطلب"));
+                  } finally {
+                    setProcessingOwnerReq(null);
+                  }
+                }}
+                className="clay-btn px-4 py-2 text-xs font-bold bg-red-600 text-white hover:bg-red-700"
+              >
+                {processingOwnerReq ? "جارٍ التنفيذ..." : "تأكيد الرفض"}
+              </button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {/* Users Management */}
         {activeTab === "users" && (
           <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={2} className="space-y-4">
+            {/* قسم طلبات الملاك المعلقة بانتظار الاعتماد */}
+            {pendingOwnerRequests.length > 0 && (
+              <div className="clay p-5 border-2 border-amber-500/40 bg-amber-500/5 rounded-2xl mb-4">
+                <div className="flex items-center justify-between gap-3 mb-3 border-b border-amber-500/20 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-700 dark:text-amber-300 flex items-center justify-center font-bold text-lg">
+                      ⏳
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-sm text-[var(--foreground)]">
+                        طلبات انضمام الملاك الجدد بانتظار الاعتماد ({pendingOwnerRequests.length})
+                      </h3>
+                      <p className="text-[11px] text-[var(--muted-foreground)]">
+                        طلب هؤلاء المستخدمون تفعيل حساباتهم كـ "مالك عقار" لنشر الشقق واستقبال الحجوزات
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {pendingOwnerRequests.map((req) => (
+                    <div
+                      key={req._id}
+                      className="clay-sm p-4 bg-white dark:bg-zinc-900 border border-amber-300/40 dark:border-amber-900/40 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
+                    >
+                      <div className="space-y-1.5 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-bold text-sm text-[var(--foreground)]">{req.fullName}</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                            طلب مالك جديد
+                          </span>
+                          <span className="text-[10px] text-[var(--muted-foreground)]">
+                            {new Date(req.createdAt).toLocaleDateString("ar-SA")}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--muted-foreground)]">
+                          <span className="flex items-center gap-1 font-mono dir-ltr">
+                            <Phone className="w-3 h-3 text-emerald-600" />
+                            <a href={`tel:${req.phone}`} className="hover:underline">{req.phone}</a>
+                          </span>
+                          {req.userEmail && (
+                            <span className="flex items-center gap-1">
+                              <Mail className="w-3 h-3" /> {req.userEmail}
+                            </span>
+                          )}
+                          <span>📍 {req.city}</span>
+                          <span>🏠 {req.propertyCount ?? 1} وحدة ({req.propertyTypes || "شقق"})</span>
+                        </div>
+
+                        {req.notes && (
+                          <p className="text-xs bg-amber-50/70 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 p-2 rounded-lg border border-amber-200/50">
+                            💬 ملاحظات المالك: {req.notes}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 shrink-0 self-end md:self-center">
+                        <a
+                          href={`https://wa.me/${req.phone.replace(/[^0-9]/g, "")}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="clay-sm px-3 py-1.5 text-xs text-emerald-700 bg-emerald-50 hover:bg-emerald-100 font-semibold flex items-center gap-1"
+                        >
+                          واتساب
+                        </a>
+                        <button
+                          type="button"
+                          disabled={processingOwnerReq === req._id}
+                          onClick={async () => {
+                            setProcessingOwnerReq(req._id);
+                            try {
+                              await approveOwnerRequest({ requestId: req._id });
+                              toast.success(`تم قبول طلب المالك ${req.fullName} وتفعيل لوحته بنجاح`);
+                            } catch (err) {
+                              toast.error(getErrorMessage(err, "تعذر قبول الطلب"));
+                            } finally {
+                              setProcessingOwnerReq(null);
+                            }
+                          }}
+                          className="clay-btn px-3.5 py-1.5 text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 flex items-center gap-1.5 shadow-sm"
+                        >
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          <span>قبول كمالك عقار</span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={processingOwnerReq === req._id}
+                          onClick={() => {
+                            setRejectOwnerTarget({ id: req._id, name: req.fullName });
+                            setOwnerRejectReason("");
+                          }}
+                          className="clay-sm px-3 py-1.5 text-xs text-red-700 bg-red-50 hover:bg-red-100 font-medium flex items-center gap-1"
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                          <span>رفض</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* User Search & Filter Header */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[var(--card)] p-4 rounded-2xl border border-[var(--border)]">
               <div className="flex flex-wrap gap-1.5" role="tablist">
                 {[
                   { id: "all", label: "كافة المسجلين" },
+                  { id: "requests", label: `طلبات الملاك (${pendingOwnerRequests.length})` },
+                  { id: "owners", label: "ملاك العقارات" },
                   { id: "paid", label: "أصحاب الحجوزات المسددة" },
                   { id: "pending", label: "محاولات الدفع المعلقة" },
-                  { id: "owners", label: "ملاك العقارات" },
                 ].map((tab) => (
                   <button
                     key={tab.id}
@@ -496,6 +661,94 @@ export default function AdminDashboard() {
 
             {allUsers === undefined ? (
               <div className="clay p-6 animate-pulse h-40" />
+            ) : userFilter === "requests" ? (
+              ownerRequests === undefined ? (
+                <div className="clay p-6 animate-pulse h-40" />
+              ) : ownerRequests.length === 0 ? (
+                <div className="clay p-12 text-center text-zinc-500">
+                  <Users className="w-12 h-12 mx-auto mb-3 text-[var(--muted-foreground)]" />
+                  <h3 className="font-bold text-base text-[var(--foreground)]">لا توجد طلبات انضمام كملاك</h3>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {ownerRequests.map((req) => (
+                    <div
+                      key={req._id}
+                      className="clay p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
+                    >
+                      <div className="space-y-1.5 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-bold text-sm text-[var(--foreground)]">{req.fullName}</span>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                              req.status === "approved"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : req.status === "rejected"
+                                ? "bg-red-100 text-red-800"
+                                : "bg-amber-100 text-amber-800"
+                            }`}
+                          >
+                            {req.status === "approved"
+                              ? "معتمد كمالك ✓"
+                              : req.status === "rejected"
+                              ? "مرفوض ✕"
+                              : "قيد المراجعة ⏳"}
+                          </span>
+                          <span className="text-[10px] text-[var(--muted-foreground)]">
+                            {new Date(req.createdAt).toLocaleDateString("ar-SA")}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--muted-foreground)]">
+                          <span className="flex items-center gap-1 font-mono dir-ltr">
+                            <Phone className="w-3 h-3 text-emerald-600" />
+                            <a href={`tel:${req.phone}`} className="hover:underline">{req.phone}</a>
+                          </span>
+                          {req.userEmail && <span>{req.userEmail}</span>}
+                          <span>📍 {req.city}</span>
+                          <span>🏠 {req.propertyCount ?? 1} وحدة ({req.propertyTypes || "شقق"})</span>
+                        </div>
+                        {req.rejectionReason && (
+                          <p className="text-xs text-red-600 bg-red-50 p-2 rounded-lg">
+                            سبب الرفض: {req.rejectionReason}
+                          </p>
+                        )}
+                        {req.notes && (
+                          <p className="text-xs bg-zinc-50 dark:bg-zinc-800 p-2 rounded-lg">
+                            ملاحظات: {req.notes}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <a
+                          href={`https://wa.me/${req.phone.replace(/[^0-9]/g, "")}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="clay-sm px-2.5 py-1.5 text-xs text-emerald-700 bg-emerald-50 hover:bg-emerald-100 font-semibold"
+                        >
+                          واتساب
+                        </a>
+                        {req.status !== "approved" && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                await approveOwnerRequest({ requestId: req._id });
+                                toast.success(`تم قبول طلب ${req.fullName}`);
+                              } catch (err) {
+                                toast.error(getErrorMessage(err, "تعذر قبول الطلب"));
+                              }
+                            }}
+                            className="clay-btn px-3 py-1.5 text-xs font-bold bg-emerald-600 text-white"
+                          >
+                            اعتماد
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
             ) : (() => {
               const filteredUsers = allUsers.filter((u) => {
                 if (userFilter === "paid" && !(u as any).paidBookingsCount) return false;

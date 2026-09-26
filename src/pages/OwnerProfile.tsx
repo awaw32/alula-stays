@@ -35,12 +35,12 @@ export default function OwnerProfile() {
     }
   }, [profile]);
 
-  // ترقية تلقائية إلى "مالك" عند دخول مستخدم عادي من بوابة المالك
+  // توجيه غير المالك إلى لوحة المالك لمتابعة طلبه
   useEffect(() => {
     if (role && role !== "owner" && role !== "admin") {
-      becomeOwner().catch(() => {});
+      navigate("/owner", { replace: true });
     }
-  }, [role, becomeOwner]);
+  }, [role, navigate]);
 
   // المالك الذي أكمل ملفه يُحوَّل إلى لوحة المالك
   if (profile && role && (role === "owner" || role === "admin") && profile.phone) {

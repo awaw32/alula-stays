@@ -59,7 +59,7 @@ export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
   const ownerMode = searchParams.get("owner") === "1";
   const redirect =
     ownerMode && !searchParams.get("returnTo")
-      ? "/owner/profile"
+      ? "/owner"
       : resolveRedirectAfterAuth(
           searchParams.get("returnTo"),
           redirectAfterAuth,

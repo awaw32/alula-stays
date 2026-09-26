@@ -47,28 +47,13 @@ export default function AddApartment() {
   const { role } = useAuth();
   const myProfile = useQuery(api.users.myProfile, DEMO_MODE ? "skip" : undefined);
   const createApartment = useMutation(api.admin.createApartment);
-  const becomeOwner = useMutation(api.users.becomeOwner);
-  const [upgrading, setUpgrading] = useState(false);
-
-  // ترقية تلقائية إلى "مالك" إذا كان المستخدم مسجلاً بدور عادي —
-  // الإدارة تبقى تتحكم بالنشر عبر المراجعة، فالترقية تفتح الرفع فقط.
-  const needsUpgrade = role !== undefined && role !== "owner" && role !== "admin";
+  // إذا لم يكن المستخدم مالكاً معتمداً أو مديراً، يتم توجيهه إلى لوحة المالك لتقديم أو متابعة الطلب
   useEffect(() => {
-    if (!needsUpgrade) return;
-    let cancelled = false;
-    const upgrade = async () => {
-      try {
-        await becomeOwner();
-        if (!cancelled) toast.success("تم تفعيل حسابك كمالك عقار");
-      } catch {
-        if (!cancelled) toast.error("تعذر تفعيل دور المالك");
-      } finally {
-        if (!cancelled) setUpgrading(false);
-      }
-    };
-    void upgrade();
-    return () => { cancelled = true; };
-  }, [needsUpgrade, becomeOwner]);
+    if (role !== undefined && role !== "owner" && role !== "admin") {
+      toast.info("يجب اعتماد حسابك كمالك عقار من الإدارة قبل إضافة الشقق");
+      navigate("/owner", { replace: true });
+    }
+  }, [role, navigate]);
 
   // إكمال الملف الشخصي قبل إضافة شقة (بعد الـ hooks لضمان ترتيب ثابت)
   if (myProfile !== undefined && !myProfile?.phone) {
