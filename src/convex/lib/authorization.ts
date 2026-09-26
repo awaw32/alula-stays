@@ -2,23 +2,24 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Role } from "../schema";
+import { AuthorizationError, NotFoundError } from "./errors";
 
 export type DatabaseCtx = QueryCtx | MutationCtx;
 
 export async function requireUser(ctx: DatabaseCtx): Promise<Doc<"users">> {
   const userId = await getAuthUserId(ctx);
   if (!userId) {
-    throw new Error("يجب تسجيل الدخول أولاً");
+    throw new AuthorizationError("يجب تسجيل الدخول أولاً");
   }
 
   const user = await ctx.db.get(userId);
   if (!user) {
-    throw new Error("المستخدم غير موجود");
+    throw new NotFoundError("المستخدم");
   }
 
   // حساب معطّل من الأدمن — لا حجز ولا رفع ولا أي إجراء كتابة
   if (user.isDisabled) {
-    throw new Error(`تم تعطيل حسابك${user.disabledReason ? `: ${user.disabledReason}` : ""}. تواصل مع الدعم`);
+    throw new AuthorizationError(`تم تعطيل حسابك${user.disabledReason ? `: ${user.disabledReason}` : ""}. تواصل مع الدعم`);
   }
 
   return user;
@@ -30,7 +31,7 @@ export async function requireRole(
 ): Promise<Doc<"users">> {
   const user = await requireUser(ctx);
   if (user.role !== role) {
-    throw new Error("غير مصرح لك بالوصول");
+    throw new AuthorizationError("غير مصرح لك بالوصول");
   }
 
   return user;
@@ -42,7 +43,7 @@ export async function requireAnyRole(
 ): Promise<Doc<"users">> {
   const user = await requireUser(ctx);
   if (!user.role || !roles.includes(user.role)) {
-    throw new Error("غير مصرح لك بالوصول");
+    throw new AuthorizationError("غير مصرح لك بالوصول");
   }
 
   return user;
@@ -56,14 +57,14 @@ export async function requireApartmentOwner(
   const apartment = await ctx.db.get(apartmentId);
 
   if (!apartment) {
-    throw new Error("الشقة غير موجودة");
+    throw new NotFoundError("الشقة");
   }
 
   const isAdmin = user.role === "admin";
   const isOwner = user.role === "owner" && apartment.ownerId === user._id;
 
   if (!isAdmin && !isOwner) {
-    throw new Error("ليس لديك صلاحية لهذه الشقة");
+    throw new AuthorizationError("ليس لديك صلاحية لهذه الشقة");
   }
 
   return { user, apartment };
@@ -77,7 +78,7 @@ export async function requireBookingAccess(
   const booking = await ctx.db.get(bookingId);
 
   if (!booking) {
-    throw new Error("الحجز غير موجود");
+    throw new NotFoundError("الحجز");
   }
 
   if (user.role === "admin" || booking.userId === user._id) {
@@ -89,5 +90,5 @@ export async function requireBookingAccess(
     return { user, booking };
   }
 
-  throw new Error("ليس لديك صلاحية لهذا الحجز");
+  throw new AuthorizationError("ليس لديك صلاحية لهذا الحجز");
 }

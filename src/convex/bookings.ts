@@ -1,7 +1,7 @@
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 // expireUnpaidSession (Webhook الدفع) معرّفة هنا لأن ملف payments يعمل بـ node
 import type { Doc } from "./_generated/dataModel";
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import {
   type DatabaseCtx,
   requireAnyRole,
@@ -286,7 +286,7 @@ export const create = mutation({
 
       return { bookingId, totalPrice, platformFee, totalNights };
     } catch (error) {
-      if (error instanceof ValidationError) {
+      if (error instanceof ConvexError) {
         throw error;
       }
       throw new ValidationError(

@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Navigation } from "@/components/Navigation";
-import { useQuery, useMutation, useAction } from "convex/react";
+import { useQuery, useMutation, useAction, useConvexAuth } from "convex/react";
 import { api } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import { getApartmentDescription, getApartmentLocation, getApartmentRules, getApartmentTitle, formatArabicDate, getAmenityLabel } from "@/lib/apartment-content";
@@ -8,7 +8,7 @@ import { DEMO_MODE, DEMO_APARTMENTS } from "@/lib/demo-data";
 import { calculateStayPrice } from "@/lib/pricing";
 import { getErrorMessage } from "@/lib/error-message";
 import { toast } from "sonner";
-import { useParams, Link, useNavigate } from "react-router";
+import { useParams, Link, useNavigate, useSearchParams } from "react-router";
 import {
   Star,
   MapPin,
@@ -119,14 +119,18 @@ function StarRating({ rating, size = "w-4 h-4" }: { rating: number; size?: strin
 
 export default function ApartmentDetail() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { isAuthenticated } = useConvexAuth();
   const apartmentId = id as Id<"apartments"> | undefined;
   const liveApartment = useQuery(api.apartments.get, DEMO_MODE || !apartmentId ? "skip" : { apartmentId });
+  const currentUser = useQuery(api.users.currentUser);
   const liveReviews = useQuery(api.reviews.list, DEMO_MODE || !apartmentId ? "skip" : { apartmentId });
   const liveFavorited = useQuery(api.favorites.isFavorited, DEMO_MODE || !apartmentId ? "skip" : { apartmentId });
   const apartment = DEMO_MODE ? (DEMO_APARTMENTS.find((a) => a._id === id) ?? null) : liveApartment;
   const reviews = DEMO_MODE ? [] : liveReviews;
   const isFavorited = DEMO_MODE ? false : liveFavorited;
+  const isOwnerOfApartment = !!(currentUser && apartment && (apartment as { ownerId?: string }).ownerId === currentUser._id);
   const toggleFavorite = useMutation(api.favorites.toggle);
   const createReport = useMutation(api.reports.create);
   const getOrCreateConversation = useMutation(api.messages.getOrCreate);
@@ -134,11 +138,15 @@ export default function ApartmentDetail() {
   const createReview = useMutation(api.reviews.create);
   const createCheckoutSession = useAction(api.payments.createCheckoutSession);
 
+  const initialCheckIn = searchParams.get("checkIn") ? parseDateInput(searchParams.get("checkIn")!) : null;
+  const initialCheckOut = searchParams.get("checkOut") ? parseDateInput(searchParams.get("checkOut")!) : null;
+  const initialGuests = Number(searchParams.get("guests")) || 2;
+
   const [selectedImage, setSelectedImage] = useState(0);
   const [showLightbox, setShowLightbox] = useState(false);
-  const [checkIn, setCheckIn] = useState<Date | null>(null);
-  const [checkOut, setCheckOut] = useState<Date | null>(null);
-  const [guests, setGuests] = useState(2);
+  const [checkIn, setCheckIn] = useState<Date | null>(initialCheckIn);
+  const [checkOut, setCheckOut] = useState<Date | null>(initialCheckOut);
+  const [guests, setGuests] = useState(initialGuests);
 
   const liveAvailability = useQuery(
     api.bookings.checkAvailability,
@@ -182,7 +190,37 @@ export default function ApartmentDetail() {
 
   const handleBooking = async () => {
     if (DEMO_MODE) { toast.error("الوضع التجريبي: اربط Convex لتفعيل الحجز."); return; }
-    if (!checkIn || !checkOut || !apartmentId) return;
+    if (!apartmentId) return;
+
+    if (!isAuthenticated) {
+      toast.info("يرجى تسجيل الدخول أولاً لإتمام الحجز");
+      const datesQuery = checkIn && checkOut
+        ? `?checkIn=${formatDateInput(checkIn)}&checkOut=${formatDateInput(checkOut)}&guests=${guests}`
+        : "";
+      navigate(`/auth?returnTo=${encodeURIComponent(`/apartment/${apartmentId}${datesQuery}`)}`);
+      return;
+    }
+
+    if (isOwnerOfApartment) {
+      toast.error("لا يمكنك حجز شقتك الخاصة");
+      return;
+    }
+
+    if (!checkIn || !checkOut) {
+      toast.error("يرجى تحديد تواريخ الوصول والمغادرة أولاً");
+      return;
+    }
+
+    if (nightsBelowMin) {
+      toast.error(`الحد الأدنى للإقامة في هذه الشقة ${minNights} ليالٍ`);
+      return;
+    }
+
+    if (availability && !availability.available) {
+      toast.error("هذه الشقة غير متاحة في التواريخ المختارة");
+      return;
+    }
+
     setBookingLoading(true);
     setBookingError(null);
     try {
@@ -210,6 +248,13 @@ export default function ApartmentDetail() {
   const handleReview = async () => {
     if (DEMO_MODE) { toast.error("الوضع التجريبي: اربط Convex لإرسال التقييم."); return; }
     if (!apartmentId || !reviewComment.trim()) return;
+
+    if (!isAuthenticated) {
+      toast.info("يرجى تسجيل الدخول أولاً لإرسال تقييم");
+      navigate(`/auth?returnTo=${encodeURIComponent(`/apartment/${id}`)}`);
+      return;
+    }
+
     setReviewLoading(true);
     setReviewError(null);
     try {
@@ -234,11 +279,18 @@ export default function ApartmentDetail() {
   const handleFavorite = async () => {
     if (DEMO_MODE) { toast.error("الوضع التجريبي: اربط Convex لحفظ المفضلة."); return; }
     if (!apartmentId) return;
+
+    if (!isAuthenticated) {
+      toast.info("يرجى تسجيل الدخول أولاً لحفظ المفضلة");
+      navigate(`/auth?returnTo=${encodeURIComponent(`/apartment/${id}`)}`);
+      return;
+    }
+
     try {
       const result = await toggleFavorite({ apartmentId });
       toast.success(result.favorited ? "تمت إضافة الشقة إلى المفضلة" : "تمت إزالة الشقة من المفضلة");
-    } catch {
-      navigate(`/auth?returnTo=${encodeURIComponent(`/apartment/${id}`)}`);
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر تحديث المفضلة"));
     }
   };
 
@@ -683,10 +735,31 @@ export default function ApartmentDetail() {
                     )}
 
                     {/* CTA */}
-                    <button type="button" onClick={() => void handleBooking()} disabled={bookingLoading || !checkIn || !checkOut || totalNights < 1 || nightsBelowMin} className="clay-btn flex w-full items-center justify-center gap-2 py-3.5 text-center text-lg disabled:cursor-not-allowed disabled:opacity-50">
-                      {bookingLoading ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : <Calendar className="h-5 w-5" aria-hidden="true" />}
-                      {bookingLoading ? "جاري الحجز..." : "احجز الآن"}
-                    </button>
+                    {isOwnerOfApartment ? (
+                      <div className="clay-inset p-3 text-center text-sm text-amber-800 bg-amber-50 rounded-xl mb-3 border border-amber-200">
+                        أنت مالك هذه الشقة — يمكنك إدارة حجوزاتها وتعديلها من{" "}
+                        <Link to="/owner" className="underline font-bold text-amber-900">لوحة المالك</Link>
+                      </div>
+                    ) : !isAuthenticated ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleBooking()}
+                        className="clay-btn flex w-full items-center justify-center gap-2 py-3.5 text-center text-lg shadow-md hover:brightness-105"
+                      >
+                        <Calendar className="h-5 w-5" aria-hidden="true" />
+                        تسجيل الدخول لإتمام الحجز
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => void handleBooking()}
+                        disabled={bookingLoading || !checkIn || !checkOut || totalNights < 1 || nightsBelowMin || (availability && !availability.available)}
+                        className="clay-btn flex w-full items-center justify-center gap-2 py-3.5 text-center text-lg disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {bookingLoading ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : <Calendar className="h-5 w-5" aria-hidden="true" />}
+                        {bookingLoading ? "جاري الحجز..." : "احجز الآن"}
+                      </button>
+                    )}
 
                     <p className="text-xs text-center text-[var(--muted-foreground)] mt-3">لن يتم خصم أي مبلغ حتى تأكيد الحجز</p>
                   </>

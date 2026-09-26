@@ -1,7 +1,6 @@
 import '@vly-ai/integrations';
 import { Toaster } from "@/components/ui/sonner";
 import { RequireAuth, RequireRole } from "@/components/RequireAuth";
-import { VlyToolbar } from "../vly-toolbar-readonly.tsx";
 import { DEMO_MODE } from "@/lib/demo-data";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { ConvexReactClient, ConvexProviderWithAuth } from "convex/react";
@@ -9,6 +8,12 @@ import React, { StrictMode, useEffect, lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router";
 import "./index.css";
+
+const isVlyEnvironment =
+  typeof window !== "undefined" && window.location.hostname.endsWith(".vly.sh");
+const LazyVlyToolbar = isVlyEnvironment
+  ? lazy(() => import("../vly-toolbar-readonly.tsx"))
+  : null;
 
 // Lazy load route components for better code splitting
 const Landing = lazy(() => import("./pages/Landing.tsx"));
@@ -281,9 +286,13 @@ function AppRoot() {
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <RootErrorBoundary>
-      <ToolbarErrorBoundary>
-        <VlyToolbar />
-      </ToolbarErrorBoundary>
+      {LazyVlyToolbar && (
+        <ToolbarErrorBoundary>
+          <Suspense fallback={null}>
+            <LazyVlyToolbar />
+          </Suspense>
+        </ToolbarErrorBoundary>
+      )}
       <AppRoot />
       <Toaster />
     </RootErrorBoundary>

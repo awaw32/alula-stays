@@ -1,37 +1,39 @@
+import { ConvexError } from "convex/values";
+
 /**
  * معالجة الأخطاء الموحدة
- * رسائل أخطاء ثابتة وموثوقة
+ * رسائل أخطاء ثابتة وموثوقة ترسل للعميل عبر ConvexError
  */
 
-export class ValidationError extends Error {
+export class ValidationError extends ConvexError<string> {
   constructor(message: string) {
     super(message);
     this.name = "ValidationError";
   }
 }
 
-export class AuthorizationError extends Error {
+export class AuthorizationError extends ConvexError<string> {
   constructor(message: string) {
     super(message);
     this.name = "AuthorizationError";
   }
 }
 
-export class NotFoundError extends Error {
+export class NotFoundError extends ConvexError<string> {
   constructor(resource: string) {
     super(`${resource} غير موجود`);
     this.name = "NotFoundError";
   }
 }
 
-export class PaymentError extends Error {
+export class PaymentError extends ConvexError<string> {
   constructor(message: string) {
     super(message);
     this.name = "PaymentError";
   }
 }
 
-export class RateLimitError extends Error {
+export class RateLimitError extends ConvexError<string> {
   constructor() {
     super("تم تجاوز الحد الأقصى للطلبات. حاول مرة أخرى لاحقاً");
     this.name = "RateLimitError";
