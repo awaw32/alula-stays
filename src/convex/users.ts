@@ -1,6 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import { mutation, query, QueryCtx } from "./_generated/server";
+import { mutation, query, internalMutation, QueryCtx } from "./_generated/server";
 
 /**
  * Get the current signed in user. Returns null if the user is not signed in.
@@ -162,4 +162,26 @@ export const claimFirstAdmin = mutation({
     return "تم تعيينك مديراً للمنصة بنجاح";
   },
 });
+
+/**
+ * تعيين أي مستخدم كمدير بواسطة البريد الإلكتروني (دالة داخلية آمنة للمسؤول وسطر الأوامر).
+ */
+export const setAdminByEmail = internalMutation({
+  args: { email: v.string() },
+  handler: async (ctx, args) => {
+    const targetEmail = args.email.toLowerCase().trim();
+    const user = await ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", targetEmail))
+      .first();
+
+    if (!user) {
+      throw new Error(`لم يتم العثور على مستخدم بالبريد: ${targetEmail}`);
+    }
+
+    await ctx.db.patch(user._id, { role: "admin" });
+    return `تم ترقية المستخدم (${user.name || user.email}) كمدير بنجاح`;
+  },
+});
+
 
