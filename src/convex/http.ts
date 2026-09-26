@@ -90,4 +90,45 @@ http.route({
   }),
 });
 
+/**
+ * Webhook الدفع من بوابة Tap Payments
+ * يستقبل تحديثات الشحنات (CAPTURED, DECLINED, FAILED)
+ */
+http.route({
+  path: "/tap-webhook",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const payload = (await request.json()) as {
+        id?: string;
+        status?: string;
+        metadata?: { bookingId?: string };
+      };
+
+      if (!payload || !payload.id) {
+        return new Response(JSON.stringify({ error: "invalid payload" }), { status: 400 });
+      }
+
+      if (payload.status === "CAPTURED") {
+        const bookingId = payload.metadata?.bookingId;
+        if (bookingId) {
+          try {
+            await ctx.runMutation(internal.bookings.markPaid, {
+              bookingId: bookingId as never,
+              sessionId: payload.id,
+            });
+          } catch (err) {
+            console.error("Tap webhook markPaid error (idempotent skip):", err);
+          }
+        }
+      }
+
+      return new Response(JSON.stringify({ received: true }), { status: 200 });
+    } catch (err) {
+      console.error("Tap webhook error:", err);
+      return new Response(JSON.stringify({ error: "internal error" }), { status: 500 });
+    }
+  }),
+});
+
 export default http;

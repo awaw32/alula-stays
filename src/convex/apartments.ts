@@ -23,14 +23,22 @@ export const list = query({
     sortBy: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const viewerRole = await getViewerRole(ctx);
-    const canSeeUnverified = viewerRole === "owner" || viewerRole === "admin";
+    const userId = await getAuthUserId(ctx);
+    let userRole: string | null = null;
+    if (userId) {
+      const user = await ctx.db.get(userId);
+      userRole = user?.role ?? null;
+    }
+
     let apartments = await ctx.db.query("apartments").collect();
 
-    // الزائر العادي والمستأجر يرون المنشور (المعتمد) فقط —
-    // المالك يرى شققه بكل حالاتها ليتابعها، والإدارة ترى الكل.
-    if (!canSeeUnverified) {
-      apartments = apartments.filter((a) => isApartmentLive(a));
+    // الشقق المعتمدة تظهر للجميع.
+    // الإدارة ترى الكل.
+    // المالك يرى الشقق المعتمدة بالإضافة إلى شققه الخاصة فقط (ليتابع مراجعتها).
+    if (userRole !== "admin") {
+      apartments = apartments.filter(
+        (a) => isApartmentLive(a) || (userId && a.ownerId === userId),
+      );
     }
 
     if (args.location && args.location !== "all") {
@@ -78,12 +86,13 @@ export const get = query({
     const apartment = await ctx.db.get(args.apartmentId);
     if (!apartment) return null;
 
-    // منع عرض الشقق غير المعتمدة على الزوار والمستأجرين
+    // منع عرض الشقق غير المعتمدة إلا للأدمن أو لصاحب الشقة نفسه
     if (!isApartmentLive(apartment)) {
-      const viewerRole = await getViewerRole(ctx);
-      if (viewerRole === "owner" || viewerRole === "admin") return apartment;
       const userId = await getAuthUserId(ctx);
-      if (userId && apartment.ownerId === userId) return apartment;
+      if (!userId) return null;
+      const user = await ctx.db.get(userId);
+      if (user?.role === "admin") return apartment;
+      if (apartment.ownerId === userId) return apartment;
       return null;
     }
 

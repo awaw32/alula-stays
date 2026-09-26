@@ -1,7 +1,10 @@
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
-import { Calendar, Heart, Home, Menu, Search, User, X } from "lucide-react";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { DEMO_MODE } from "@/lib/demo-data";
+import { Calendar, Heart, Home, Menu, MessageSquare, Search, User, X } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router";
 
@@ -20,6 +23,10 @@ export function Navigation() {
   const location = useLocation();
   const { isAuthenticated, role } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const unreadCount = useQuery(
+    api.messages.unreadCount,
+    isAuthenticated && !DEMO_MODE ? {} : "skip",
+  ) ?? 0;
 
   const accountPath = role === "admin" ? "/admin" : role === "owner" ? "/owner" : "/dashboard";
   const accountLabel = role === "admin" ? "الإدارة" : role === "owner" ? "لوحة المالك" : "حسابي";
@@ -60,6 +67,26 @@ export function Navigation() {
                 </Link>
               );
             })}
+            {isAuthenticated && (
+              <Link
+                to="/messages"
+                className={cn(
+                  "relative flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200",
+                  isActivePath(location.pathname, "/messages")
+                    ? "bg-[var(--clay-accent)] text-white shadow-md"
+                    : "text-[var(--muted-foreground)] hover:bg-[var(--clay-surface)] hover:text-[var(--foreground)]",
+                )}
+                aria-current={isActivePath(location.pathname, "/messages") ? "page" : undefined}
+              >
+                <MessageSquare className="h-4 w-4" aria-hidden="true" />
+                الرسائل
+                {unreadCount > 0 && (
+                  <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white shadow-sm">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+              </Link>
+            )}
           </nav>
 
           <div className="flex items-center gap-3">
@@ -120,6 +147,29 @@ export function Navigation() {
                   </Link>
                 );
               })}
+              {isAuthenticated && (
+                <Link
+                  to="/messages"
+                  onClick={() => setMobileOpen(false)}
+                  className={cn(
+                    "flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium transition-all",
+                    isActivePath(location.pathname, "/messages")
+                      ? "bg-[var(--clay-accent)] text-white"
+                      : "text-[var(--muted-foreground)] hover:bg-[var(--clay-surface)]",
+                  )}
+                  aria-current={isActivePath(location.pathname, "/messages") ? "page" : undefined}
+                >
+                  <span className="flex items-center gap-3">
+                    <MessageSquare className="h-5 w-5" aria-hidden="true" />
+                    الرسائل
+                  </span>
+                  {unreadCount > 0 && (
+                    <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white">
+                      {unreadCount}
+                    </span>
+                  )}
+                </Link>
+              )}
               <Separator className="my-1" />
               <Link
                 to={isAuthenticated ? accountPath : "/auth"}
@@ -155,6 +205,26 @@ export function Navigation() {
               </Link>
             );
           })}
+          {isAuthenticated && (
+            <Link
+              to="/messages"
+              className={cn(
+                "relative flex min-w-[60px] flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition-all",
+                isActivePath(location.pathname, "/messages") ? "text-[var(--clay-accent)]" : "text-[var(--muted-foreground)]",
+              )}
+              aria-current={isActivePath(location.pathname, "/messages") ? "page" : undefined}
+            >
+              <span className={cn("relative rounded-xl p-1.5 transition-all", isActivePath(location.pathname, "/messages") && "bg-[var(--clay-accent-soft)] shadow-sm")}>
+                <MessageSquare className="h-5 w-5" aria-hidden="true" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+              </span>
+              <span className="text-[10px] font-medium">الرسائل</span>
+            </Link>
+          )}
           <Link
             to={isAuthenticated ? accountPath : "/auth"}
             className={cn(
@@ -173,3 +243,4 @@ export function Navigation() {
     </>
   );
 }
+

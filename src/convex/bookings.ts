@@ -31,13 +31,27 @@ import {
 } from "./lib/money";
 import { checkRateLimit } from "./lib/rateLimiting";
 
-const DAY_MS = 1000 * 60 * 60 * 24;
 const bookingStatusValidator = v.union(
   v.literal("pending"),
   v.literal("confirmed"),
   v.literal("cancelled"),
   v.literal("completed"),
 );
+
+const PENDING_TIMEOUT_MS = 30 * 60 * 1000; // مهلة 30 دقيقة للحجز المعلق غير المدفوع قبل فك حجب التواريخ
+
+export function isBookingActive(booking: Doc<"bookings">, now: number = Date.now()): boolean {
+  if (booking.status === "cancelled") return false;
+  // الحجز المعلق وغير المدفوع يسقط بعد 30 دقيقة لعدم حجب الشقة للأبد
+  if (
+    booking.status === "pending" &&
+    booking.paymentStatus === "unpaid" &&
+    now - booking.createdAt > PENDING_TIMEOUT_MS
+  ) {
+    return false;
+  }
+  return true;
+}
 
 async function enrichBooking(ctx: DatabaseCtx, booking: Doc<"bookings">) {
   const apartment = await ctx.db.get(booking.apartmentId);
@@ -141,9 +155,10 @@ export const checkAvailability = query({
       .withIndex("by_apartment", (q) => q.eq("apartmentId", args.apartmentId))
       .collect();
 
+    const now = Date.now();
     const hasOverlap = bookings.some(
       (booking) =>
-        booking.status !== "cancelled" &&
+        isBookingActive(booking, now) &&
         args.checkIn < booking.checkOut &&
         args.checkOut > booking.checkIn,
     );
@@ -220,9 +235,10 @@ export const create = mutation({
         .withIndex("by_apartment", (q) => q.eq("apartmentId", args.apartmentId))
         .collect();
 
+      const now = Date.now();
       const hasOverlap = bookings.some(
         (booking) =>
-          booking.status !== "cancelled" &&
+          isBookingActive(booking, now) &&
           args.checkIn < booking.checkOut &&
           args.checkOut > booking.checkIn,
       );
@@ -462,7 +478,8 @@ export const getPaymentContext = internalQuery({
     }
 
     const apartment = await ctx.db.get(booking.apartmentId);
-    return { booking, apartment };
+    const user = await ctx.db.get(booking.userId);
+    return { booking, apartment, user };
   },
 });
 

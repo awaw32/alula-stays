@@ -129,3 +129,37 @@ export const updateProfile = mutation({
     return "تم حفظ البيانات";
   },
 });
+
+/**
+ * فحص ما إذا كان هناك أي مدير مسجل في المنصة.
+ */
+export const hasAdmin = query({
+  args: {},
+  handler: async (ctx) => {
+    const allUsers = await ctx.db.query("users").collect();
+    return allUsers.some((u) => u.role === "admin");
+  },
+});
+
+/**
+ * تعيين أول مدير للمنصة — مسموح فقط إذا لم يكن هناك أي مدير مسجل بعد.
+ */
+export const claimFirstAdmin = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("يجب تسجيل الدخول أولاً");
+    }
+
+    const allUsers = await ctx.db.query("users").collect();
+    const existingAdmin = allUsers.find((u) => u.role === "admin");
+    if (existingAdmin) {
+      throw new Error("يوجد مدير للمنصة بالفعل — اطلب منه منحك الصلاحية من لوحة الإدارة");
+    }
+
+    await ctx.db.patch(userId, { role: "admin" });
+    return "تم تعيينك مديراً للمنصة بنجاح";
+  },
+});
+

@@ -40,10 +40,97 @@ function getStripe() {
 }
 
 /**
+ * إنشاء شحنة دفع عبر بوابة Tap Payments (مدى، Apple Pay، فيزا/ماستركارد)
+ */
+async function createTapSession(args: {
+  amount: number;
+  bookingId: string;
+  userId: string;
+  apartmentTitle: string;
+  customerName?: string;
+  customerEmail?: string;
+  publicAppUrl: string;
+}): Promise<{ url: string; sessionId: string }> {
+  const tapKey = process.env.TAP_SECRET_KEY;
+  if (!tapKey) {
+    throw new PaymentError("مفتاح بوابة الدفع Tap غير معرف في النظام");
+  }
+
+  const response = await fetch("https://api.tap.company/v2/charges", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${tapKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      amount: args.amount,
+      currency: "SAR",
+      threeDSecure: true,
+      save_card: false,
+      description: `حجز شقة في العلا: ${args.apartmentTitle}`,
+      statement_descriptor: "AlUla Stays",
+      metadata: {
+        bookingId: args.bookingId,
+        userId: args.userId,
+      },
+      customer: {
+        first_name: args.customerName || "ضيف العلا",
+        email: args.customerEmail || "guest@soqaqalaula.world",
+      },
+      source: { id: "src_all" },
+      redirect: {
+        url: `${args.publicAppUrl}/my-bookings?booking=${args.bookingId}`,
+      },
+      post: {
+        url: `${process.env.CONVEX_SITE_URL || "https://wry-mosquito-572.convex.site"}/tap-webhook`,
+      },
+    }),
+  });
+
+  const data = (await response.json()) as {
+    id?: string;
+    transaction?: { url?: string };
+    errors?: Array<{ code: string; description: string }>;
+  };
+
+  if (!response.ok || !data.id || !data.transaction?.url) {
+    const errorMsg = data.errors?.[0]?.description || "فشل إنشاء جلسة الدفع عبر Tap Payments";
+    throw new PaymentError(errorMsg);
+  }
+
+  return { url: data.transaction.url, sessionId: data.id };
+}
+
+/**
+ * التحقق من حالة الدفع من بوابة Tap Payments
+ */
+async function verifyTapSession(chargeId: string): Promise<{ paid: boolean; status: string }> {
+  const tapKey = process.env.TAP_SECRET_KEY;
+  if (!tapKey) {
+    throw new PaymentError("مفتاح بوابة الدفع Tap غير معرف");
+  }
+
+  const response = await fetch(`https://api.tap.company/v2/charges/${chargeId}`, {
+    headers: {
+      Authorization: `Bearer ${tapKey}`,
+    },
+  });
+
+  const data = (await response.json()) as {
+    id?: string;
+    status?: string;
+    response?: { code?: string; message?: string };
+  };
+
+  const isPaid = data.status === "CAPTURED";
+  return { paid: isPaid, status: data.status || "UNKNOWN" };
+}
+
+/**
  * الحصول على رابط التطبيق مع التحقق
  */
 function getPublicAppUrl() {
-  const publicAppUrl = process.env.SITE_URL || process.env.PUBLIC_APP_URL;
+  const publicAppUrl = process.env.SITE_URL || process.env.PUBLIC_APP_URL || "https://soqaqalaula.world";
   return validateUrl(
     publicAppUrl,
     "SITE_URL أو PUBLIC_APP_URL"
@@ -98,14 +185,32 @@ export const createCheckoutSession = action({
         booking.platformFee
       );
 
-      // تحويل إلى أصغر وحدة (هللة) للـ Stripe
-      const amountInHalalah = convertToSmallestUnit(amount);
-
-      // الحصول على Stripe و URL
-      const stripe = getStripe();
       const publicAppUrl = getPublicAppUrl();
 
-      // إنشاء جلسة الدفع
+      // أولوية الدفع: بوابة Tap Payments (تدعم مدى، Apple Pay، البطاقات المحلية)
+      if (process.env.TAP_SECRET_KEY) {
+        const tapSession = await createTapSession({
+          amount,
+          bookingId: args.bookingId,
+          userId: booking.userId,
+          apartmentTitle: apartment.titleAr || apartment.title,
+          customerName: paymentContext.user?.name,
+          customerEmail: paymentContext.user?.email,
+          publicAppUrl,
+        });
+
+        await ctx.runMutation(internal.bookings.attachPaymentSession, {
+          bookingId: args.bookingId,
+          sessionId: tapSession.sessionId,
+        });
+
+        return tapSession;
+      }
+
+      // الخيار الاحتياطي: Stripe
+      const amountInHalalah = convertToSmallestUnit(amount);
+      const stripe = getStripe();
+
       let session;
       try {
         session = await stripe.checkout.sessions.create({
@@ -155,14 +260,10 @@ export const createCheckoutSession = action({
 
       return { url: session.url, sessionId: session.id };
     } catch (error) {
-      // تسجيل الخطأ للمراقبة
       console.error("Create Checkout Session Error:", error);
-
-      // إرجاع رسالة خطأ ودية
       if (error instanceof PaymentError) {
         throw error;
       }
-
       throw new PaymentError(formatErrorMessage(error));
     }
   },
@@ -207,6 +308,18 @@ export const verifyPayment = action({
       // التحقق من أن الحجز ملك للمستخدم
       if (paymentContext.booking.userId !== userId) {
         throw new PaymentError(ERROR_MESSAGES.PAYMENT_NOT_YOURS);
+      }
+
+      // التحقق عبر بوابة Tap Payments إذا كانت شحنة Tap (تبدأ بـ chg_)
+      if (args.sessionId.startsWith("chg_")) {
+        const tapResult = await verifyTapSession(args.sessionId);
+        if (tapResult.paid) {
+          await ctx.runMutation(internal.bookings.markPaid, {
+            bookingId: args.bookingId,
+            sessionId: args.sessionId,
+          });
+        }
+        return tapResult;
       }
 
       // الحصول على Stripe والتحقق من الجلسة

@@ -36,7 +36,7 @@ export default function MyBookings() {
   const cancelBooking = useMutation(api.bookings.cancel);
   const verifyPayment = useAction(api.payments.verifyPayment);
 
-  const sessionId = searchParams.get("session_id");
+  const sessionId = searchParams.get("tap_id") || searchParams.get("session_id");
   const bookingId = searchParams.get("booking");
 
   useEffect(() => {

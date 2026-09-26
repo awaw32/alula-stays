@@ -39,12 +39,25 @@ export const create = mutation({
       throw new Error("لقد قمت بتقييم هذه الشقة من قبل");
     }
 
-    const completedBookings = await ctx.db
+    const now = Date.now();
+    const userBookings = await ctx.db
       .query("bookings")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .collect();
-    if (!completedBookings.some((booking) => booking.apartmentId === args.apartmentId && booking.status === "completed")) {
-      throw new Error("يمكنك إضافة تقييم بعد إكمال الإقامة");
+
+    const completedBooking = userBookings.find(
+      (booking) =>
+        booking.apartmentId === args.apartmentId &&
+        (booking.status === "completed" || (booking.status === "confirmed" && booking.checkOut <= now))
+    );
+
+    if (!completedBooking) {
+      throw new Error("يمكنك إضافة تقييم بعد إكمال الإقامة في هذه الشقة");
+    }
+
+    // تحديث حالة الحجز إلى مكتمل تلقائياً عند انتهاء فترة الإقامة
+    if (completedBooking.status === "confirmed" && completedBooking.checkOut <= now) {
+      await ctx.db.patch(completedBooking._id, { status: "completed" });
     }
 
     const reviewId = await ctx.db.insert("reviews", {
