@@ -3,7 +3,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -13,14 +12,31 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-
 import { useAuth } from "@/hooks/use-auth";
 import { DEMO_MODE } from "@/lib/demo-data";
 import logo from "@/assets/logo.svg";
-import { ArrowRight, KeyRound, Loader2, Mail, UserX } from "lucide-react";
-import { Suspense, useEffect, useState } from "react";
+import {
+  ArrowRight,
+  CheckCircle2,
+  KeyRound,
+  Loader2,
+  Lock,
+  Mail,
+  Phone,
+  RefreshCw,
+  ShieldCheck,
+  Smartphone,
+  UserX,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import { getErrorMessage } from "@/lib/error-message";
 import { Link, useNavigate, useSearchParams } from "react-router";
+import {
+  formatPhoneDisplay,
+  isValidSaudiPhone,
+  normalizePhone,
+} from "@/lib/phone";
+import { toast } from "sonner";
 
 interface AuthProps {
   redirectAfterAuth?: string;
@@ -36,279 +52,530 @@ function resolveRedirectAfterAuth(
   return fallback;
 }
 
-function Auth({ redirectAfterAuth }: AuthProps = {}) {
+export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
   const { isLoading: authLoading, isAuthenticated, signIn } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const ownerMode = searchParams.get("owner") === "1";
-  const redirect = ownerMode && !searchParams.get("returnTo")
-    ? "/owner/profile"
-    : resolveRedirectAfterAuth(
-        searchParams.get("returnTo"),
-        redirectAfterAuth,
-      );
-  const [step, setStep] = useState<"signIn" | { email: string }>("signIn");
+  const redirect =
+    ownerMode && !searchParams.get("returnTo")
+      ? "/owner/profile"
+      : resolveRedirectAfterAuth(
+          searchParams.get("returnTo"),
+          redirectAfterAuth,
+        );
+
+  // طريقة الدخول: الافتراضي هو رقم الجوال (كما طلب المستخدم تماماً)
+  const [method, setMethod] = useState<"phone" | "email">("phone");
+  const [step, setStep] = useState<"input" | "otp">("input");
+
+  // حقول الإدخال
+  const [phoneInput, setPhoneInput] = useState("");
+  const [emailInput, setEmailInput] = useState("");
   const [otp, setOtp] = useState("");
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  // الرقم المعتمد بعد إرسال الرمز للتحقق
+  const [activeIdentifier, setActiveIdentifier] = useState("");
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
       navigate(redirect);
     }
   }, [authLoading, isAuthenticated, navigate, redirect]);
-  const demoBlock = async () => { setError("الوضع التجريبي: اربط VITE_CONVEX_URL لتفعيل تسجيل الدخول."); };
-  const handleEmailSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    if (DEMO_MODE) { event.preventDefault(); await demoBlock(); return; }
-    event.preventDefault();
-    setIsLoading(true);
+
+  // عداد إعادة الإرسال
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [resendCooldown]);
+
+  const demoBlock = async () => {
+    setError("الوضع التجريبي: اربط VITE_CONVEX_URL لتفعيل تسجيل الدخول.");
+  };
+
+  // إرسال رمز التحقق (جوال أو إيميل)
+  const handleSendCode = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (DEMO_MODE) {
+      await demoBlock();
+      return;
+    }
+
     setError(null);
-    try {
-      const formData = new FormData(event.currentTarget);
-      await signIn("email-otp", formData);
-      setStep({ email: formData.get("email") as string });
-      setIsLoading(false);
-    } catch (error) {
-      console.error("Email sign-in error:", error);
-      setError(getErrorMessage(error, "تعذر إرسال رمز التحقق. حاول مرة أخرى."));
-      setIsLoading(false);
+
+    if (method === "phone") {
+      const normalized = normalizePhone(phoneInput);
+      if (!isValidSaudiPhone(normalized)) {
+        setError("يرجى إدخال رقم جوال سعودي صحيح يبدأ بـ 05 أو 5 (مثال: 0512345678)");
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        await signIn("phone-otp", { phone: normalized });
+        setActiveIdentifier(normalized);
+        setStep("otp");
+        setOtp("");
+        setResendCooldown(60);
+        toast.success("تم إرسال رمز التحقق في رسالة نصية (SMS)");
+      } catch (err) {
+        console.error("[Phone Auth Error]", err);
+        setError(
+          getErrorMessage(
+            err,
+            "تعذر إرسال رمز التحقق عبر الرسائل القصيرة. يرجى التأكد من الرقم والمحاولة مرة أخرى.",
+          ),
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      const cleanEmail = emailInput.trim().toLowerCase();
+      if (!cleanEmail || !cleanEmail.includes("@")) {
+        setError("يرجى إدخال بريد إلكتروني صحيح");
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        await signIn("email-otp", { email: cleanEmail });
+        setActiveIdentifier(cleanEmail);
+        setStep("otp");
+        setOtp("");
+        setResendCooldown(60);
+        toast.success("تم إرسال رمز التحقق إلى بريدك الإلكتروني");
+      } catch (err) {
+        console.error("[Email Auth Error]", err);
+        setError(
+          getErrorMessage(err, "تعذر إرسال رمز التحقق. يرجى المحاولة مرة أخرى."),
+        );
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
-  const handleOtpSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    if (DEMO_MODE) { event.preventDefault(); await demoBlock(); return; }
-    event.preventDefault();
+  // تأكيد رمز التحقق للدخول
+  const handleVerifyOtp = async (codeToVerify?: string) => {
+    const code = codeToVerify ?? otp;
+    if (code.length !== 6) {
+      setError("يرجى إدخال رمز التحقق المكون من 6 أرقام");
+      return;
+    }
+
+    if (DEMO_MODE) {
+      await demoBlock();
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
+
     try {
-      const formData = new FormData(event.currentTarget);
-      await signIn("email-otp", formData);
+      if (method === "phone") {
+        await signIn("phone-otp", {
+          phone: activeIdentifier,
+          code,
+        });
+      } else {
+        await signIn("email-otp", {
+          email: activeIdentifier,
+          code,
+        });
+      }
 
+      toast.success("تم تسجيل الدخول بنجاح! مرحباً بك في شقق العلا");
       navigate(redirect);
-    } catch (error) {
-      setError(getErrorMessage(error, "رمز التحقق غير صحيح. حاول مرة أخرى."));
-      setIsLoading(false);
-
+    } catch (err) {
+      console.error("[Verify OTP Error]", err);
+      setError("رمز التحقق غير صحيح أو قد انتهت صلاحيته. يرجى المحاولة مجدداً.");
       setOtp("");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleGuestLogin = async () => {
-    if (DEMO_MODE) { await demoBlock(); return; }
+    if (DEMO_MODE) {
+      await demoBlock();
+      return;
+    }
     setIsLoading(true);
     setError(null);
     try {
       await signIn("anonymous");
       navigate(redirect);
-    } catch (error) {
-      setError(getErrorMessage(error, "تعذر الدخول كضيف. حاول مرة أخرى."));
+    } catch (err) {
+      setError(getErrorMessage(err, "تعذر الدخول كضيف. حاول مرة أخرى."));
+    } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <main
+      dir="rtl"
+      className="relative flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-background via-amber-50/20 to-background px-4 py-12 dark:via-amber-950/10"
+    >
+      {/* خلفية جمالية تعكس طبيعة العلا وسحر الرمال */}
+      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        <div className="absolute -top-40 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-[var(--clay-gold)]/10 blur-3xl" />
+        <div className="absolute -bottom-40 right-1/4 h-96 w-96 rounded-full bg-[var(--clay-accent)]/10 blur-3xl" />
+      </div>
 
-      
-      {/* Auth Content */}
-      <div className="flex-1 flex items-center justify-center">
-        <div className="flex items-center justify-center h-full flex-col">
-        <Card className="min-w-[350px] pb-0 border shadow-md">
-          {step === "signIn" ? (
-            <>
-              <CardHeader className="text-center">
-              <div className="flex justify-center">
-                    <img
-                      src={logo}
-                      alt="شعار شقق العلا"
-                      width={64}
-                      height={64}
-                      className="rounded-lg mb-4 mt-4 cursor-pointer"
-                      onClick={() => navigate("/")}
-                    />
-                  </div>
-                <CardTitle className="text-xl">{ownerMode ? "بوابة المالكين" : "ابدأ رحلتك"}</CardTitle>
-                <CardDescription>
-                  {ownerMode
-                    ? "سجّل دخولك لترفع شقتك — ستراجعها الإدارة قبل النشر"
-                    : "أدخل بريدك الإلكتروني لتسجيل الدخول أو إنشاء حساب"}
-                </CardDescription>
-              </CardHeader>
-              <form onSubmit={handleEmailSubmit}>
-                <CardContent>
-                  
-                  <div className="relative flex items-center gap-2">
-                    <div className="relative flex-1">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+      <div className="w-full max-w-md">
+        <Card className="border border-border/80 bg-background/95 shadow-xl backdrop-blur-xl sm:rounded-3xl">
+          <CardHeader className="flex flex-col items-center pb-4 text-center">
+            {/* الشعار الفاخر المستوحى من هوية العلا وعراقتها */}
+            <div className="group relative mb-3 flex flex-col items-center">
+              <div
+                onClick={() => navigate("/")}
+                className="relative flex h-20 w-20 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-2 border-amber-500/30 bg-gradient-to-br from-[#9C441E] via-[#C25E2E] to-[#D97706] p-1.5 shadow-lg shadow-amber-950/20 transition-all duration-300 hover:scale-105 hover:shadow-xl"
+                role="button"
+                tabIndex={0}
+                aria-label="الرئيسية"
+              >
+                <img
+                  src={logo}
+                  alt="شعار شقق العلا"
+                  className="h-full w-full object-contain"
+                />
+              </div>
+            </div>
+
+            <CardTitle className="text-2xl font-bold tracking-tight text-foreground">
+              {ownerMode ? "بوابة مالكي الشقق" : "مرحباً بك في شقق العلا"}
+            </CardTitle>
+            <CardDescription className="mt-1 text-sm text-muted-foreground">
+              {ownerMode
+                ? "سجّل دخولك لإدارة شققك وحجوزاتك واستقبال النزلاء"
+                : "بوابتك الموثوقة لحجز أرقى الشقق والإقامات السكنية في العلا"}
+            </CardDescription>
+
+            {/* مفتاح التبديل بين الهاتف والبريد الإلكتروني (عند خطوة الإدخال) */}
+            {step === "input" && (
+              <div className="mt-5 grid w-full grid-cols-2 gap-1.5 rounded-2xl bg-muted/60 p-1 text-sm">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMethod("phone");
+                    setError(null);
+                  }}
+                  className={`flex items-center justify-center gap-2 rounded-xl py-2.5 font-bold transition-all duration-200 ${
+                    method === "phone"
+                      ? "bg-background text-[var(--clay-accent)] shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Smartphone className="size-4" />
+                  <span>رقم الجوال</span>
+                  <span className="rounded-md bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-700 dark:text-amber-300">
+                    افتراضي
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMethod("email");
+                    setError(null);
+                  }}
+                  className={`flex items-center justify-center gap-2 rounded-xl py-2.5 font-bold transition-all duration-200 ${
+                    method === "email"
+                      ? "bg-background text-[var(--clay-accent)] shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Mail className="size-4" />
+                  <span>البريد الإلكتروني</span>
+                </button>
+              </div>
+            )}
+          </CardHeader>
+
+          <CardContent className="space-y-4 pt-2">
+            {/* ── الخطوة الأولى: إدخال رقم الجوال أو البريد ── */}
+            {step === "input" && (
+              <form onSubmit={handleSendCode} className="space-y-4">
+                {method === "phone" ? (
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="phone-input"
+                      className="block text-right text-xs font-bold text-foreground"
+                    >
+                      رقم الجوال السعودي
+                    </label>
+                    <div className="relative flex items-center rounded-2xl border border-input bg-background/50 shadow-sm focus-within:border-[var(--clay-accent)] focus-within:ring-2 focus-within:ring-[var(--clay-accent)]/20">
+                      {/* بادئة المملكة العربية السعودية */}
+                      <div
+                        dir="ltr"
+                        className="flex select-none items-center gap-1.5 border-r border-border bg-muted/40 px-3 py-2.5 text-sm font-bold text-foreground"
+                      >
+                        <span className="text-base" role="img" aria-label="السعودية">
+                          🇸🇦
+                        </span>
+                        <span className="text-xs tracking-wider">+966</span>
+                      </div>
+
                       <Input
-                        name="email"
-                        placeholder="name@example.com"
-                        type="email"
-                        className="pl-9"
+                        id="phone-input"
+                        type="tel"
+                        dir="ltr"
+                        inputMode="numeric"
+                        placeholder="50 123 4567"
+                        value={phoneInput}
+                        onChange={(e) => {
+                          setPhoneInput(e.target.value);
+                          setError(null);
+                        }}
                         disabled={isLoading}
-                        required
+                        autoFocus
+                        className="border-0 bg-transparent text-left font-mono text-base font-semibold shadow-none focus-visible:ring-0"
                       />
                     </div>
-                    <Button
-                      type="submit"
-                      variant="outline"
-                      size="icon"
-                      disabled={isLoading}
-                    >
-                      {isLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <ArrowRight className="h-4 w-4" />
-                      )}
-                    </Button>
+                    <p className="text-[11px] leading-relaxed text-muted-foreground">
+                      أدخل رقم جوالك (مثال: 0501234567) لتصلك رسالة SMS سريعة برمز الدخول.
+                    </p>
                   </div>
-                  {error && (
-                    <p className="mt-2 text-sm text-red-500">{error}</p>
+                ) : (
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="email-input"
+                      className="block text-right text-xs font-bold text-foreground"
+                    >
+                      عنوان البريد الإلكتروني
+                    </label>
+                    <div className="relative flex items-center">
+                      <Mail className="absolute right-3 top-3.5 size-4 text-muted-foreground" />
+                      <Input
+                        id="email-input"
+                        type="email"
+                        dir="ltr"
+                        placeholder="name@example.com"
+                        value={emailInput}
+                        onChange={(e) => {
+                          setEmailInput(e.target.value);
+                          setError(null);
+                        }}
+                        disabled={isLoading}
+                        autoFocus
+                        className="rounded-2xl pr-10 text-left font-sans text-sm shadow-sm"
+                      />
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-muted-foreground">
+                      سنرسل لك رمز تحقق إلى بريدك الإلكتروني لتسجيل الدخول فوراً.
+                    </p>
+                  </div>
+                )}
+
+                {error && (
+                  <div className="rounded-xl border border-red-200 bg-red-50/80 p-3 text-right text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300">
+                    {error}
+                  </div>
+                )}
+
+                <Button
+                  type="submit"
+                  disabled={isLoading}
+                  className="clay-btn h-12 w-full rounded-2xl text-base font-bold shadow-md"
+                >
+                  {isLoading ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="size-5 animate-spin" />
+                      جارٍ إرسال رمز التحقق...
+                    </span>
+                  ) : (
+                    <span className="flex items-center justify-center gap-2">
+                      <span>إرسال رمز التحقق</span>
+                      <ArrowRight className="size-4 rotate-180" />
+                    </span>
                   )}
-                  
-                  <div className="mt-4">
-                    <div className="relative">
-                      <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t" />
-                      </div>
-                      <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-background px-2 text-muted-foreground">
-                          أو
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full mt-4"
-                      onClick={handleGuestLogin}
-                      disabled={isLoading}
-                    >
-                      <UserX className="mr-2 h-4 w-4" />
-                      المتابعة كضيف
-                    </Button>
+                </Button>
 
-                    <div className="mt-4 text-center">
-                      <Link
-                        to="/auth?owner=1"
-                        className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-[var(--clay-accent)] hover:underline"
-                      >
-                        <KeyRound className="h-3 w-3" />
-                        تسجيل دخول مالك عقار
-                      </Link>
-                    </div>
-                  </div>
-                </CardContent>
+                {/* شارة حفظ تسجيل الدخول لـ 30 يوماً */}
+                <div className="flex items-center justify-center gap-2 rounded-xl bg-muted/40 p-2.5 text-center text-[11px] text-muted-foreground">
+                  <ShieldCheck className="size-4 shrink-0 text-emerald-600" />
+                  <span>
+                    يبقى تسجيل دخولك محفوظاً ومفعل لمدة <strong>30 يوماً</strong> لراحتك وتوفير وقتك.
+                  </span>
+                </div>
               </form>
-            </>
-          ) : (
-            <>
-              <CardHeader className="text-center mt-4">
-                <CardTitle>تحقق من بريدك الإلكتروني</CardTitle>
-                <CardDescription>
-                  أرسلنا رمز التحقق إلى {step.email}
-                </CardDescription>
-              </CardHeader>
-              <form onSubmit={handleOtpSubmit}>
-                <CardContent className="pb-4">
-                  <input type="hidden" name="email" value={step.email} />
-                  <input type="hidden" name="code" value={otp} />
+            )}
 
-                  <div className="flex justify-center">
+            {/* ── الخطوة الثانية: إدخال رمز التحقق (OTP) ── */}
+            {step === "otp" && (
+              <div className="space-y-5">
+                <div className="rounded-2xl border border-amber-500/20 bg-amber-50/50 p-4 text-center dark:bg-amber-950/20">
+                  <div className="mx-auto mb-2 flex size-10 items-center justify-center rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300">
+                    {method === "phone" ? (
+                      <Phone className="size-5" />
+                    ) : (
+                      <Mail className="size-5" />
+                    )}
+                  </div>
+                  <h3 className="text-sm font-bold text-foreground">
+                    {method === "phone"
+                      ? "أرسلنا رمز التحقق في رسالة نصية (SMS)"
+                      : "أرسلنا رمز التحقق إلى بريدك الإلكتروني"}
+                  </h3>
+                  <p
+                    dir="ltr"
+                    className="mt-1 font-mono text-sm font-bold text-[var(--clay-accent)]"
+                  >
+                    {method === "phone"
+                      ? formatPhoneDisplay(activeIdentifier)
+                      : activeIdentifier}
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <label className="block text-center text-xs font-medium text-muted-foreground">
+                    أدخل الرمز المكون من 6 أرقام
+                  </label>
+
+                  <div className="flex justify-center" dir="ltr">
                     <InputOTP
                       value={otp}
-                      onChange={setOtp}
-                      maxLength={6}
-                      disabled={isLoading}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && otp.length === 6 && !isLoading) {
-                          // Find the closest form and submit it
-                          const form = (e.target as HTMLElement).closest("form");
-                          if (form) {
-                            form.requestSubmit();
-                          }
+                      onChange={(val) => {
+                        setOtp(val);
+                        setError(null);
+                        if (val.length === 6 && !isLoading) {
+                          handleVerifyOtp(val);
                         }
                       }}
+                      maxLength={6}
+                      disabled={isLoading}
+                      autoFocus
                     >
-                      <InputOTPGroup>
+                      <InputOTPGroup className="gap-2">
                         {Array.from({ length: 6 }).map((_, index) => (
-                          <InputOTPSlot key={index} index={index} />
+                          <InputOTPSlot
+                            key={index}
+                            index={index}
+                            className="h-12 w-10 rounded-xl border border-input bg-background text-lg font-bold shadow-sm sm:w-12"
+                          />
                         ))}
                       </InputOTPGroup>
                     </InputOTP>
                   </div>
+
                   {error && (
-                    <p className="mt-2 text-sm text-red-500 text-center">
+                    <div className="rounded-xl border border-red-200 bg-red-50/80 p-3 text-center text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300">
                       {error}
-                    </p>
+                    </div>
                   )}
-                  <p className="text-sm text-muted-foreground text-center mt-4">
-                      لم يصلك الرمز؟{" "}
-                      <Button
-                        type="button"
-                        variant="link"
-                        className="h-auto p-0"
-                        onClick={() => setStep("signIn")}
-                      >
-                        أعد المحاولة
-                      </Button>
-                  </p>
-                </CardContent>
-                <CardFooter className="flex-col gap-2">
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={isLoading || otp.length !== 6}
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        جاري التحقق...
-                      </>
-                    ) : (
-                      <>
-                        تحقق من الرمز
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </>
-                    )}
-                  </Button>
+
                   <Button
                     type="button"
-                    variant="ghost"
-                    onClick={() => setStep("signIn")}
-                    disabled={isLoading}
-                    className="w-full"
+                    onClick={() => handleVerifyOtp()}
+                    disabled={isLoading || otp.length !== 6}
+                    className="clay-btn h-12 w-full rounded-2xl text-base font-bold shadow-md"
                   >
-                    استخدام بريد مختلف
+                    {isLoading ? (
+                      <span className="flex items-center gap-2">
+                        <Loader2 className="size-5 animate-spin" />
+                        جارٍ التحقق...
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <CheckCircle2 className="size-5" />
+                        تأكيد والدخول
+                      </span>
+                    )}
                   </Button>
-                </CardFooter>
-              </form>
-            </>
-          )}
+                </div>
 
-            <div className="rounded-b-lg border-t bg-muted px-6 py-4 text-center text-xs text-muted-foreground">
-            محمي بواسطة{" "}
-            <a
-              href="https://freebuff.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline hover:text-primary transition-colors"
-            >
-              freebuff.com
-            </a>
-          </div>
+                <div className="flex flex-col items-center gap-2 pt-1 text-center text-xs text-muted-foreground">
+                  {resendCooldown > 0 ? (
+                    <p className="text-muted-foreground">
+                      يمكنك إعادة طلب الرمز بعد{" "}
+                      <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
+                        ({resendCooldown} ثانية)
+                      </span>
+                    </p>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleSendCode()}
+                      disabled={isLoading}
+                      className="inline-flex items-center gap-1.5 font-bold text-[var(--clay-accent)] hover:underline"
+                    >
+                      <RefreshCw className="size-3.5" />
+                      إعادة إرسال رمز التحقق الآن
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStep("input");
+                      setOtp("");
+                      setError(null);
+                    }}
+                    className="mt-2 text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                  >
+                    {method === "phone"
+                      ? "تغيير رقم الجوال"
+                      : "تغيير البريد الإلكتروني"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* فاصل */}
+            {step === "input" && (
+              <div className="pt-2">
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-border" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-3 text-muted-foreground">أو</span>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-col gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 w-full rounded-2xl text-sm font-medium hover:bg-muted"
+                    onClick={handleGuestLogin}
+                    disabled={isLoading}
+                  >
+                    <UserX className="ml-2 size-4 text-muted-foreground" />
+                    المتابعة كزائر سريع (تصفح واستكشاف)
+                  </Button>
+
+                  <div className="mt-2 text-center">
+                    <Link
+                      to={ownerMode ? "/auth" : "/auth?owner=1"}
+                      className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-[var(--clay-accent)]"
+                    >
+                      <KeyRound className="size-3.5" />
+                      {ownerMode
+                        ? "الدخول كنزيل / زائر عادي"
+                        : "هل أنت مالك شقة؟ تسجيل دخول المالكين"}
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
         </Card>
-        </div>
-      </div>
-    </div>
-  );
-}
 
-export default function AuthPage(props: AuthProps) {
-  return (
-    <Suspense>
-      <Auth {...props} />
-    </Suspense>
+        {/* تذييل الصفحة بالأمان والخصوصية */}
+        <p className="mt-6 flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
+          <Lock className="size-3.5 text-emerald-600" />
+          <span>بياناتك ومصادقتك محمية بأحدث معايير التشفير والأمان.</span>
+        </p>
+      </div>
+    </main>
   );
 }

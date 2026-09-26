@@ -29,6 +29,8 @@ const schema = defineSchema(
       image: v.optional(v.string()), // image of the user. do not remove
       email: v.optional(v.string()), // email of the user. do not remove
       emailVerificationTime: v.optional(v.number()), // email verification time. do not remove
+      phone: v.optional(v.string()), // phone of the user
+      phoneVerificationTime: v.optional(v.number()), // phone verification time
       isAnonymous: v.optional(v.boolean()), // is the user anonymous. do not remove
 
       role: v.optional(roleValidator), // role of the user. do not remove
@@ -36,7 +38,9 @@ const schema = defineSchema(
       // تعطيل الحساب من الأدمن
       isDisabled: v.optional(v.boolean()),
       disabledReason: v.optional(v.string()),
-    }).index("email", ["email"]), // index for the email. do not remove or modify
+    })
+      .index("email", ["email"])
+      .index("phone", ["phone"]), // index for email and phone
 
     // Apartments / Listings
     apartments: defineTable({
