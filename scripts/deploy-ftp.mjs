@@ -70,14 +70,27 @@ async function main() {
   const client = new ftp.Client(60_000);
   try {
     console.log(`🔌 الاتصال بـ ${FTP_HOST}:${FTP_PORT} ...`);
-    await client.access({
-      host: FTP_HOST,
-      user: FTP_USER,
-      password: FTP_PASS,
-      port: FTP_PORT,
-      secure: false, // FTP عادي على المنفذ 21 (FTPS الصريح متاح عند الحاجة)
-    });
-    console.log("✅ تم الاتصال");
+    try {
+      await client.access({
+        host: FTP_HOST,
+        user: FTP_USER,
+        password: FTP_PASS,
+        port: FTP_PORT,
+        secure: "explicit",
+        secureOptions: { rejectUnauthorized: false },
+      });
+      console.log("✅ تم الاتصال مشفّراً (FTPS Explicit)");
+    } catch (ftpsErr) {
+      console.warn("⚠️ تعذر الاتصال المشفّر، محاولة الاتصال العادي...", ftpsErr.message);
+      await client.access({
+        host: FTP_HOST,
+        user: FTP_USER,
+        password: FTP_PASS,
+        port: FTP_PORT,
+        secure: false,
+      });
+      console.log("✅ تم الاتصال (FTP عادي)");
+    }
 
     // جذر FTP هو جذر الموقع مباشرة (cgi-bin + index.html الافتراضي)
     const dest = "/";
