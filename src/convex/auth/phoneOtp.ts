@@ -47,15 +47,16 @@ export const phoneOtp = {
     },
     ctx: any,
   ) {
-    const apiKey =
-      process.env.INFOBIP_API_KEY ||
-      "e7923b67d7307866885e643173c76eaf-08b56421-648d-44a2-955a-9fe6d95e27e8";
-    const rawBaseUrl =
-      process.env.INFOBIP_BASE_URL || "https://55nw9j.api.infobip.com";
+    const apiKey = process.env.INFOBIP_API_KEY;
+    const rawBaseUrl = process.env.INFOBIP_BASE_URL || "https://55nw9j.api.infobip.com";
     const baseUrl = rawBaseUrl.startsWith("http")
       ? rawBaseUrl
       : `https://${rawBaseUrl}`;
     const sender = process.env.INFOBIP_SENDER || "AlulaStays";
+
+    if (!apiKey) {
+      console.warn("[phoneOtp] INFOBIP_API_KEY is not defined in environment variables");
+    }
 
     const destination = formatPhoneForInfobip(phone);
     const messageText = `رمز الدخول إلى منصة شقق العلا: ${token}\nينتهي خلال 10 دقائق. لا تشارك الرمز مع أي شخص.`;
