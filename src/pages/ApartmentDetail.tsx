@@ -19,6 +19,12 @@ import {
   CheckCircle,
   Trophy,
   Heart,
+  Share2,
+  Shield,
+  ShieldCheck,
+  Copy,
+  ExternalLink,
+  Check,
   Sparkles,
   ArrowRight,
   Calendar,
@@ -166,12 +172,37 @@ export default function ApartmentDetail() {
   const [redirectingToPayment, setRedirectingToPayment] = useState(false);
   const [createdBookingId, setCreatedBookingId] = useState<Id<"bookings"> | null>(null);
 
-  // Review form
-  const [showReviewForm, setShowReviewForm] = useState(false);
-  const [reviewRating, setReviewRating] = useState(5);
-  const [reviewComment, setReviewComment] = useState("");
-  const [reviewLoading, setReviewLoading] = useState(false);
-  const [reviewError, setReviewError] = useState<string | null>(null);
+  // Share modal state
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const handleShare = async () => {
+    if (!apartment) return;
+    const shareTitle = getApartmentTitle(apartment);
+    const shareUrl = window.location.href;
+    const shareText = `استكشف هذه الإقامة الفاخرة في العلا: ${shareTitle} على منصة شقق العلا: ${shareUrl}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: shareTitle,
+          text: shareText,
+          url: shareUrl,
+        });
+        return;
+      } catch {
+        // User cancelled or unsupported
+      }
+    }
+    setShowShareModal(true);
+  };
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(window.location.href);
+    setCopiedLink(true);
+    toast.success("تم نسخ رابط الشقة بنجاح!");
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
 
   // تفصيل التسعير الحقيقي: أسعار نهاية الأسبوع + الحد الأدنى للليالي
   const stayBreakdown =
@@ -374,6 +405,15 @@ export default function ApartmentDetail() {
                   ))}
                 </div>
               )}
+              {/* Share button */}
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); void handleShare(); }}
+                className="absolute right-16 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-gray-700 shadow-lg backdrop-blur-sm transition-transform hover:scale-110 hover:text-[var(--clay-accent)]"
+                aria-label="مشاركة الشقة"
+              >
+                <Share2 className="h-5 w-5" aria-hidden="true" />
+              </button>
               {/* Favorite button */}
               <button
                 onClick={(e) => { e.stopPropagation(); void handleFavorite(); }}
@@ -449,6 +489,12 @@ export default function ApartmentDetail() {
                       {apartment.isVerified && (
                         <span className="flex items-center gap-1 text-emerald-600 text-xs font-medium">
                           <CheckCircle className="w-3.5 h-3.5" />موثقة
+                        </span>
+                      )}
+                      {apartment.tourismLicenseNumber && (
+                        <span className="flex items-center gap-1.5 text-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 px-2.5 py-0.5 rounded-full text-xs font-semibold shadow-xs">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>ترخيص السياحة: {apartment.tourismLicenseNumber}</span>
                         </span>
                       )}
                     </div>
@@ -546,6 +592,88 @@ export default function ApartmentDetail() {
                 </div>
               </motion.div>
             )}
+
+            {/* سياسة الإلغاء */}
+            <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={5.2}>
+              <div className="clay p-6 space-y-3">
+                <h2 className="text-lg font-bold text-[var(--foreground)] flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-[var(--clay-accent)]" />
+                  سياسة الإلغاء والاسترداد
+                </h2>
+                {(() => {
+                  const policy = (apartment as { cancellationPolicy?: string }).cancellationPolicy || "flexible";
+                  if (policy === "strict") {
+                    return (
+                      <div className="space-y-1.5 text-sm text-[var(--muted-foreground)]">
+                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900 mb-1">
+                          سياسة صارمة
+                        </span>
+                        <p>• استرداد 50% من إجمالي المبلغ في حال الإلغاء قبل 7 أيام على الأقل من موعد تسجيل الوصول.</p>
+                        <p>• لا يوجد استرداد في حال الإلغاء قبل أقل من 7 أيام أو في حال عدم الحضور.</p>
+                      </div>
+                    );
+                  }
+                  if (policy === "moderate") {
+                    return (
+                      <div className="space-y-1.5 text-sm text-[var(--muted-foreground)]">
+                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900 mb-1">
+                          سياسة متوسطة
+                        </span>
+                        <p>• إلغاء مجاني واسترداد كامل للمبلغ حتى 5 أيام قبل موعد تسجيل الوصول.</p>
+                        <p>• استرداد 50% من قيمة الإقامة في حال الإلغاء بعد ذلك وحتى 48 ساعة قبل موعد الوصول.</p>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="space-y-1.5 text-sm text-[var(--muted-foreground)]">
+                      <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900 mb-1">
+                        سياسة مرنة ومريحة
+                      </span>
+                      <p>• إلغاء مجاني واسترداد كامل للمبلغ حتى 48 ساعة قبل موعد تسجيل الوصول.</p>
+                      <p>• في حال الإلغاء بعد 48 ساعة، يتم خصم قيمة الليلة الأولى فقط واسترداد بقية الليالي.</p>
+                    </div>
+                  );
+                })()}
+              </div>
+            </motion.div>
+
+            {/* خريطة الموقع والاتجاهات */}
+            {(() => {
+              const lat = (apartment as { latitude?: number }).latitude ?? 26.62;
+              const lng = (apartment as { longitude?: number }).longitude ?? 37.92;
+              return (
+                <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={5.4}>
+                  <div className="clay p-6 space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h2 className="text-lg font-bold text-[var(--foreground)] flex items-center gap-2">
+                          <MapPin className="w-5 h-5 text-[var(--clay-accent)]" />
+                          موقع الإقامة على الخريطة
+                        </h2>
+                        <p className="text-xs text-[var(--muted-foreground)] mt-0.5">{getApartmentLocation(apartment)} • العلا، المملكة العربية السعودية</p>
+                      </div>
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="clay-btn text-xs px-3.5 py-2 inline-flex items-center gap-1.5 transition-all hover:scale-105"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        الاتجاهات في خرائط Google
+                      </a>
+                    </div>
+                    <div className="relative aspect-[16/9] md:aspect-[21/9] w-full rounded-2xl overflow-hidden border border-[var(--border)] shadow-inner">
+                      <iframe
+                        title="موقع الشقة في العلا"
+                        src={`https://www.openstreetmap.org/export/embed.html?bbox=${lng - 0.015}%2C${lat - 0.015}%2C${lng + 0.015}%2C${lat + 0.015}&layer=mapnik&marker=${lat}%2C${lng}`}
+                        className="w-full h-full border-0"
+                        loading="lazy"
+                      />
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })()}
 
             {/* Reviews Section */}
             <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={6}>
@@ -830,6 +958,86 @@ export default function ApartmentDetail() {
                 <img src={img} alt={`${getApartmentTitle(apartment)} - صورة ${i + 1}`} className="h-full w-full object-cover" />
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Share Modal */}
+      {showShareModal && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setShowShareModal(false)}
+        >
+          <div
+            className="clay p-6 w-full max-w-md bg-[var(--background)] space-y-5 rounded-2xl relative shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+            dir="rtl"
+          >
+            <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
+              <h3 className="text-lg font-bold text-[var(--foreground)] flex items-center gap-2">
+                <Share2 className="w-5 h-5 text-[var(--clay-accent)]" />
+                مشاركة هذه الشقة
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowShareModal(false)}
+                className="text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                aria-label="إغلاق نافذة المشاركة"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-sm text-[var(--muted-foreground)]">
+              شارك تفاصيل <span className="font-semibold text-[var(--foreground)]">{getApartmentTitle(apartment)}</span> مع عائلتك وأصدقائك:
+            </p>
+
+            <div className="grid grid-cols-1 gap-3">
+              {/* WhatsApp Share */}
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(
+                  `استكشف هذه الشقة الفاخرة في العلا:\n✨ ${getApartmentTitle(apartment)}\n📍 ${getApartmentLocation(apartment)}\n\nتفاصيل أكثر والحجز المباشر عبر منصة شقق العلا:\n${window.location.href}`
+                )}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-between px-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium transition-all shadow-sm"
+              >
+                <span className="flex items-center gap-2.5">
+                  <span className="text-lg">💬</span>
+                  مشاركة عبر واتساب (WhatsApp)
+                </span>
+                <ExternalLink className="w-4 h-4 opacity-80" />
+              </a>
+
+              {/* Twitter / X */}
+              <a
+                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
+                  `شقة فاخرة في العلا: ${getApartmentTitle(apartment)} - احجز الآن عبر شقق العلا:`
+                )}&url=${encodeURIComponent(window.location.href)}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-between px-4 py-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white font-medium transition-all shadow-sm"
+              >
+                <span className="flex items-center gap-2.5">
+                  <span className="text-base font-bold">𝕏</span>
+                  مشاركة عبر منصة X (تويتر)
+                </span>
+                <ExternalLink className="w-4 h-4 opacity-80" />
+              </a>
+
+              {/* Copy Link Button */}
+              <button
+                type="button"
+                onClick={handleCopyLink}
+                className="flex items-center justify-between px-4 py-3 rounded-xl clay-sm text-[var(--foreground)] font-medium transition-all hover:bg-[var(--clay-surface)]"
+              >
+                <span className="flex items-center gap-2.5">
+                  {copiedLink ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-[var(--clay-accent)]" />}
+                  {copiedLink ? "تم نسخ الرابط بنجاح!" : "نسخ رابط الشقة المباشر"}
+                </span>
+                <span className="text-xs text-[var(--muted-foreground)]">انقر للنسخ</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

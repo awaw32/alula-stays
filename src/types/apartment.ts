@@ -2,6 +2,8 @@ export type PropertyType = "apartment" | "chalet" | "villa" | "camp";
 
 export type ApartmentFormMode = "create" | "edit";
 
+export type CancellationPolicy = "flexible" | "moderate" | "strict";
+
 export interface ApartmentRecord {
   _id: string;
   title: string;
@@ -38,6 +40,10 @@ export interface ApartmentRecord {
   isVerified?: boolean;
   isFeatured?: boolean;
   badges?: string[];
+  tourismLicenseNumber?: string;
+  cancellationPolicy?: CancellationPolicy;
+  icalImportUrl?: string;
+  icalExportToken?: string;
 }
 
 export interface ApartmentFormValues {
@@ -70,4 +76,8 @@ export interface ApartmentFormValues {
   rules: string[];
   rulesAr: string[];
   available: boolean;
+  tourismLicenseNumber?: string;
+  cancellationPolicy?: CancellationPolicy;
+  icalImportUrl?: string;
 }
+

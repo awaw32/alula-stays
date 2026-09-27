@@ -40,6 +40,9 @@ const initialValues: ApartmentFormValues = {
   rules: [],
   rulesAr: [],
   available: true,
+  tourismLicenseNumber: "",
+  cancellationPolicy: "flexible",
+  icalImportUrl: "",
 };
 
 export default function AddApartment() {
@@ -90,6 +93,9 @@ export default function AddApartment() {
       amenities: values.amenities,
       rules: values.rules,
       rulesAr: values.rulesAr,
+      tourismLicenseNumber: values.tourismLicenseNumber || undefined,
+      cancellationPolicy: values.cancellationPolicy || undefined,
+      icalImportUrl: values.icalImportUrl || undefined,
     });
     toast.success("تم رفع الشقة — بانتظار مراجعة الإدارة");
     navigate("/owner");

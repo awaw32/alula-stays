@@ -13,6 +13,8 @@ import {
   Bed,
   ArrowUpDown,
   X,
+  LayoutGrid,
+  Map as MapIcon,
 } from "lucide-react";
 
 const fadeUp = {
@@ -60,6 +62,8 @@ export default function Apartments() {
   const [minPrice, setMinPrice] = useState<number | "">("");
   const [maxPrice, setMaxPrice] = useState<number | "">("");
   const [showFilters, setShowFilters] = useState(false);
+  const [viewMode, setViewMode] = useState<"grid" | "map">("grid");
+  const [activeMapApt, setActiveMapApt] = useState<ApartmentRecord | null>(null);
 
   const liveApartments = useQuery(
     api.apartments.list,
@@ -272,16 +276,48 @@ export default function Apartments() {
           </div>
         </motion.div>
 
-        {/* Results count */}
-        <div className="flex items-center justify-between mb-6">
+        {/* Results count & View toggle */}
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           <p className="text-sm text-[var(--muted-foreground)]">
             {apartments === undefined
               ? "جاري التحميل..."
-              : `${filteredApartments.length} شقة متاحة`}
+              : `${filteredApartments.length} شقة وإقامة متاحة في العلا`}
           </p>
+
+          <div className="flex items-center gap-1.5 clay-sm p-1">
+            <button
+              type="button"
+              onClick={() => setViewMode("grid")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                viewMode === "grid"
+                  ? "bg-[var(--clay-accent)] text-white shadow-xs"
+                  : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>شبكة</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setViewMode("map");
+                if (filteredApartments.length > 0 && !activeMapApt) {
+                  setActiveMapApt(filteredApartments[0] as ApartmentRecord);
+                }
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                viewMode === "map"
+                  ? "bg-[var(--clay-accent)] text-white shadow-xs"
+                  : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+              }`}
+            >
+              <MapIcon className="w-3.5 h-3.5" />
+              <span>خريطة العلا</span>
+            </button>
+          </div>
         </div>
 
-        {/* Apartment Grid */}
+        {/* Content View: Grid or Map */}
         {apartments === undefined ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -310,6 +346,57 @@ export default function Apartments() {
             <button onClick={clearFilters} className="clay-btn text-sm">
               مسح الفلاتر
             </button>
+          </div>
+        ) : viewMode === "map" ? (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Interactive Map */}
+            <div className="lg:col-span-8 clay overflow-hidden rounded-2xl min-h-[480px] h-[75vh] relative shadow-lg">
+              {(() => {
+                const targetLat = activeMapApt?.latitude ?? 26.62;
+                const targetLng = activeMapApt?.longitude ?? 37.92;
+                return (
+                  <iframe
+                    title="خريطة شقق وإقامات العلا"
+                    src={`https://www.openstreetmap.org/export/embed.html?bbox=${targetLng - 0.04}%2C${targetLat - 0.04}%2C${targetLng + 0.04}%2C${targetLat + 0.04}&layer=mapnik&marker=${targetLat}%2C${targetLng}`}
+                    className="w-full h-full border-0"
+                    loading="lazy"
+                  />
+                );
+              })()}
+              <div className="absolute top-4 right-4 bg-white/95 dark:bg-neutral-900/90 backdrop-blur-md px-3.5 py-2 rounded-xl shadow-md text-xs font-bold text-[var(--foreground)] flex items-center gap-1.5">
+                <MapPin className="w-4 h-4 text-[var(--clay-accent)]" />
+                <span>خريطة شقق وإقامات العلا</span>
+              </div>
+              {activeMapApt && (
+                <div className="absolute bottom-4 left-4 right-4 max-w-sm mx-auto bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md p-3 rounded-2xl shadow-xl border border-[var(--border)] flex items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-2">
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold truncate text-[var(--foreground)]">{activeMapApt.titleAr || activeMapApt.title}</p>
+                    <p className="text-[11px] text-[var(--clay-accent)] font-semibold">{activeMapApt.price} ر.س / ليلة</p>
+                  </div>
+                  <a
+                    href={`/apartment/${activeMapApt._id}`}
+                    className="clay-btn text-xs px-3 py-1.5 shrink-0"
+                  >
+                    عرض الشقة
+                  </a>
+                </div>
+              )}
+            </div>
+
+            {/* List beside Map */}
+            <div className="lg:col-span-4 h-[75vh] overflow-y-auto space-y-4 pr-1">
+              {filteredApartments.map((apt) => (
+                <div
+                  key={apt._id}
+                  onClick={() => setActiveMapApt(apt as ApartmentRecord)}
+                  className={`transition-all duration-200 cursor-pointer rounded-2xl ${
+                    activeMapApt?._id === apt._id ? "ring-2 ring-[var(--clay-accent)] scale-[1.01]" : "hover:opacity-95"
+                  }`}
+                >
+                  <ApartmentCard apartment={apt as ApartmentRecord} />
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

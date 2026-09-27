@@ -21,6 +21,7 @@ import {
   Maximize,
   Mountain,
   Plus,
+  Shield,
   Upload,
   Users,
   UtensilsCrossed,
@@ -287,6 +288,52 @@ export function ApartmentForm({ mode, initialValues, loading = false, disabled =
               {label}
             </label>
           ))}
+        </div>
+      </section>
+
+      <section className="clay space-y-4 p-6">
+        <h2 className="flex items-center gap-2 text-lg font-bold text-[var(--foreground)]">
+          <Shield className="h-5 w-5 text-emerald-600" aria-hidden="true" />
+          التوثيق والسياسات ومزامنة التقويم
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <Label htmlFor="tourismLicenseNumber">رقم ترخيص وزارة السياحة / وثيقة العمل الحر</Label>
+            <Input
+              id="tourismLicenseNumber"
+              value={form.tourismLicenseNumber || ""}
+              onChange={(event) => update("tourismLicenseNumber", event.target.value)}
+              placeholder="مثال: 730012345 أو وثيقة معتمدة"
+              className="clay-input mt-1 w-full"
+            />
+            <p className="text-[10px] text-[var(--muted-foreground)] mt-1">يمنح عقارك شارة "مرخص وموثق" الذهبية لزيادة ثقة الضيوف</p>
+          </div>
+          <div>
+            <Label htmlFor="cancellationPolicy">سياسة الإلغاء</Label>
+            <select
+              id="cancellationPolicy"
+              value={form.cancellationPolicy || "flexible"}
+              onChange={(event) => update("cancellationPolicy", event.target.value as any)}
+              className="clay-input mt-1 w-full"
+            >
+              <option value="flexible">مرنة (إلغاء مجاني حتى 48 ساعة قبل الوصول)</option>
+              <option value="moderate">متوسطة (إلغاء مجاني حتى 5 أيام قبل الوصول)</option>
+              <option value="strict">صارمة (استرداد 50% حتى 7 أيام قبل الوصول)</option>
+            </select>
+            <p className="text-[10px] text-[var(--muted-foreground)] mt-1">توضح للضيف شروط الاسترداد في حال الإلغاء</p>
+          </div>
+          <div>
+            <Label htmlFor="icalImportUrl">رابط تقويم Airbnb / Booking (iCal)</Label>
+            <Input
+              id="icalImportUrl"
+              type="url"
+              value={form.icalImportUrl || ""}
+              onChange={(event) => update("icalImportUrl", event.target.value)}
+              placeholder="https://www.airbnb.com/calendar/ical/..."
+              className="clay-input mt-1 w-full"
+            />
+            <p className="text-[10px] text-[var(--muted-foreground)] mt-1">لحظر الأيام المحجوزة على المنصات الأخرى تلقائياً</p>
+          </div>
         </div>
       </section>
 

@@ -107,22 +107,26 @@ export function ApartmentCard({ apartment }: ApartmentCardProps) {
         )}
 
         {/* Badges */}
-        {displayBadges.length > 0 && (
-          <div className="absolute top-3 left-3 flex gap-2">
-            {displayBadges.map((badge, i) => (
-              <span
-                key={i}
-                className={cn(
-                  "flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border backdrop-blur-sm",
-                  badge.color,
-                )}
-              >
-                <badge.icon className="w-3 h-3" />
-                {badge.label}
-              </span>
-            ))}
-          </div>
-        )}
+        <div className="absolute top-3 left-3 flex flex-wrap gap-1.5 max-w-[80%]">
+          {apartment.tourismLicenseNumber && (
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-700/90 text-white shadow-xs backdrop-blur-sm">
+              <CheckCircle className="w-2.5 h-2.5" />
+              مرخص سياحياً
+            </span>
+          )}
+          {displayBadges.map((badge, i) => (
+            <span
+              key={i}
+              className={cn(
+                "flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border backdrop-blur-sm",
+                badge.color,
+              )}
+            >
+              <badge.icon className="w-3 h-3" />
+              {badge.label}
+            </span>
+          ))}
+        </div>
 
         {/* Price overlay */}
         <div className="absolute bottom-3 right-3">

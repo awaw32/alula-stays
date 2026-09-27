@@ -41,6 +41,9 @@ function toFormValues(apartment: ApartmentRecord): ApartmentFormValues {
     rules: apartment.rules || [],
     rulesAr: apartment.rulesAr || [],
     available: apartment.available !== false,
+    tourismLicenseNumber: apartment.tourismLicenseNumber || "",
+    cancellationPolicy: apartment.cancellationPolicy || "flexible",
+    icalImportUrl: apartment.icalImportUrl || "",
   };
 }
 
@@ -93,6 +96,9 @@ export default function EditApartment() {
       rules: values.rules,
       rulesAr: values.rulesAr,
       available: values.available,
+      tourismLicenseNumber: values.tourismLicenseNumber || undefined,
+      cancellationPolicy: values.cancellationPolicy || undefined,
+      icalImportUrl: values.icalImportUrl || undefined,
     });
     toast.success("تم حفظ التغييرات بنجاح");
     navigate(`/apartment/${id}`);

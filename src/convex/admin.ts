@@ -130,6 +130,9 @@ export const createApartment = mutation({
     amenities: v.array(v.string()),
     rules: v.optional(v.array(v.string())),
     rulesAr: v.optional(v.array(v.string())),
+    tourismLicenseNumber: v.optional(v.string()),
+    cancellationPolicy: v.optional(v.union(v.literal("flexible"), v.literal("moderate"), v.literal("strict"))),
+    icalImportUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
@@ -214,6 +217,9 @@ export const updateApartment = mutation({
     smokingAllowed: v.optional(v.boolean()),
     elevator: v.optional(v.boolean()),
     wheelchairAccessible: v.optional(v.boolean()),
+    tourismLicenseNumber: v.optional(v.string()),
+    cancellationPolicy: v.optional(v.union(v.literal("flexible"), v.literal("moderate"), v.literal("strict"))),
+    icalImportUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     await requireApartmentOwner(ctx, args.apartmentId);

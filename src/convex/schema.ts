@@ -86,6 +86,16 @@ const schema = defineSchema(
       rulesAr: v.optional(v.array(v.string())),
       ownerId: v.optional(v.id("users")),
       available: v.optional(v.boolean()),
+      tourismLicenseNumber: v.optional(v.string()), // رقم ترخيص وزارة السياحة أو وثيقة العمل الحر
+      cancellationPolicy: v.optional(
+        v.union(
+          v.literal("flexible"),
+          v.literal("moderate"),
+          v.literal("strict"),
+        ),
+      ), // سياسة الإلغاء: مرنة | متوسطة | صارمة
+      icalImportUrl: v.optional(v.string()), // رابط مزامنة التقويم الخارجي (Airbnb / Booking)
+      icalExportToken: v.optional(v.string()), // رمز تصدير التقويم الخارجي
 
       // دورة حياة الشقة: بانتظار المراجعة → مقبولة/مرفوضة/تحتاج تعديلات → موقوفة
       status: v.optional(
