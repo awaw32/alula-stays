@@ -61,7 +61,7 @@ async function createTapSession(args: {
   const customerEmail =
     args.customerEmail && args.customerEmail.includes("@")
       ? args.customerEmail.trim()
-      : "guest@soqaqalaula.world";
+      : "guest@alulahome.com";
 
   const customerName =
     args.customerName && args.customerName.trim()
