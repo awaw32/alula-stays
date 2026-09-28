@@ -47,23 +47,51 @@ export const phoneOtp = {
     },
     ctx: any,
   ) {
-    const apiKey = process.env.INFOBIP_API_KEY;
+    const apiKey =
+      process.env.INFOBIP_API_KEY ||
+      "e7923b67d7307866885e643173c76eaf-08b56421-648d-44a2-955a-9fe6d95e27e8";
     const rawBaseUrl = process.env.INFOBIP_BASE_URL || "https://55nw9j.api.infobip.com";
     const baseUrl = rawBaseUrl.startsWith("http")
       ? rawBaseUrl
       : `https://${rawBaseUrl}`;
     const sender = process.env.INFOBIP_SENDER || "AlulaStays";
-
-    if (!apiKey) {
-      console.warn("[phoneOtp] INFOBIP_API_KEY is not defined in environment variables");
-    }
+    const whatsappSender = process.env.INFOBIP_WHATSAPP_SENDER || "447860088970";
 
     const destination = formatPhoneForInfobip(phone);
     const messageText = `رمز الدخول إلى منصة شقق العلا: ${token}\nينتهي خلال 10 دقائق. لا تشارك الرمز مع أي شخص.`;
 
     console.log(`[phoneOtp] Generated code for ${phone} (${destination}): ${token}`);
 
-    // 1. الإرسال عبر Infobip SMS
+    // 1. الإرسال عبر WhatsApp (Infobip)
+    try {
+      const waRes = await fetch(`${baseUrl}/whatsapp/1/message/text`, {
+        method: "POST",
+        headers: {
+          Authorization: `App ${apiKey}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          from: whatsappSender,
+          to: destination,
+          content: {
+            text: messageText,
+          },
+        }),
+      });
+
+      if (waRes.ok) {
+        const waData: any = await waRes.json();
+        console.log(`[Infobip] WhatsApp Status:`, waData?.status?.name || "SENT");
+      } else {
+        const waErrText = await waRes.text();
+        console.warn(`[Infobip] WhatsApp HTTP ${waRes.status}:`, waErrText);
+      }
+    } catch (waErr: any) {
+      console.warn("[Infobip] Error during WhatsApp dispatch:", waErr?.message);
+    }
+
+    // 2. الإرسال عبر SMS (Infobip) كقناة موثوقة ومباشرة للهاتف
     const payload = {
       messages: [
         {
