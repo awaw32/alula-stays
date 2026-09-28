@@ -50,9 +50,17 @@ const HTACCESS = `# React Router SPA fallback
   AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json image/svg+xml
 </IfModule>
 
+# منع التخزين المؤقت لملفات HTML لضمان تحميل التحديثات فوراً
+<IfModule mod_headers.c>
+  <FilesMatch "\\.(html|htm)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires 0
+  </FilesMatch>
+</IfModule>
+
 # تخزين مؤقت للأصول (hashed filenames)
 <IfModule mod_expires.c>
-  ExpiresActive On
   ExpiresActive On
   ExpiresByType text/css "access plus 1 year"
   ExpiresByType application/javascript "access plus 1 year"
@@ -60,6 +68,8 @@ const HTACCESS = `# React Router SPA fallback
   ExpiresByType text/html "access plus 0 seconds"
 </IfModule>
 `;
+
+const FTP_SECURE = env.FTP_SECURE === "explicit" ? "explicit" : false;
 
 async function main() {
   if (!fs.existsSync(path.join(LOCAL_DIR, "index.html"))) {
@@ -69,28 +79,16 @@ async function main() {
 
   const client = new ftp.Client(60_000);
   try {
-    console.log(`🔌 الاتصال بـ ${FTP_HOST}:${FTP_PORT} ...`);
-    try {
-      await client.access({
-        host: FTP_HOST,
-        user: FTP_USER,
-        password: FTP_PASS,
-        port: FTP_PORT,
-        secure: "explicit",
-        secureOptions: { rejectUnauthorized: false },
-      });
-      console.log("✅ تم الاتصال مشفّراً (FTPS Explicit)");
-    } catch (ftpsErr) {
-      console.warn("⚠️ تعذر الاتصال المشفّر، محاولة الاتصال العادي...", ftpsErr.message);
-      await client.access({
-        host: FTP_HOST,
-        user: FTP_USER,
-        password: FTP_PASS,
-        port: FTP_PORT,
-        secure: false,
-      });
-      console.log("✅ تم الاتصال (FTP عادي)");
-    }
+    console.log(`🔌 الاتصال بـ ${FTP_HOST}:${FTP_PORT} (secure: ${FTP_SECURE}) ...`);
+    await client.access({
+      host: FTP_HOST,
+      user: FTP_USER,
+      password: FTP_PASS,
+      port: FTP_PORT,
+      secure: FTP_SECURE,
+      secureOptions: { rejectUnauthorized: false },
+    });
+    console.log("✅ تم الاتصال بنجاح");
 
     // جذر FTP هو جذر الموقع مباشرة (cgi-bin + index.html الافتراضي)
     const dest = "/";
