@@ -117,7 +117,7 @@ export default function AddApartment() {
             للمستأجرين. ستظهر بحالة "بانتظار المراجعة" في لوحة المالك حتى تُعتمد.
           </span>
         </div>
-        <ApartmentForm mode="create" initialValues={initialValues} onSubmit={handleSubmit} disabled={upgrading} />
+        <ApartmentForm mode="create" initialValues={initialValues} onSubmit={handleSubmit} />
       </main>
     </div>
   );
