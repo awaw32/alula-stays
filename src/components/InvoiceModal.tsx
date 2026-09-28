@@ -67,9 +67,11 @@ export function InvoiceModal({ open, onOpenChange, invoice }: InvoiceModalProps)
           <div className="flex justify-between items-start border-b border-zinc-200 dark:border-zinc-800 pb-6 mb-6">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[var(--clay-accent)] to-[var(--clay-gold)] flex items-center justify-center text-white font-bold text-sm">
-                  عُ
-                </div>
+                <img
+                  src="/logo-icon.png"
+                  alt="شقق العلا"
+                  className="h-8 w-auto object-contain"
+                />
                 <h2 className="text-xl font-bold tracking-tight text-[var(--foreground)]">شقق العلا</h2>
               </div>
               <p className="text-xs text-zinc-500">منصة حجز الشقق والوحدات السكنية في العلا</p>

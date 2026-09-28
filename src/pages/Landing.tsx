@@ -163,9 +163,11 @@ export default function Landing() {
               transition={{ duration: 0.6 }}
               className="flex items-center gap-3 mb-3 bg-black/30 backdrop-blur-md px-5 py-2 rounded-full border border-white/20"
             >
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--clay-accent)] to-[var(--clay-gold)] flex items-center justify-center shadow-md">
-                <span className="text-white font-black text-sm">عُ</span>
-              </div>
+              <img
+                src="/logo-icon.png"
+                alt="شقق العلا"
+                className="w-7 h-7 object-contain drop-shadow"
+              />
               <span className="text-white font-bold text-sm tracking-wide">
                 منصة شقق وإقامات العلا المعتمدة
               </span>
@@ -467,9 +469,11 @@ export default function Landing() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div>
               <div className="flex items-center gap-2.5 mb-4">
-                <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-[var(--clay-accent)] to-[var(--clay-gold)] flex items-center justify-center shadow-md">
-                  <span className="text-white font-bold text-sm">عُ</span>
-                </div>
+                <img
+                  src="/logo-icon.png"
+                  alt="شقق العلا"
+                  className="h-10 w-auto object-contain"
+                />
                 <div>
                   <span className="font-bold text-lg text-neutral-900 dark:text-neutral-100">
                     شقق العلا

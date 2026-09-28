@@ -238,9 +238,11 @@ export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
           <CardHeader className="flex flex-col items-center pb-3 pt-6 text-center">
             {/* Centered Brand Mark */}
             <div className="mb-4 flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[var(--clay-accent)] to-[var(--clay-gold)] flex items-center justify-center shadow-md">
-                <span className="text-white font-black text-base">عُ</span>
-              </div>
+              <img
+                src="/logo-icon.png"
+                alt="شقق العلا"
+                className="h-12 w-auto object-contain"
+              />
               <span className="font-black text-2xl tracking-tight text-neutral-900 dark:text-neutral-100">
                 شقق العلا
               </span>

@@ -111,9 +111,11 @@ export function Navigation() {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
           {/* Logo */}
           <Link to="/" className="group flex items-center gap-2.5" aria-label="الرئيسية">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--clay-accent)] to-[var(--clay-gold)] shadow-md transition-transform group-hover:scale-105">
-              <span className="text-base font-black text-white">عُ</span>
-            </div>
+            <img
+              src="/logo-icon.png"
+              alt="شقق العلا"
+              className="h-10 w-auto object-contain transition-transform group-hover:scale-105 drop-shadow-xs"
+            />
             <div>
               <span className="text-lg font-black tracking-tight text-neutral-900 dark:text-neutral-100">
                 شقق العلا
@@ -229,12 +231,14 @@ export function Navigation() {
               </Link>
 
               <div className="flex items-center gap-2">
+                <img
+                  src="/logo-icon.png"
+                  alt="شقق العلا"
+                  className="h-7 w-auto object-contain"
+                />
                 <span className="font-black text-base text-neutral-900 dark:text-neutral-100">
                   شقق العلا
                 </span>
-                <div className="w-7 h-7 rounded-xl bg-[var(--clay-accent)] flex items-center justify-center text-white text-xs font-black">
-                  عُ
-                </div>
               </div>
 
               <button

@@ -12,10 +12,22 @@
   "theme_color": "#C2694F",
   "icons": [
     {
-      "src": "./logo.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "./favicon.png",
+      "sizes": "64x64",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./logo-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "./logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }
