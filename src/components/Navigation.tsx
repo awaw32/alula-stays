@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router";
+import { NotificationBell } from "./NotificationBell";
 
 const navLinks = [
   { href: "/", label: "الرئيسية", icon: Home, requiresAuth: false },
@@ -169,8 +170,8 @@ export function Navigation() {
             )}
           </nav>
 
-          {/* Right Header Actions: Host Gateway & User Account */}
-          <div className="flex items-center gap-2.5">
+          {/* Right Header Actions: Host Gateway, Notification Bell & User Account */}
+          <div className="flex items-center gap-2">
             {/* بوابة المضيفين (Host CTA on Desktop) */}
             <Link
               to="/owner"
@@ -179,6 +180,9 @@ export function Navigation() {
               <RotateCcw className="w-3.5 h-3.5" />
               <span>بوابة المضيفين</span>
             </Link>
+
+            {/* Notification Bell */}
+            {isAuthenticated && <NotificationBell />}
 
             {/* User Account Button */}
             <Link

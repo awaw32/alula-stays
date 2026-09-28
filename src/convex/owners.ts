@@ -162,6 +162,23 @@ export const submitOwnerApplication = mutation({
       createdAt: Date.now(),
     });
 
+    // 5. إشعار فوري لجميع مديري المنصة (Admins) لمراجعة واعتماد طلب المالك
+    const admins = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("role"), "admin"))
+      .collect();
+    for (const admin of admins) {
+      await ctx.db.insert("notifications", {
+        userId: admin._id,
+        type: "owner_request_pending",
+        title: "📋 طلب انضمام مالك جديد",
+        message: `قدم ${args.fullName.trim()} (${args.phone.trim()}) طلباً للانضمام كمالك عقار في العلا (${args.city.trim()}) — بانتظار اعتمادك`,
+        actionUrl: "/admin",
+        read: false,
+        createdAt: Date.now(),
+      });
+    }
+
     return {
       status: "pending",
       message: "تم رفع بياناتك للإدارة بنجاح وسيتم قبول وتفعيل حسابك بأقرب وقت!",

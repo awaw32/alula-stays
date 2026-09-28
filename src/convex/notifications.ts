@@ -1,10 +1,6 @@
-/**
- * نظام الإشعارات الفوري
- * إشعارات حقيقية للمستخدمين عند حدث معين
- */
-
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { getAuthUserId } from "@convex-dev/auth/server";
 
 const NOTIFICATION_TYPES = {
   BOOKING_CONFIRMED: "booking_confirmed",
@@ -47,7 +43,7 @@ export const create = mutation({
 });
 
 /**
- * الحصول على إشعارات المستخدم
+ * الحصول على إشعارات المستخدم الحالي (سواء سجل بالهاتف أو البريد)
  */
 export const getUserNotifications = query({
   args: {
@@ -55,36 +51,21 @@ export const getUserNotifications = query({
     skip: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("يجب تسجيل الدخول");
-    }
-
-    const limit = args.limit || 20;
-    const skip = args.skip || 0;
-
-    // البحث عن المستخدم عبر بريد الهوية الحالية
-    const email = identity.email ?? identity.subject;
-    const user = email
-      ? await ctx.db
-          .query("users")
-          .withIndex("email", (q) => q.eq("email", email))
-          .unique()
-      : null;
-
-    if (!user) {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
       return [];
     }
 
-    // جلب إشعارات المستخدم
+    const limit = args.limit || 25;
+    const skip = args.skip || 0;
+
     const all = await ctx.db
       .query("notifications")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .order("desc")
       .collect();
-    const notifications = all.slice(skip, skip + limit);
 
-    return notifications;
+    return all.slice(skip, skip + limit);
   },
 });
 
@@ -93,26 +74,14 @@ export const getUserNotifications = query({
  */
 export const getUnreadCount = query({
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      return 0;
-    }
-
-    const email = identity.email ?? identity.subject;
-    const user = email
-      ? await ctx.db
-          .query("users")
-          .withIndex("email", (q) => q.eq("email", email))
-          .unique()
-      : null;
-
-    if (!user) {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
       return 0;
     }
 
     const unreadNotifications = await ctx.db
       .query("notifications")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .filter((q) => q.eq(q.field("read"), false))
       .collect();
 
@@ -144,30 +113,18 @@ export const markAsRead = mutation({
 });
 
 /**
- * تحديد جميع الإشعارات كمقروءة
+ * تحديد جميع الإشعارات كمقروءة للمستخدم الحالي
  */
 export const markAllAsRead = mutation({
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
       throw new Error("يجب تسجيل الدخول");
-    }
-
-    const email = identity.email ?? identity.subject;
-    const user = email
-      ? await ctx.db
-          .query("users")
-          .withIndex("email", (q) => q.eq("email", email))
-          .unique()
-      : null;
-
-    if (!user) {
-      throw new Error("المستخدم غير موجود");
     }
 
     const notifications = await ctx.db
       .query("notifications")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
 
     for (const notification of notifications) {
@@ -179,7 +136,7 @@ export const markAllAsRead = mutation({
       }
     }
 
-    return `تم تحديد ${notifications.length} إشعار`;
+    return `تم تحديد ${notifications.length} إشعار كمقروء`;
   },
 });
 
@@ -201,26 +158,14 @@ export const deleteNotification = mutation({
  */
 export const clearReadNotifications = mutation({
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
       throw new Error("يجب تسجيل الدخول");
-    }
-
-    const email = identity.email ?? identity.subject;
-    const user = email
-      ? await ctx.db
-          .query("users")
-          .withIndex("email", (q) => q.eq("email", email))
-          .unique()
-      : null;
-
-    if (!user) {
-      throw new Error("المستخدم غير موجود");
     }
 
     const notifications = await ctx.db
       .query("notifications")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .filter((q) => q.eq(q.field("read"), true))
       .collect();
 

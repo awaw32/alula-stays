@@ -349,6 +349,27 @@ export const create = mutation({
         });
       }
 
+      // إشعار فوري لجميع مديري المنصة (Admins)
+      const admins = await ctx.db
+        .query("users")
+        .filter((q) => q.eq(q.field("role"), "admin"))
+        .collect();
+      for (const admin of admins) {
+        if (admin._id !== apartment.ownerId) {
+          await ctx.db.insert("notifications", {
+            userId: admin._id,
+            type: "booking_created",
+            title: "🛎️ طلب حجز جديد في المنصة",
+            message: `حجز جديد لشقة "${apartment.titleAr || apartment.title}" من ${user.name || "ضيف"} بمبلغ ${totalPrice.toLocaleString()} ر.س (فاتورة #${invoiceNumber})`,
+            relatedBookingId: bookingId,
+            relatedApartmentId: args.apartmentId,
+            actionUrl: "/admin",
+            read: false,
+            createdAt: Date.now(),
+          });
+        }
+      }
+
       return { bookingId, totalPrice, platformFee, totalNights };
     } catch (error) {
       if (error instanceof ConvexError) {
@@ -624,6 +645,27 @@ export const markPaid = internalMutation({
           read: false,
           createdAt: now,
         });
+      }
+
+      // إشعار فوري لجميع مديري المنصة (Admins) بسداد الحجز
+      const admins = await ctx.db
+        .query("users")
+        .filter((q) => q.eq(q.field("role"), "admin"))
+        .collect();
+      for (const admin of admins) {
+        if (admin._id !== apartment?.ownerId) {
+          await ctx.db.insert("notifications", {
+            userId: admin._id,
+            type: "booking_paid",
+            title: "💰 حجز مؤكد ومسدد في المنصة!",
+            message: `تم سداد حجز شقة "${apartment?.titleAr || apartment?.title || "العلا"}" بنجاح بمبلغ ${updatedBooking.totalPrice.toLocaleString()} ر.س (فاتورة #${invoiceNum})`,
+            relatedBookingId: args.bookingId,
+            relatedApartmentId: updatedBooking.apartmentId,
+            actionUrl: "/admin",
+            read: false,
+            createdAt: now,
+          });
+        }
       }
     }
 

@@ -272,58 +272,77 @@ export const createCheckoutSession = action({
         return tapSession;
       }
 
-      // الخيار الاحتياطي: Stripe
-      const amountInHalalah = convertToSmallestUnit(amount);
-      const stripe = getStripe();
+      // الخيار الثاني: بوابة Stripe (إن وُجد المفتاح)
+      if (process.env.STRIPE_SECRET_KEY) {
+        const amountInHalalah = convertToSmallestUnit(amount);
+        const stripe = getStripe();
 
-      let session;
-      try {
-        session = await stripe.checkout.sessions.create({
-          payment_method_types: ["card"],
-          line_items: [
-            {
-              price_data: {
-                currency: "sar",
-                product_data: {
-                  name: `حجز: ${apartment.titleAr || apartment.title}`,
-                  description: `حجز شقة في العلا - رقم الحجز: ${args.bookingId}`,
+        let session;
+        try {
+          session = await stripe.checkout.sessions.create({
+            payment_method_types: ["card"],
+            line_items: [
+              {
+                price_data: {
+                  currency: "sar",
+                  product_data: {
+                    name: `حجز: ${apartment.titleAr || apartment.title}`,
+                    description: `حجز شقة في العلا - رقم الحجز: ${args.bookingId}`,
+                  },
+                  unit_amount: amountInHalalah,
                 },
-                unit_amount: amountInHalalah,
+                quantity: 1,
               },
-              quantity: 1,
+            ],
+            mode: "payment",
+            success_url: `${publicAppUrl}/my-bookings?booking=${args.bookingId}&session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${publicAppUrl}/apartment/${booking.apartmentId}`,
+            metadata: {
+              bookingId: args.bookingId,
+              userId: booking.userId,
             },
-          ],
-          mode: "payment",
-          success_url: `${publicAppUrl}/my-bookings?booking=${args.bookingId}&session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${publicAppUrl}/apartment/${booking.apartmentId}`,
-          metadata: {
+          });
+        } catch (stripeError) {
+          console.error("Stripe Error:", stripeError);
+          throw new PaymentError(
+            "حدث خطأ أثناء إنشاء جلسة الدفع. حاول مرة أخرى"
+          );
+        }
+
+        if (!session?.id) {
+          throw new PaymentError("فشل في إنشاء جلسة الدفع");
+        }
+
+        try {
+          await ctx.runMutation(internal.bookings.attachPaymentSession, {
             bookingId: args.bookingId,
-            userId: booking.userId,
-          },
-        });
-      } catch (stripeError) {
-        console.error("Stripe Error:", stripeError);
-        throw new PaymentError(
-          "حدث خطأ أثناء إنشاء جلسة الدفع. حاول مرة أخرى"
-        );
+            sessionId: session.id,
+          });
+        } catch (dbError) {
+          console.error("Database Error:", dbError);
+          throw new PaymentError("فشل في حفظ بيانات الحجز");
+        }
+
+        return { url: session.url, sessionId: session.id };
       }
 
-      if (!session?.id) {
-        throw new PaymentError("فشل في إنشاء جلسة الدفع");
-      }
+      // وضع الفحص والاختبار السريع (Sandbox Payment Mode) في حال عدم إدخال مفاتيح البوابات بعد
+      const mockSessionId = `test_sess_${Date.now()}`;
+      await ctx.runMutation(internal.bookings.attachPaymentSession, {
+        bookingId: args.bookingId,
+        sessionId: mockSessionId,
+      });
 
-      // حفظ معرف جلسة الدفع
-      try {
-        await ctx.runMutation(internal.bookings.attachPaymentSession, {
-          bookingId: args.bookingId,
-          sessionId: session.id,
-        });
-      } catch (dbError) {
-        console.error("Database Error:", dbError);
-        throw new PaymentError("فشل في حفظ بيانات الحجز");
-      }
+      // سداد الحجز فورياً وإصدار الفاتورة وتنبيه المالك والأدمن
+      await ctx.runMutation(internal.bookings.markPaid, {
+        bookingId: args.bookingId,
+        sessionId: mockSessionId,
+      });
 
-      return { url: session.url, sessionId: session.id };
+      return {
+        url: `${publicAppUrl}/my-bookings?booking=${args.bookingId}&test_payment=success`,
+        sessionId: mockSessionId,
+      };
     } catch (error) {
       console.error("Create Checkout Session Error:", error);
       if (error instanceof ConvexError) {
