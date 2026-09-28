@@ -842,11 +842,37 @@ export default function Landing() {
               <h4 className="font-bold text-sm text-neutral-900 dark:text-neutral-100 mb-3">
                 تواصل معنا
               </h4>
-              <div className="flex flex-col gap-2 text-xs text-neutral-500 dark:text-neutral-400">
-                <span>📍 العلا، المملكة العربية السعودية</span>
-                <span>📧 {siteSettings?.contactEmail || "info@alulahome.com"}</span>
-                <span>📱 {siteSettings?.contactPhone && !siteSettings.contactPhone.includes("XX") ? siteSettings.contactPhone : "+966 50 123 4567"}</span>
-                {siteSettings?.whatsapp && <span>💬 واتساب: {siteSettings.whatsapp}</span>}
+              <div className="flex flex-col gap-2.5 text-xs text-neutral-600 dark:text-neutral-300">
+                <span className="flex items-center gap-2">
+                  <span>📍</span>
+                  <span>العلا، المملكة العربية السعودية</span>
+                </span>
+                <a
+                  href={`mailto:${siteSettings?.contactEmail || "alulahome2026@gmail.com"}`}
+                  className="flex items-center gap-2 hover:text-[#542382] dark:hover:text-purple-400 transition-colors"
+                  dir="ltr"
+                >
+                  <span className="text-right flex-1">{siteSettings?.contactEmail || "alulahome2026@gmail.com"}</span>
+                  <span>📧</span>
+                </a>
+                <a
+                  href={`tel:${siteSettings?.contactPhone || "0590051074"}`}
+                  className="flex items-center gap-2 hover:text-[#542382] dark:hover:text-purple-400 transition-colors"
+                  dir="ltr"
+                >
+                  <span className="text-right flex-1">{siteSettings?.contactPhone || "0590051074"}</span>
+                  <span>📱</span>
+                </a>
+                <a
+                  href="https://wa.me/966590051074"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-emerald-600 hover:text-emerald-700 font-semibold transition-colors"
+                  dir="ltr"
+                >
+                  <span className="text-right flex-1">0590051074</span>
+                  <span>💬 واتساب:</span>
+                </a>
               </div>
             </div>
           </div>

@@ -4,8 +4,8 @@ import { ArrowRight } from "lucide-react";
 import { useEffect } from "react";
 
 const BRAND = "شقق العلا";
-const CONTACT_EMAIL = "info@alulahome.com";
-const CONTACT_PHONE = "+966-XX-XXX-XXXX"; // ← حدّثه بالرقم الرسمي قبل الإطلاق
+const CONTACT_EMAIL = "alulahome2026@gmail.com";
+const CONTACT_PHONE = "0590051074";
 
 type Section = { heading: string; body: string[] };
 
@@ -31,6 +31,7 @@ const PAGES: Record<string, { title: string; sections: Section[] }> = {
         body: [
           `البريد الإلكتروني: ${CONTACT_EMAIL}`,
           `الهاتف: ${CONTACT_PHONE}`,
+          `واتساب: ${CONTACT_PHONE}`,
         ],
       },
     ],

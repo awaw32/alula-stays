@@ -15,6 +15,12 @@ export const SETTINGS_KEY = "general";
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^\+?[0-9\s-]{8,20}$/;
 
+export const DEFAULT_CONTACT = {
+  email: "alulahome2026@gmail.com",
+  phone: "0590051074",
+  whatsapp: "0590051074",
+};
+
 /** قراءة الإعدادات — عامة (تحتاجها الصفحة الرئيسية والتذييل) */
 export const get = query({
   args: {},
@@ -23,7 +29,53 @@ export const get = query({
       .query("siteSettings")
       .filter((q) => q.eq(q.field("key"), SETTINGS_KEY))
       .unique();
-    return settings ?? null;
+    if (!settings) {
+      return {
+        key: SETTINGS_KEY,
+        brandName: "شقق العلا",
+        contactEmail: DEFAULT_CONTACT.email,
+        contactPhone: DEFAULT_CONTACT.phone,
+        whatsapp: DEFAULT_CONTACT.whatsapp,
+      };
+    }
+    return {
+      ...settings,
+      contactEmail: settings.contactEmail || DEFAULT_CONTACT.email,
+      contactPhone: settings.contactPhone || DEFAULT_CONTACT.phone,
+      whatsapp: settings.whatsapp || DEFAULT_CONTACT.whatsapp,
+    };
+  },
+});
+
+/** تهيئة وتثبيت بيانات التواصل الرسمية في قاعدة البيانات */
+export const initPlatformContact = mutation({
+  args: {},
+  handler: async (ctx: MutationCtx) => {
+    const existing = await ctx.db
+      .query("siteSettings")
+      .filter((q) => q.eq(q.field("key"), SETTINGS_KEY))
+      .unique();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        contactEmail: DEFAULT_CONTACT.email,
+        contactPhone: DEFAULT_CONTACT.phone,
+        whatsapp: DEFAULT_CONTACT.whatsapp,
+        brandName: existing.brandName || "شقق العلا",
+        updatedAt: Date.now(),
+      });
+      return "updated";
+    } else {
+      await ctx.db.insert("siteSettings", {
+        key: SETTINGS_KEY,
+        brandName: "شقق العلا",
+        contactEmail: DEFAULT_CONTACT.email,
+        contactPhone: DEFAULT_CONTACT.phone,
+        whatsapp: DEFAULT_CONTACT.whatsapp,
+        updatedAt: Date.now(),
+      });
+      return "inserted";
+    }
   },
 });
 

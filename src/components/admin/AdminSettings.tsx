@@ -45,9 +45,9 @@ interface FormState {
 
 const EMPTY: FormState = {
   brandName: "",
-  contactEmail: "",
-  contactPhone: "",
-  whatsapp: "",
+  contactEmail: "alulahome2026@gmail.com",
+  contactPhone: "0590051074",
+  whatsapp: "0590051074",
   instagram: "",
   twitter: "",
   paymentProvider: "",
@@ -578,15 +578,15 @@ function SettingsForm({
             </div>
             <div>
               <label htmlFor="st-email" className={labelCls}>البريد الرسمي</label>
-              <input id="st-email" type="email" dir="ltr" value={form.contactEmail} onChange={(e) => set("contactEmail", e.target.value)} placeholder="info@alulahome.com" className={inputCls} />
+              <input id="st-email" type="email" dir="ltr" value={form.contactEmail} onChange={(e) => set("contactEmail", e.target.value)} placeholder="alulahome2026@gmail.com" className={inputCls} />
             </div>
             <div>
               <label htmlFor="st-phone" className={labelCls}>رقم التواصل</label>
-              <input id="st-phone" type="tel" dir="ltr" value={form.contactPhone} onChange={(e) => set("contactPhone", e.target.value)} placeholder="+966-5X-XXX-XXXX" className={inputCls} />
+              <input id="st-phone" type="tel" dir="ltr" value={form.contactPhone} onChange={(e) => set("contactPhone", e.target.value)} placeholder="0590051074" className={inputCls} />
             </div>
             <div>
               <label htmlFor="st-whatsapp" className={labelCls}>واتساب</label>
-              <input id="st-whatsapp" type="tel" dir="ltr" value={form.whatsapp} onChange={(e) => set("whatsapp", e.target.value)} placeholder="+966-5X-XXX-XXXX" className={inputCls} />
+              <input id="st-whatsapp" type="tel" dir="ltr" value={form.whatsapp} onChange={(e) => set("whatsapp", e.target.value)} placeholder="0590051074" className={inputCls} />
             </div>
             <div>
               <label htmlFor="st-instagram" className={labelCls}>إنستغرام (رابط)</label>
