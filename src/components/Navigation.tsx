@@ -1,20 +1,74 @@
-import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/hooks/use-auth";
 import { isAuthorizedAdmin } from "@/types/auth";
 import { cn } from "@/lib/utils";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { DEMO_MODE } from "@/lib/demo-data";
-import { Calendar, Heart, Home, Menu, MessageSquare, Search, User, X } from "lucide-react";
+import {
+  Calendar,
+  Heart,
+  Home,
+  Menu,
+  MessageSquare,
+  Search,
+  User,
+  X,
+  Building2,
+  TreePalm,
+  Tent,
+  Sparkles,
+  Hotel,
+  Globe,
+  RotateCcw,
+  ShieldCheck,
+  Instagram,
+  Twitter,
+  Youtube,
+  Share2,
+} from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router";
 
 const navLinks = [
   { href: "/", label: "الرئيسية", icon: Home, requiresAuth: false },
-  { href: "/apartments", label: "الشقق", icon: Search, requiresAuth: false },
+  { href: "/apartments", label: "الشقق والإقامات", icon: Search, requiresAuth: false },
   { href: "/favorites", label: "المفضلة", icon: Heart, requiresAuth: true },
   { href: "/my-bookings", label: "حجوزاتي", icon: Calendar, requiresAuth: true },
 ] as const;
+
+// فئات وأقسام العلا المستوحاة من جاذر إن (Image 3)
+const gathernCategories = [
+  {
+    label: "شقق، استوديو، غرف، فلل",
+    href: "/apartments",
+    icon: Building2,
+    badgeColor: "bg-purple-100 text-purple-600 dark:bg-purple-950/60 dark:text-purple-300",
+  },
+  {
+    label: "شاليهات، استراحات، منتجعات صحراوية",
+    href: "/apartments?type=resort",
+    icon: TreePalm,
+    badgeColor: "bg-cyan-100 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-300",
+  },
+  {
+    label: "مزارع وبساتين النخيل",
+    href: "/apartments?location=AlUla+Oasis",
+    icon: Sparkles,
+    badgeColor: "bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-300",
+  },
+  {
+    label: "مخيمات وكرفانات رصد النجوم",
+    href: "/apartments?type=camp",
+    icon: Tent,
+    badgeColor: "bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-300",
+  },
+  {
+    label: "شقق مخدومة وتراثية",
+    href: "/apartments?location=AlUla+Old+Town",
+    icon: Hotel,
+    badgeColor: "bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-300",
+  },
+];
 
 function isActivePath(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
@@ -29,7 +83,6 @@ export function Navigation() {
     isAuthenticated && !DEMO_MODE ? {} : "skip",
   ) ?? 0;
 
-  // التحقق الحصري: لا يظهر زر الإدارة إطلاقاً إلا للحسابات المصرح بها حصراً
   const isAdmin = isAuthorizedAdmin(role, user?.email);
   const ownerStatus = useQuery(
     api.owners.myOwnerStatus,
@@ -45,26 +98,34 @@ export function Navigation() {
     : role === "owner"
     ? "لوحة المالك"
     : ownerStatus?.status === "pending"
-    ? "طلب المالك (قيد المراجعة)"
+    ? "طلب المالك"
     : "حسابي";
+
   const authHref = (href: string, requiresAuth: boolean) =>
     requiresAuth && !isAuthenticated ? `/auth?returnTo=${encodeURIComponent(href)}` : href;
 
   return (
     <>
-      <header className="sticky top-0 z-50 border-b border-[var(--border)] bg-[var(--background)]/80 backdrop-blur-xl">
+      {/* ─── Top Desktop / Mobile Header ─── */}
+      <header className="sticky top-0 z-50 border-b border-neutral-200/80 dark:border-neutral-800 bg-white/90 dark:bg-[#15100C]/90 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-          <Link to="/" className="group flex items-center gap-2.5" aria-label="العودة إلى الصفحة الرئيسية">
-            <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--clay-accent)] to-[var(--clay-gold)] shadow-md transition-shadow group-hover:shadow-lg">
-              <span className="text-sm font-bold text-white">عُ</span>
+          {/* Logo */}
+          <Link to="/" className="group flex items-center gap-2.5" aria-label="الرئيسية">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--clay-accent)] to-[var(--clay-gold)] shadow-md transition-transform group-hover:scale-105">
+              <span className="text-base font-black text-white">عُ</span>
             </div>
-            <div className="hidden sm:block">
-              <span className="text-lg font-bold tracking-tight text-[var(--foreground)]">شقق العلا</span>
-              <span className="-mt-1 block text-[10px] tracking-wide text-[var(--muted-foreground)]">ALULA APARTMENTS</span>
+            <div>
+              <span className="text-lg font-black tracking-tight text-neutral-900 dark:text-neutral-100">
+                شقق العلا
+              </span>
+              <span className="-mt-1 block text-[9px] font-bold tracking-wider text-neutral-400">
+                ALULA STAYS
+              </span>
             </div>
           </Link>
 
-          <nav className="hidden items-center gap-1 md:flex" aria-label="التنقل الرئيسي">
+          {/* Desktop Nav Links */}
+          <nav className="hidden items-center gap-1.5 md:flex" aria-label="التنقل الرئيسي">
             {navLinks.map((link) => {
               const isActive = isActivePath(location.pathname, link.href);
               return (
@@ -72,10 +133,10 @@ export function Navigation() {
                   key={link.href}
                   to={authHref(link.href, link.requiresAuth)}
                   className={cn(
-                    "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200",
+                    "flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all",
                     isActive
-                      ? "bg-[var(--clay-accent)] text-white shadow-md"
-                      : "text-[var(--muted-foreground)] hover:bg-[var(--clay-surface)] hover:text-[var(--foreground)]",
+                      ? "bg-[var(--clay-accent)] text-white shadow-xs"
+                      : "text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900",
                   )}
                   aria-current={isActive ? "page" : undefined}
                 >
@@ -84,124 +145,180 @@ export function Navigation() {
                 </Link>
               );
             })}
+
             {isAuthenticated && (
               <Link
                 to="/messages"
                 className={cn(
-                  "relative flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200",
+                  "relative flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all",
                   isActivePath(location.pathname, "/messages")
-                    ? "bg-[var(--clay-accent)] text-white shadow-md"
-                    : "text-[var(--muted-foreground)] hover:bg-[var(--clay-surface)] hover:text-[var(--foreground)]",
+                    ? "bg-[var(--clay-accent)] text-white shadow-xs"
+                    : "text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800",
                 )}
-                aria-current={isActivePath(location.pathname, "/messages") ? "page" : undefined}
               >
                 <MessageSquare className="h-4 w-4" aria-hidden="true" />
                 الرسائل
                 {unreadCount > 0 && (
-                  <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white shadow-sm">
-                    {unreadCount > 9 ? "9+" : unreadCount}
+                  <span className="flex h-4 min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                    {unreadCount}
                   </span>
                 )}
               </Link>
             )}
           </nav>
 
-          <div className="flex items-center gap-3">
+          {/* Right Header Actions: Host Gateway & User Account */}
+          <div className="flex items-center gap-2.5">
+            {/* بوابة المضيفين (Host CTA on Desktop) */}
+            <Link
+              to="/owner"
+              className="hidden lg:flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-[var(--clay-accent)]/30 text-xs font-bold text-[var(--clay-accent)] hover:bg-[var(--clay-accent-soft)] transition-colors"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>بوابة المضيفين</span>
+            </Link>
+
+            {/* User Account Button */}
             <Link
               to={isAuthenticated ? accountPath : "/auth"}
               className={cn(
-                "hidden items-center gap-2 text-sm font-medium transition-colors md:flex",
+                "hidden sm:flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all",
                 isAuthenticated
-                  ? "clay-sm px-4 py-2 text-[var(--clay-accent)] hover:bg-[var(--clay-accent-soft)]"
-                  : "clay-btn px-4 py-2",
+                  ? "bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-200"
+                  : "bg-[var(--clay-accent)] text-white shadow-md hover:opacity-90",
               )}
             >
-              <User className="h-4 w-4" aria-hidden="true" />
-              {isAuthenticated ? accountLabel : "تسجيل الدخول"}
+              <div className="w-5 h-5 rounded-full bg-[var(--clay-gold)] flex items-center justify-center text-[10px] text-white font-bold">
+                {isAuthenticated && user?.name ? user.name.charAt(0) : <User className="w-3 h-3" />}
+              </div>
+              <span>{isAuthenticated ? accountLabel : "تسجيل الدخول"}</span>
             </Link>
 
+            {/* Mobile Drawer Toggle (Hamburger) */}
             <button
               type="button"
-              onClick={() => setMobileOpen((open) => !open)}
-              className="clay-sm p-2.5 md:hidden"
-              aria-label={mobileOpen ? "إغلاق قائمة التنقل" : "فتح قائمة التنقل"}
-              aria-expanded={mobileOpen}
-              aria-controls="mobile-navigation"
+              onClick={() => setMobileOpen(true)}
+              className="p-2 rounded-xl text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors md:hidden"
+              aria-label="القائمة"
             >
-              {mobileOpen ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
+              <Menu className="h-6 w-6" />
             </button>
           </div>
         </div>
       </header>
 
+      {/* ─── Gathern Style Mobile Drawer Menu (Image 3) ─── */}
       {mobileOpen && (
-        <div id="mobile-navigation" className="fixed inset-0 z-40 md:hidden">
-          <button
-            type="button"
-            className="absolute inset-0 h-full w-full bg-black/30 backdrop-blur-sm"
+        <div className="fixed inset-0 z-50 md:hidden flex justify-end">
+          {/* Overlay */}
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
             onClick={() => setMobileOpen(false)}
-            aria-label="إغلاق قائمة التنقل"
           />
-          <div className="clay absolute left-4 right-4 top-16 z-50 p-4">
-            <nav className="flex flex-col gap-2" aria-label="التنقل على الهاتف">
-              {navLinks.map((link) => {
-                const isActive = isActivePath(location.pathname, link.href);
-                return (
-                  <Link
-                    key={link.href}
-                    to={authHref(link.href, link.requiresAuth)}
-                    onClick={() => setMobileOpen(false)}
-                    className={cn(
-                      "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all",
-                      isActive
-                        ? "bg-[var(--clay-accent)] text-white"
-                        : "text-[var(--muted-foreground)] hover:bg-[var(--clay-surface)]",
-                    )}
-                    aria-current={isActive ? "page" : undefined}
-                  >
-                    <link.icon className="h-5 w-5" aria-hidden="true" />
-                    {link.label}
-                  </Link>
-                );
-              })}
-              {isAuthenticated && (
-                <Link
-                  to="/messages"
-                  onClick={() => setMobileOpen(false)}
-                  className={cn(
-                    "flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium transition-all",
-                    isActivePath(location.pathname, "/messages")
-                      ? "bg-[var(--clay-accent)] text-white"
-                      : "text-[var(--muted-foreground)] hover:bg-[var(--clay-surface)]",
-                  )}
-                  aria-current={isActivePath(location.pathname, "/messages") ? "page" : undefined}
-                >
-                  <span className="flex items-center gap-3">
-                    <MessageSquare className="h-5 w-5" aria-hidden="true" />
-                    الرسائل
-                  </span>
-                  {unreadCount > 0 && (
-                    <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white">
-                      {unreadCount}
-                    </span>
-                  )}
-                </Link>
-              )}
-              <Separator className="my-1" />
+
+          {/* Drawer Content */}
+          <div className="relative w-[85%] max-w-sm h-full bg-white dark:bg-neutral-900 shadow-2xl flex flex-col z-50 text-right overflow-y-auto animate-in slide-in-from-right duration-300">
+            {/* Drawer Header */}
+            <div className="flex items-center justify-between p-4 border-b border-neutral-100 dark:border-neutral-800">
               <Link
                 to={isAuthenticated ? accountPath : "/auth"}
                 onClick={() => setMobileOpen(false)}
-                className="clay-btn flex items-center justify-center gap-3 rounded-xl px-4 py-3 text-center text-sm font-medium"
+                className="w-10 h-10 rounded-full bg-[var(--clay-accent-soft)] flex items-center justify-center text-[var(--clay-accent)] shadow-xs"
               >
-                <User className="h-5 w-5" aria-hidden="true" />
-                {isAuthenticated ? accountLabel : "تسجيل الدخول"}
+                <User className="w-5 h-5" />
               </Link>
-            </nav>
+
+              <div className="flex items-center gap-2">
+                <span className="font-black text-base text-neutral-900 dark:text-neutral-100">
+                  شقق العلا
+                </span>
+                <div className="w-7 h-7 rounded-xl bg-[var(--clay-accent)] flex items-center justify-center text-white text-xs font-black">
+                  عُ
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setMobileOpen(false)}
+                className="w-9 h-9 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-600 dark:text-neutral-300"
+                aria-label="إغلاق"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Categories List (Matching Gathern Image 3) */}
+            <div className="p-4 space-y-1.5">
+              {gathernCategories.map((cat) => (
+                <Link
+                  key={cat.label}
+                  to={cat.href}
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center justify-between p-3 rounded-2xl hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
+                >
+                  <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">
+                    {cat.label}
+                  </span>
+                  <div
+                    className={cn(
+                      "w-8 h-8 rounded-xl flex items-center justify-center shrink-0",
+                      cat.badgeColor,
+                    )}
+                  >
+                    <cat.icon className="w-4 h-4" />
+                  </div>
+                </Link>
+              ))}
+            </div>
+
+            <div className="mx-4 my-2 border-t border-neutral-100 dark:border-neutral-800" />
+
+            {/* Host Banner in Drawer */}
+            <div className="p-4">
+              <Link
+                to="/owner"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center justify-between p-3.5 rounded-2xl bg-gradient-to-r from-[var(--clay-accent)] to-[var(--clay-gold)] text-white shadow-md"
+              >
+                <div>
+                  <span className="block text-xs font-black">بوابة المضيفين</span>
+                  <span className="block text-[10px] text-white/90">اعرض وحدتك في العلا</span>
+                </div>
+                <RotateCcw className="w-4 h-4" />
+              </Link>
+            </div>
+
+            {/* Language & Social Links (Gathern Image 3 bottom) */}
+            <div className="mt-auto p-4 border-t border-neutral-100 dark:border-neutral-800 space-y-4">
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => alert("قريباً: النسخة الإنجليزية")}
+                  className="flex items-center gap-1.5 px-6 py-2 rounded-xl bg-neutral-100 dark:bg-neutral-800 text-xs font-bold text-neutral-700 dark:text-neutral-300"
+                >
+                  <Globe className="w-4 h-4" />
+                  <span>ENGLISH</span>
+                </button>
+              </div>
+
+              <div className="flex items-center justify-center gap-4 text-neutral-400">
+                <a href="https://instagram.com" target="_blank" rel="noreferrer" className="hover:text-[var(--clay-accent)]">
+                  <Instagram className="w-4 h-4" />
+                </a>
+                <a href="https://twitter.com" target="_blank" rel="noreferrer" className="hover:text-[var(--clay-accent)]">
+                  <Twitter className="w-4 h-4" />
+                </a>
+                <a href="https://youtube.com" target="_blank" rel="noreferrer" className="hover:text-[var(--clay-accent)]">
+                  <Youtube className="w-4 h-4" />
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      <nav className="safe-area-bottom fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--border)] bg-[var(--background)]/90 backdrop-blur-xl md:hidden" aria-label="التنقل السريع">
+      {/* ─── Mobile Bottom App Bar (Clean & Elevated) ─── */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-neutral-200/90 dark:border-neutral-800 bg-white/95 dark:bg-[#15100C]/95 backdrop-blur-xl md:hidden">
         <div className="flex h-16 items-center justify-around px-2">
           {navLinks.map((link) => {
             const isActive = isActivePath(location.pathname, link.href);
@@ -210,54 +327,31 @@ export function Navigation() {
                 key={link.href}
                 to={authHref(link.href, link.requiresAuth)}
                 className={cn(
-                  "flex min-w-[60px] flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition-all",
-                  isActive ? "text-[var(--clay-accent)]" : "text-[var(--muted-foreground)]",
+                  "flex min-w-[60px] flex-col items-center gap-0.5 transition-colors",
+                  isActive ? "text-[var(--clay-accent)]" : "text-neutral-400 dark:text-neutral-500",
                 )}
                 aria-current={isActive ? "page" : undefined}
               >
-                <span className={cn("rounded-xl p-1.5 transition-all", isActive && "bg-[var(--clay-accent-soft)] shadow-sm")}>
-                  <link.icon className="h-5 w-5" aria-hidden="true" />
-                </span>
-                <span className="text-[10px] font-medium">{link.label}</span>
+                <link.icon className={cn("h-5 w-5", isActive && "stroke-[2.5]")} aria-hidden="true" />
+                <span className="text-[10px] font-bold">{link.label}</span>
               </Link>
             );
           })}
-          {isAuthenticated && (
-            <Link
-              to="/messages"
-              className={cn(
-                "relative flex min-w-[60px] flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition-all",
-                isActivePath(location.pathname, "/messages") ? "text-[var(--clay-accent)]" : "text-[var(--muted-foreground)]",
-              )}
-              aria-current={isActivePath(location.pathname, "/messages") ? "page" : undefined}
-            >
-              <span className={cn("relative rounded-xl p-1.5 transition-all", isActivePath(location.pathname, "/messages") && "bg-[var(--clay-accent-soft)] shadow-sm")}>
-                <MessageSquare className="h-5 w-5" aria-hidden="true" />
-                {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
-                    {unreadCount > 9 ? "9+" : unreadCount}
-                  </span>
-                )}
-              </span>
-              <span className="text-[10px] font-medium">الرسائل</span>
-            </Link>
-          )}
+
           <Link
             to={isAuthenticated ? accountPath : "/auth"}
             className={cn(
-              "flex min-w-[60px] flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition-all",
-              isActivePath(location.pathname, accountPath) ? "text-[var(--clay-accent)]" : "text-[var(--muted-foreground)]",
+              "flex min-w-[60px] flex-col items-center gap-0.5 transition-colors",
+              isActivePath(location.pathname, accountPath)
+                ? "text-[var(--clay-accent)]"
+                : "text-neutral-400 dark:text-neutral-500",
             )}
-            aria-current={isActivePath(location.pathname, accountPath) ? "page" : undefined}
           >
-            <span className={cn("rounded-xl p-1.5 transition-all", isActivePath(location.pathname, accountPath) && "bg-[var(--clay-accent-soft)] shadow-sm")}>
-              <User className="h-5 w-5" aria-hidden="true" />
-            </span>
-            <span className="text-[10px] font-medium">{isAuthenticated ? "حسابي" : "دخول"}</span>
+            <User className={cn("h-5 w-5", isActivePath(location.pathname, accountPath) && "stroke-[2.5]")} aria-hidden="true" />
+            <span className="text-[10px] font-bold">{isAuthenticated ? "حسابي" : "دخول"}</span>
           </Link>
         </div>
       </nav>
     </>
   );
 }
-

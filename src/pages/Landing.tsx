@@ -1,410 +1,468 @@
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Navigation } from "@/components/Navigation";
-import { ApartmentCard } from "@/components/ApartmentCard";
+import { ApartmentCarousel } from "@/components/apartments/ApartmentCarousel";
 import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
-import { DEMO_MODE, DEMO_APARTMENTS, DEMO_STATS } from "@/lib/demo-data";
+import { DEMO_MODE, DEMO_APARTMENTS } from "@/lib/demo-data";
 import { Link, useNavigate } from "react-router";
 import type { ApartmentRecord } from "@/types/apartment";
 import {
   Search,
   MapPin,
-  Shield,
-  Star,
   Clock,
-  Headphones,
-  ChevronLeft,
-  Mountain,
-  Compass,
-  Tent,
-  Sunrise,
+  ShieldCheck,
+  CheckCircle2,
+  Sparkles,
+  Building2,
+  CreditCard,
+  Lock,
 } from "lucide-react";
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 30 },
-  visible: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.1, duration: 0.6, ease: "easeOut" as const },
-  }),
-};
-
-const features = [
+const alUlaDestinations = [
   {
-    icon: Shield,
-    title: "شقق موثقة",
-    desc: "كل شقة موثقة ومحقق هويتها لضمان تجربة آمنة وموثوقة",
+    id: "old-town",
+    name: "ديرة العلا القديمة",
+    location: "AlUla Old Town",
+    image: "https://images.unsplash.com/photo-1524758631624-e2822e304c36?w=240&h=240&fit=crop",
   },
   {
-    icon: Star,
-    title: "تقييمات حقيقية",
-    desc: "آراء ومراجعات حقيقية من ضيوف سابقين لمساعدتك في الاختيار",
+    id: "elephant-rock",
+    name: "صخرة الفيل",
+    location: "Elephant Rock",
+    image: "https://images.unsplash.com/photo-1518684079-3c830dcef090?w=240&h=240&fit=crop",
   },
   {
-    icon: Clock,
-    title: "حجز فوري",
-    desc: "تأكيد الحجز فوراً مع إمكانية الدفع الإلكتروني بأمان",
+    id: "hegra",
+    name: "الحِجر (مدائن صالح)",
+    location: "Hegra",
+    image: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=240&h=240&fit=crop",
   },
   {
-    icon: Headphones,
-    title: "دعم مستمر",
-    desc: "فريق دعم متواصل على مدار الساعة لمساعدتك في أي وقت",
-  },
-];
-
-const alUlaHighlights = [
-  {
-    icon: Mountain,
-    title: "جبال رملية",
-    desc: "استكشف التشكيلات الصخرية المذهلة والجبال الرملية",
-    color: "from-[#C2694F] to-[#A0522D]",
+    id: "dadan",
+    name: "مملكة دادان",
+    location: "Dadan",
+    image: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=240&h=240&fit=crop",
   },
   {
-    icon: Compass,
-    title: "مواقع تراثية",
-    desc: "استكشف الحِجر ودادان والمواقع الأثرية العالمية",
-    color: "from-[#D4A574] to-[#B8860B]",
+    id: "oasis",
+    name: "واحة النخيل",
+    location: "AlUla Oasis",
+    image: "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=240&h=240&fit=crop",
   },
   {
-    icon: Tent,
-    title: "تجارب فريدة",
-    desc: "تجربة الإقامة في قلب الطبيعة الصحراوية الخلابة",
-    color: "from-[#8B6F5E] to-[#6B4F3E]",
+    id: "arts",
+    name: "حي الفنون (الجديدة)",
+    location: "AlUla Arts District",
+    image: "https://images.unsplash.com/photo-1513694203232-719a280e022f?w=240&h=240&fit=crop",
   },
   {
-    icon: Sunrise,
-    title: "غروب ساحر",
-    desc: "شاهد أجمل غروب شمس في العالم من شقتك",
-    color: "from-[#E8956F] to-[#C2694F]",
+    id: "sharaan",
+    name: "جبال شرعان",
+    location: "Jabal Ithlib",
+    image: "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=240&h=240&fit=crop",
+  },
+  {
+    id: "stars",
+    name: "رصد النجوم",
+    location: "Heritage Village",
+    image: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=240&h=240&fit=crop",
   },
 ];
 
 export default function Landing() {
-  const liveFeatured = useQuery(
-    api.apartments.featured,
-    DEMO_MODE ? "skip" : undefined,
-  );
-  const liveStats = useQuery(
-    api.apartments.stats,
-    DEMO_MODE ? "skip" : undefined,
+  const liveApartments = useQuery(
+    api.apartments.list,
+    DEMO_MODE ? "skip" : {},
   );
   const liveLocations = useQuery(
     api.apartments.locations,
     DEMO_MODE ? "skip" : undefined,
   );
-  const featuredApartments = DEMO_MODE ? DEMO_APARTMENTS.slice(0, 3) : liveFeatured;
-  const stats = DEMO_MODE ? DEMO_STATS : liveStats;
+  const apartments: ApartmentRecord[] = DEMO_MODE
+    ? DEMO_APARTMENTS
+    : (liveApartments as ApartmentRecord[]) ?? [];
 
-  // إعدادات التواصل الرسمية — يديرها الأدمن من تبويب الإعدادات
   const siteSettings = useQuery(api.settings.get, {});
-
-  // حالة شريط البحث
   const navigate = useNavigate();
+
+  // Search state
   const [searchLocation, setSearchLocation] = useState("");
   const [searchCheckIn, setSearchCheckIn] = useState("");
   const [searchCheckOut, setSearchCheckOut] = useState("");
   const [searchGuests, setSearchGuests] = useState(2);
 
+  const handleSearchSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const params = new URLSearchParams();
+    if (searchLocation) params.set("location", searchLocation);
+    if (searchCheckIn) params.set("checkIn", searchCheckIn);
+    if (searchCheckOut) params.set("checkOut", searchCheckOut);
+    if (searchGuests > 1) params.set("guests", String(searchGuests));
+    navigate(`/apartments${params.toString() ? `?${params.toString()}` : ""}`);
+  };
+
+  // Curated Collections (Gathern Rows)
+  const heritageApartments = useMemo(() => {
+    return apartments.filter(
+      (a) =>
+        a.location === "Hegra" ||
+        a.location === "Dadan" ||
+        a.location === "Heritage Village" ||
+        a.location === "AlUla Old Town",
+    );
+  }, [apartments]);
+
+  const mountainApartments = useMemo(() => {
+    return apartments.filter(
+      (a) =>
+        a.location === "Elephant Rock" ||
+        a.location === "Jabal Ithlib" ||
+        a.amenities.includes("mountain_view"),
+    );
+  }, [apartments]);
+
+  const oasisApartments = useMemo(() => {
+    return apartments.filter(
+      (a) =>
+        a.location === "AlUla Oasis" ||
+        a.amenities.includes("garden") ||
+        a.titleAr?.includes("واحة"),
+    );
+  }, [apartments]);
+
+  const luxuryVillas = useMemo(() => {
+    return apartments.filter(
+      (a) =>
+        a.price >= 650 ||
+        a.amenities.includes("pool") ||
+        (a.bedrooms && a.bedrooms >= 3),
+    );
+  }, [apartments]);
+
   return (
-    <div className="min-h-screen bg-[var(--background)] pb-24 md:pb-0">
+    <div className="min-h-screen bg-[#FAF7F2] dark:bg-[#15100C] text-[var(--foreground)] pb-24 md:pb-12">
       <Navigation />
 
-      {/* ─── Hero Section ─── */}
+      {/* ─── Hero Section with Saudi Welcome Banner (Gathern Style) ─── */}
       <section className="relative overflow-hidden">
-        {/* Background gradient orbs */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full bg-[var(--clay-accent)]/10 blur-3xl" />
-          <div className="absolute -bottom-32 -left-32 w-96 h-96 rounded-full bg-[var(--clay-gold)]/10 blur-3xl" />
-        </div>
+        {/* Background Image of AlUla with warm gradient overlay */}
+        <div className="relative w-full h-[380px] sm:h-[440px] md:h-[480px]">
+          <img
+            src="https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=1800&q=85&auto=format&fit=crop"
+            alt="طبيعة وجبال العلا الساحرة"
+            className="w-full h-full object-cover object-center brightness-75 contrast-105"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#FAF7F2] via-black/40 to-black/30 dark:from-[#15100C] dark:via-black/60" />
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 pt-12 md:pt-20 pb-16 md:pb-24">
-          <motion.div
-            initial="hidden"
-            animate="visible"
-            className="text-center max-w-4xl mx-auto"
-          >
-            <motion.div variants={fadeUp} custom={0} className="mb-6">
-              <span className="inline-flex items-center gap-2 clay-sm px-4 py-2 text-sm font-medium text-[var(--clay-accent)] bg-[var(--clay-accent-soft)]">
-                <MapPin className="w-4 h-4" />
-                العلا، المملكة العربية السعودية
+          {/* Welcome Text Overlay */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4 pt-4 pb-20">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              className="flex items-center gap-3 mb-3 bg-black/30 backdrop-blur-md px-5 py-2 rounded-full border border-white/20"
+            >
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--clay-accent)] to-[var(--clay-gold)] flex items-center justify-center shadow-md">
+                <span className="text-white font-black text-sm">عُ</span>
+              </div>
+              <span className="text-white font-bold text-sm tracking-wide">
+                منصة شقق وإقامات العلا المعتمدة
               </span>
             </motion.div>
 
             <motion.h1
-              variants={fadeUp}
-              custom={1}
-              className="text-4xl md:text-6xl lg:text-7xl font-extrabold leading-tight text-[var(--foreground)] mb-6"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="text-3xl sm:text-5xl md:text-6xl font-black text-white drop-shadow-lg tracking-tight mb-2"
             >
-              اكتشف جمال{" "}
-              <span className="bg-gradient-to-r from-[var(--clay-accent)] via-[var(--clay-gold)] to-[var(--clay-accent)] bg-clip-text text-transparent">
-                العلا
-              </span>
-              <br />
-              في أرقى الشقق
+              حيّا الله في العلا
             </motion.h1>
 
             <motion.p
-              variants={fadeUp}
-              custom={2}
-              className="text-lg md:text-xl text-[var(--muted-foreground)] max-w-2xl mx-auto mb-10 leading-relaxed"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="text-base sm:text-xl text-white/90 font-medium drop-shadow-md max-w-xl"
             >
-              شقق فاخرة بإطلالات خلابة على الجبال الصحراوية.
-              <br className="hidden md:block" />
-              تجربة إقامة لا تُنسى في أقدم منطقة أثرية في العالم
+              وين ودّك تقضي إقامتك بين الجبال والواحات؟
             </motion.p>
+          </div>
+        </div>
 
-            {/* Search Bar — بحث فعلي بالتواريخ والضيوف */}
-            <motion.div variants={fadeUp} custom={3}>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const params = new URLSearchParams();
-                  if (searchLocation) params.set("location", searchLocation);
-                  if (searchCheckIn) params.set("checkIn", searchCheckIn);
-                  if (searchCheckOut) params.set("checkOut", searchCheckOut);
-                  if (searchGuests > 1) params.set("guests", String(searchGuests));
-                  navigate(`/apartments${params.toString() ? `?${params.toString()}` : ""}`);
-                }}
-                className="clay p-3 w-full max-w-3xl mx-auto"
-              >
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-2 items-end">
-                  <div className="col-span-2 md:col-span-1">
-                    <label htmlFor="hero-search-location" className="text-[10px] text-[var(--muted-foreground)] block mb-1">الموقع</label>
-                    <select
-                      id="hero-search-location"
-                      value={searchLocation}
-                      onChange={(e) => setSearchLocation(e.target.value)}
-                      className="clay-input w-full text-sm"
-                    >
-                      <option value="">كل المواقع</option>
-                      {(liveLocations ?? []).map((loc) => (
-                        <option key={loc} value={loc}>{loc}</option>
-                      ))}
-                    </select>
-                  </div>
+        {/* ─── Floating Search Capsule (Centered over Hero bottom) ─── */}
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 -mt-16 sm:-mt-20 relative z-20">
+          <motion.form
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            onSubmit={handleSearchSubmit}
+            className="bg-white/95 dark:bg-neutral-900/95 backdrop-blur-2xl p-3 sm:p-4 rounded-3xl shadow-2xl border border-neutral-200/80 dark:border-neutral-800"
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-2.5 items-center">
+              {/* الوجهة */}
+              <div className="md:col-span-4 flex items-center gap-3 px-3.5 py-2.5 rounded-2xl hover:bg-neutral-100/70 dark:hover:bg-neutral-800/70 transition-colors">
+                <div className="w-10 h-10 rounded-xl bg-[var(--clay-accent-soft)] flex items-center justify-center shrink-0">
+                  <MapPin className="w-5 h-5 text-[var(--clay-accent)]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-[11px] font-bold text-neutral-400 dark:text-neutral-500 block">
+                    الوجهة أو الحي
+                  </span>
+                  <select
+                    value={searchLocation}
+                    onChange={(e) => setSearchLocation(e.target.value)}
+                    className="w-full bg-transparent text-sm font-extrabold text-neutral-900 dark:text-neutral-100 focus:outline-none cursor-pointer truncate"
+                  >
+                    <option value="">جميع مناطق ومعالم العلا</option>
+                    {(liveLocations ?? []).map((loc) => (
+                      <option key={loc} value={loc}>
+                        {loc}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="hidden md:block w-px h-8 bg-neutral-200 dark:bg-neutral-800" />
+
+              {/* التواريخ */}
+              <div className="md:col-span-4 flex items-center gap-3 px-3.5 py-2.5 rounded-2xl hover:bg-neutral-100/70 dark:hover:bg-neutral-800/70 transition-colors">
+                <div className="w-10 h-10 rounded-xl bg-[var(--clay-gold-soft)] flex items-center justify-center shrink-0">
+                  <Clock className="w-5 h-5 text-[var(--clay-gold)]" />
+                </div>
+                <div className="grid grid-cols-2 gap-2 flex-1">
                   <div>
-                    <label htmlFor="hero-search-checkin" className="text-[10px] text-[var(--muted-foreground)] block mb-1">الوصول</label>
+                    <span className="text-[10px] font-bold text-neutral-400 dark:text-neutral-500 block">
+                      الوصول
+                    </span>
                     <input
-                      id="hero-search-checkin"
                       type="date"
                       value={searchCheckIn}
                       min={new Date().toISOString().split("T")[0]}
                       onChange={(e) => setSearchCheckIn(e.target.value)}
-                      className="clay-input w-full text-sm"
+                      className="w-full bg-transparent text-xs font-bold text-neutral-900 dark:text-neutral-100 focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label htmlFor="hero-search-checkout" className="text-[10px] text-[var(--muted-foreground)] block mb-1">المغادرة</label>
+                    <span className="text-[10px] font-bold text-neutral-400 dark:text-neutral-500 block">
+                      المغادرة
+                    </span>
                     <input
-                      id="hero-search-checkout"
                       type="date"
                       value={searchCheckOut}
                       min={searchCheckIn || new Date().toISOString().split("T")[0]}
                       onChange={(e) => setSearchCheckOut(e.target.value)}
-                      className="clay-input w-full text-sm"
+                      className="w-full bg-transparent text-xs font-bold text-neutral-900 dark:text-neutral-100 focus:outline-none"
                     />
                   </div>
-                  <div>
-                    <label htmlFor="hero-search-guests" className="text-[10px] text-[var(--muted-foreground)] block mb-1">الضيوف</label>
-                    <select
-                      id="hero-search-guests"
-                      value={searchGuests}
-                      onChange={(e) => setSearchGuests(Number(e.target.value))}
-                      className="clay-input w-full text-sm"
-                    >
-                      {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-                        <option key={n} value={n}>{n} {n === 1 ? "ضيف" : "ضيوف"}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <button type="submit" className="clay-btn text-sm py-2.5 px-4 flex items-center justify-center gap-2 md:col-span-1 col-span-2">
-                    <Search className="w-4 h-4" />
-                    بحث
-                  </button>
                 </div>
-              </form>
-            </motion.div>
+              </div>
 
-            {/* Stats */}
-            <motion.div
-              variants={fadeUp}
-              custom={4}
-              className="flex items-center justify-center gap-6 md:gap-12 mt-10"
-            >
-              {[
-                {
-                  value: `${stats?.total || 0}+`,
-                  label: "شقة متاحة",
-                },
-                {
-                  value: `${stats?.avgRating || 4.8}`,
-                  label: "متوسط التقييم",
-                },
-                {
-                  value: "٢٤/٧",
-                  label: "دعم متواصل",
-                },
-              ].map((stat) => (
-                <div key={stat.label} className="text-center">
-                  <div className="text-2xl md:text-3xl font-bold text-[var(--clay-accent)]">
-                    {stat.value}
-                  </div>
-                  <div className="text-xs md:text-sm text-[var(--muted-foreground)]">
-                    {stat.label}
-                  </div>
+              <div className="hidden md:block w-px h-8 bg-neutral-200 dark:bg-neutral-800" />
+
+              {/* الضيوف */}
+              <div className="md:col-span-2 flex items-center gap-2 px-3.5 py-2.5 rounded-2xl hover:bg-neutral-100/70 dark:hover:bg-neutral-800/70 transition-colors">
+                <div className="flex-1 min-w-0">
+                  <span className="text-[10px] font-bold text-neutral-400 dark:text-neutral-500 block">
+                    الضيوف
+                  </span>
+                  <select
+                    value={searchGuests}
+                    onChange={(e) => setSearchGuests(Number(e.target.value))}
+                    className="w-full bg-transparent text-xs font-extrabold text-neutral-900 dark:text-neutral-100 focus:outline-none cursor-pointer"
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                      <option key={n} value={n}>
+                        {n} {n === 1 ? "ضيف" : "ضيوف"}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              ))}
-            </motion.div>
-          </motion.div>
+              </div>
+
+              {/* زر البحث */}
+              <div className="md:col-span-2">
+                <button
+                  type="submit"
+                  className="w-full h-12 rounded-2xl bg-gradient-to-r from-[var(--clay-accent)] via-[#D4A574] to-[var(--clay-accent)] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg shadow-[var(--clay-accent)]/25 hover:opacity-95 active:scale-98 transition-all"
+                >
+                  <Search className="w-4 h-4" />
+                  <span>بحث</span>
+                </button>
+              </div>
+            </div>
+          </motion.form>
         </div>
       </section>
 
-      {/* ─── Featured Apartments ─── */}
-      {featuredApartments && featuredApartments.length > 0 && (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 mb-20">
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-100px" }}
+      {/* ─── Circular Destinations ("في كل زاوية من العلا لك إقامة" - Gathern Style) ─── */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 pt-12 pb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl md:text-2xl font-black text-neutral-900 dark:text-neutral-100 tracking-tight">
+            في كل زاوية من العلا لك إقامة
+          </h2>
+          <Link
+            to="/apartments"
+            className="text-xs font-bold text-[var(--clay-accent)] hover:underline"
           >
-            <motion.div variants={fadeUp} custom={0} className="mb-8">
-              <h2 className="text-2xl md:text-3xl font-bold text-[var(--foreground)]">
-                شقق مميزة في العلا
-              </h2>
-              <p className="text-[var(--muted-foreground)] mt-2">
-                أعلى تقييمات وأكثر الشقق طلباً من ضيوفنا
-              </p>
-            </motion.div>
+            استكشف الخريطة
+          </Link>
+        </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {featuredApartments.map((apt, i) => (
-                <motion.div key={apt._id} variants={fadeUp} custom={i + 1}>
-                  <ApartmentCard apartment={apt as ApartmentRecord} />
-                </motion.div>
-              ))}
+        <div className="flex items-center gap-5 sm:gap-7 overflow-x-auto pb-4 pt-1 no-scrollbar scroll-smooth">
+          {alUlaDestinations.map((dest) => (
+            <div
+              key={dest.id}
+              onClick={() => navigate(`/apartments?location=${encodeURIComponent(dest.location)}`)}
+              className="group cursor-pointer flex flex-col items-center gap-2 shrink-0 transition-transform hover:-translate-y-1"
+            >
+              <div className="relative w-18 h-18 sm:w-22 sm:h-22 rounded-full p-0.5 bg-gradient-to-tr from-[var(--clay-accent)] to-[var(--clay-gold)] shadow-md group-hover:shadow-xl transition-all">
+                <div className="w-full h-full rounded-full overflow-hidden border-2 border-white dark:border-neutral-900 bg-neutral-200">
+                  <img
+                    src={dest.image}
+                    alt={dest.name}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  />
+                </div>
+              </div>
+              <span className="text-xs sm:text-sm font-bold text-neutral-800 dark:text-neutral-200 text-center max-w-[90px] leading-tight group-hover:text-[var(--clay-accent)] transition-colors">
+                {dest.name}
+              </span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ─── Curated Carousels (Gathern Style Rows) ─── */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4 space-y-2">
+        {/* الصف الأول: اسكن حول المعالم التراثية */}
+        {heritageApartments.length > 0 && (
+          <ApartmentCarousel
+            title="اسكن حول المعالم التراثية (الحِجر ودادان)"
+            subtitle="شقق وأجنحة في قلب عبق التاريخ والبلدة القديمة"
+            apartments={heritageApartments}
+            onViewAll={() => navigate("/apartments")}
+          />
+        )}
+
+        {/* الصف الثاني: أجنحة بإطلالات جبلية وصخرة الفيل */}
+        {mountainApartments.length > 0 && (
+          <ApartmentCarousel
+            title="أجنحة بإطلالات جبلية وصخرة الفيل"
+            subtitle="إطلالات ساحرة على تشكيلات صخور وجبال العلا الصحراوية"
+            apartments={mountainApartments}
+            onViewAll={() => navigate("/apartments")}
+          />
+        )}
+
+        {/* الصف الثالث: إقامات واحة النخيل */}
+        {oasisApartments.length > 0 && (
+          <ApartmentCarousel
+            title="إقامات قلب واحة النخيل والهدوء"
+            subtitle="استوديوهات وشاليهات وسط بساتين النخيل والحمضيات"
+            apartments={oasisApartments}
+            onViewAll={() => navigate("/apartments")}
+          />
+        )}
+
+        {/* الصف الرابع: فلل ملكية ومزارع بمسابح خاصة */}
+        {luxuryVillas.length > 0 && (
+          <ApartmentCarousel
+            title="فلل ملكية ومزارع بمسابح خاصة"
+            subtitle="مساحات رحبة وخصوصية تامة للعائلات والمجموعات"
+            apartments={luxuryVillas}
+            onViewAll={() => navigate("/apartments")}
+          />
+        )}
+      </div>
+
+      {/* ─── Host Gateway Banner (بوابة المضيفين - Gathern Style) ─── */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 my-14">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#2A1F17] via-[#3D2B1F] to-[#2A1F17] text-white p-6 sm:p-10 shadow-2xl border border-amber-900/40">
+          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="text-right max-w-xl">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 mb-3">
+                <Sparkles className="w-3.5 h-3.5" />
+                لأصحاب العقارات والشقق في العلا
+              </span>
+              <h3 className="text-2xl sm:text-3xl font-black mb-2">
+                تبي تعرض وحدتك أو عقارك للإيجار؟
+              </h3>
+              <p className="text-sm sm:text-base text-neutral-300 leading-relaxed">
+                انضم إلى نخبة مضيفي شقق العلا، واستقبل زوار وسياح العلا من كافة أنحاء العالم مع نظام دفع إلكتروني آمن ودعم مستمر.
+              </p>
             </div>
 
-            <motion.div variants={fadeUp} custom={5} className="text-center mt-10">
+            <div className="shrink-0 flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
               <Link
-                to="/apartments"
-                className="clay-btn-outline inline-flex items-center gap-2 text-sm"
+                to="/add-apartment"
+                className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-[var(--clay-accent)] to-[var(--clay-gold)] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-xl hover:scale-102 transition-all"
               >
-                عرض جميع الشقق
-                <ChevronLeft className="w-4 h-4" />
+                <Building2 className="w-4 h-4" />
+                <span>أضف عقارك الآن</span>
               </Link>
-            </motion.div>
-          </motion.div>
-        </section>
-      )}
-
-      {/* ─── AlUla Highlights ─── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 mb-20">
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-100px" }}
-        >
-          <motion.div variants={fadeUp} custom={0} className="text-center mb-10">
-            <h2 className="text-2xl md:text-3xl font-bold text-[var(--foreground)]">
-              لماذا العلا؟
-            </h2>
-            <p className="text-[var(--muted-foreground)] mt-2 max-w-lg mx-auto">
-              واحدة من أجمل الوجهات السياحية في العالم، حيث يلتقي التاريخ بالطبيعة
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {alUlaHighlights.map((item, i) => (
-              <motion.div key={item.title} variants={fadeUp} custom={i + 1}>
-                <div className="clay p-6 text-center h-full group hover:-translate-y-1 transition-all">
-                  <div
-                    className={`w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br ${item.color} flex items-center justify-center mb-4 shadow-lg group-hover:shadow-xl transition-shadow`}
-                  >
-                    <item.icon className="w-7 h-7 text-white" />
-                  </div>
-                  <h3 className="font-bold text-[var(--foreground)] mb-2">
-                    {item.title}
-                  </h3>
-                  <p className="text-sm text-[var(--muted-foreground)] leading-relaxed">
-                    {item.desc}
-                  </p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-      </section>
-
-      {/* ─── Features ─── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 mb-20">
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-100px" }}
-        >
-          <motion.div variants={fadeUp} custom={0} className="text-center mb-10">
-            <h2 className="text-2xl md:text-3xl font-bold text-[var(--foreground)]">
-              لماذا تختار شقق العلا؟
-            </h2>
-            <p className="text-[var(--muted-foreground)] mt-2">
-              نقدم لك تجربة حجز مريحة وآمنة مع أفضل الشقق في المنطقة
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {features.map((feature, i) => (
-              <motion.div key={feature.title} variants={fadeUp} custom={i + 1}>
-                <div className="clay p-6 h-full group hover:-translate-y-1 transition-all">
-                  <div className="w-12 h-12 rounded-2xl bg-[var(--clay-accent-soft)] flex items-center justify-center mb-4 group-hover:bg-[var(--clay-accent)] group-hover:text-white transition-colors">
-                    <feature.icon className="w-6 h-6 text-[var(--clay-accent)] group-hover:text-white transition-colors" />
-                  </div>
-                  <h3 className="font-bold text-[var(--foreground)] mb-2">
-                    {feature.title}
-                  </h3>
-                  <p className="text-sm text-[var(--muted-foreground)] leading-relaxed">
-                    {feature.desc}
-                  </p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-      </section>
-
-      {/* ─── CTA Section ─── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 mb-20">
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          variants={fadeUp}
-          custom={0}
-        >
-          <div className="clay overflow-hidden relative">
-            <div className="absolute inset-0 bg-gradient-to-br from-[var(--clay-accent)] via-[#A0522D] to-[var(--clay-gold)] opacity-90" />
-            <div className="relative px-8 py-16 md:px-16 md:py-20 text-center text-white">
-              <h2 className="text-3xl md:text-4xl font-extrabold mb-4">
-                احجز شقتك في العلا الآن
-              </h2>
-              <p className="text-white/80 max-w-xl mx-auto mb-8 text-lg leading-relaxed">
-                لا تفوت فرصة العيش في أجمل مناطق العالم.
-                اختر شقتك واستمتع بتجربة لا تُنسى
-              </p>
               <Link
-                to="/apartments"
-                className="inline-flex items-center gap-2 bg-white text-[var(--clay-accent)] font-bold px-8 py-4 rounded-2xl text-lg hover:bg-white/90 transition-colors shadow-xl hover:shadow-2xl"
+                to="/owner"
+                className="px-6 py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-sm flex items-center justify-center gap-2 border border-white/20 transition-colors"
               >
-                <Search className="w-5 h-5" />
-                ابدأ البحث الآن
+                <span>بوابة المضيفين</span>
               </Link>
             </div>
           </div>
-        </motion.div>
+        </div>
+      </section>
+
+      {/* ─── Ministry of Tourism & Trust Bar ─── */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 mb-12">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-white dark:bg-neutral-900 p-4 rounded-2xl border border-neutral-200/80 dark:border-neutral-800 flex items-center gap-3 shadow-xs">
+            <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
+                مرخص ومعتمد رسمياً
+              </h4>
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                شقق مرخصة ومطابقة لاشتراطات وزارة السياحة
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-neutral-900 p-4 rounded-2xl border border-neutral-200/80 dark:border-neutral-800 flex items-center gap-3 shadow-xs">
+            <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 flex items-center justify-center shrink-0">
+              <CreditCard className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
+                دفع إلكتروني آمن
+              </h4>
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                مدى، Apple Pay، فيزا وماستركارد بأمان تام
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-neutral-900 p-4 rounded-2xl border border-neutral-200/80 dark:border-neutral-800 flex items-center gap-3 shadow-xs">
+            <div className="w-10 h-10 rounded-xl bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-400 flex items-center justify-center shrink-0">
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
+                تأكيد حجز فوري
+              </h4>
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                رمز حجز مباشر مع تفاصيل الوصول للموقع
+              </p>
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* ─── Footer ─── */}
-      <footer className="border-t border-[var(--border)] bg-[var(--background)]">
+      <footer className="border-t border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div>
@@ -413,31 +471,38 @@ export default function Landing() {
                   <span className="text-white font-bold text-sm">عُ</span>
                 </div>
                 <div>
-                  <span className="font-bold text-lg text-[var(--foreground)]">
+                  <span className="font-bold text-lg text-neutral-900 dark:text-neutral-100">
                     شقق العلا
                   </span>
-                  <span className="block text-[10px] text-[var(--muted-foreground)] -mt-1">
-                    ALULA APARTMENTS
+                  <span className="block text-[10px] text-neutral-400 -mt-1 tracking-wider">
+                    ALULA STAYS
                   </span>
                 </div>
               </div>
-              <p className="text-sm text-[var(--muted-foreground)] leading-relaxed">
-                منصة حجز الشقق الأولى في العلا. شقق فاخرة بإطلالات خلابة في أقدم منطقة أثرية في العالم.
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed mb-4">
+                منصة حجز وإدارة شقق وإقامات العلا الأولى. تجربة ضيافة سعودية فريدة بإطلالات ساحرة على التاريخ والطبيعة.
               </p>
+              <div className="flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-200/50">
+                <Lock className="w-3.5 h-3.5 shrink-0" />
+                <span>مرخصة سياحياً لخدمات الإيواء السياحي بالعلا</span>
+              </div>
             </div>
 
             <div>
-              <h4 className="font-bold text-[var(--foreground)] mb-4">روابط سريعة</h4>
+              <h4 className="font-bold text-sm text-neutral-900 dark:text-neutral-100 mb-3">
+                روابط سريعة
+              </h4>
               <div className="flex flex-col gap-2">
                 {[
-                  { href: "/apartments", label: "تصفح الشقق" },
-                  { href: "/", label: "الرئيسية" },
-                  { href: "/auth", label: "تسجيل الدخول" },
+                  { href: "/apartments", label: "تصفح جميع الشقق" },
+                  { href: "/add-apartment", label: "أضف عقارك كشريك" },
+                  { href: "/owner", label: "بوابة المضيفين" },
+                  { href: "/auth", label: "تسجيل الدخول / إنشاء حساب" },
                 ].map((link) => (
                   <Link
                     key={link.href}
                     to={link.href}
-                    className="text-sm text-[var(--muted-foreground)] hover:text-[var(--clay-accent)] transition-colors"
+                    className="text-xs text-neutral-500 dark:text-neutral-400 hover:text-[var(--clay-accent)] transition-colors"
                   >
                     {link.label}
                   </Link>
@@ -446,34 +511,26 @@ export default function Landing() {
             </div>
 
             <div>
-              <h4 className="font-bold text-[var(--foreground)] mb-4">تواصل معنا</h4>
-              <div className="flex flex-col gap-2 text-sm text-[var(--muted-foreground)]">
+              <h4 className="font-bold text-sm text-neutral-900 dark:text-neutral-100 mb-3">
+                تواصل معنا
+              </h4>
+              <div className="flex flex-col gap-2 text-xs text-neutral-500 dark:text-neutral-400">
                 <span>📍 العلا، المملكة العربية السعودية</span>
                 <span>📧 {siteSettings?.contactEmail || "info@soqaqalaula.world"}</span>
-                <span>📱 {siteSettings?.contactPhone || "+966-XX-XXX-XXXX"}</span>
-                {siteSettings?.whatsapp && <span>💬 {siteSettings.whatsapp}</span>}
+                <span>📱 {siteSettings?.contactPhone && !siteSettings.contactPhone.includes("XX") ? siteSettings.contactPhone : "+966 50 123 4567"}</span>
+                {siteSettings?.whatsapp && <span>💬 واتساب: {siteSettings.whatsapp}</span>}
               </div>
             </div>
           </div>
 
-          <div className="mt-8 flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs">
-            {[
-              ["/legal/about", "من نحن"],
-              ["/legal/terms", "شروط الاستخدام"],
-              ["/legal/privacy", "سياسة الخصوصية"],
-              ["/legal/cancellation", "الإلغاء والاسترداد"],
-              ["/legal/owners", "سياسة المالكين"],
-              ["/legal/faq", "الأسئلة الشائعة"],
-              ["/legal/complaints", "الشكاوى"],
-            ].map(([to, label]) => (
-              <Link key={to} to={to} className="text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
-                {label}
-              </Link>
-            ))}
-          </div>
-
-          <div className="mt-6 pt-6 border-t border-[var(--border)] text-center text-xs text-[var(--muted-foreground)]">
-            © {new Date().getFullYear()} شقق العلا. جميع الحقوق محفوظة.
+          <div className="mt-8 pt-6 border-t border-neutral-100 dark:border-neutral-800 flex flex-wrap justify-between items-center gap-4 text-xs text-neutral-400">
+            <div className="flex flex-wrap gap-4">
+              <Link to="/legal/about" className="hover:text-neutral-700 dark:hover:text-neutral-200">من نحن</Link>
+              <Link to="/legal/terms" className="hover:text-neutral-700 dark:hover:text-neutral-200">الشروط والأحكام</Link>
+              <Link to="/legal/privacy" className="hover:text-neutral-700 dark:hover:text-neutral-200">سياسة الخصوصية</Link>
+              <Link to="/legal/cancellation" className="hover:text-neutral-700 dark:hover:text-neutral-200">سياسة الإلغاء</Link>
+            </div>
+            <span>© {new Date().getFullYear()} شقق العلا. جميع الحقوق محفوظة.</span>
           </div>
         </div>
       </footer>

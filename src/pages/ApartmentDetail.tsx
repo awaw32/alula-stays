@@ -172,6 +172,13 @@ export default function ApartmentDetail() {
   const [redirectingToPayment, setRedirectingToPayment] = useState(false);
   const [createdBookingId, setCreatedBookingId] = useState<Id<"bookings"> | null>(null);
 
+  // Reviews state
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+
   // Share modal state
   const [showShareModal, setShowShareModal] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -379,7 +386,7 @@ export default function ApartmentDetail() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 pb-12">
         {/* Breadcrumb */}
         <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={0}>
-            <div className="mb-6 flex items-center gap-2 text-sm text-[var(--muted-foreground)]">
+          <div className="mb-6 flex items-center gap-2 text-sm text-[var(--muted-foreground)]">
             <Link to="/" className="transition-colors hover:text-[var(--clay-accent)]">الرئيسية</Link>
             <span>/</span>
             <Link to="/apartments" className="hover:text-[var(--clay-accent)] transition-colors">الشقق</Link>
@@ -388,48 +395,119 @@ export default function ApartmentDetail() {
           </div>
         </motion.div>
 
-        {/* Image Gallery */}
+        {/* Image Gallery — شبكة صور فسيفسائية راقية كالفنادق العالمية (Mosaic Grid) */}
         <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={1}>
-          <div className="clay overflow-hidden mb-8">
+          <div className="relative mb-8 rounded-3xl overflow-hidden shadow-xl border border-[var(--border)] bg-[var(--clay-surface)]">
+            {/* Desktop Mosaic: 1 large on right, 4 grid on left */}
+            <div className="hidden md:grid md:grid-cols-4 gap-2 aspect-[21/9] max-h-[520px]">
+              {/* Main Photo (Takes 2 cols) */}
+              <div
+                className="col-span-2 relative h-full overflow-hidden cursor-pointer group"
+                onClick={() => { setSelectedImage(0); setShowLightbox(true); }}
+              >
+                <img
+                  src={apartment.images[0]}
+                  alt={getApartmentTitle(apartment)}
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
+              </div>
+
+              {/* Secondary Grid (4 images) */}
+              <div className="col-span-2 grid grid-cols-2 gap-2 h-full">
+                {[1, 2, 3, 4].map((idx) => {
+                  const img = apartment.images[idx] || apartment.images[idx % apartment.images.length];
+                  return (
+                    <div
+                      key={idx}
+                      className="relative h-full overflow-hidden cursor-pointer group"
+                      onClick={() => { setSelectedImage(idx < apartment.images.length ? idx : 0); setShowLightbox(true); }}
+                    >
+                      <img
+                        src={img}
+                        alt={`${getApartmentTitle(apartment)} - ${idx + 1}`}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Mobile View: Single hero with tap to open */}
             <div
-              className="relative aspect-[16/9] md:aspect-[21/9] bg-[var(--clay-surface)] cursor-pointer overflow-hidden rounded-t-[1.5rem]"
+              className="md:hidden relative aspect-[16/10] overflow-hidden cursor-pointer"
               onClick={() => setShowLightbox(true)}
             >
-              <img src={apartment.images[selectedImage]} alt={getApartmentTitle(apartment)} className="h-full w-full object-cover transition-transform duration-500 hover:scale-105" />
-              {displayBadges.length > 0 && (
-                <div className="absolute top-4 left-4 flex gap-2">
-                  {displayBadges.map((badge, i) => (
-                    <span key={i} className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold ${badge.color}`}>
-                      <badge.icon className="w-3.5 h-3.5" />{badge.label}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {/* Share button */}
+              <img
+                src={apartment.images[selectedImage]}
+                alt={getApartmentTitle(apartment)}
+                className="w-full h-full object-cover"
+              />
+            </div>
+
+            {/* Floating Action Buttons: Share & Favorite */}
+            <div className="absolute top-4 right-4 flex items-center gap-2 z-20">
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); void handleShare(); }}
-                className="absolute right-16 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-gray-700 shadow-lg backdrop-blur-sm transition-transform hover:scale-110 hover:text-[var(--clay-accent)]"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-white/95 dark:bg-neutral-900/90 text-gray-700 dark:text-gray-200 shadow-lg backdrop-blur-md transition-all hover:scale-110 hover:text-[var(--clay-accent)]"
                 aria-label="مشاركة الشقة"
               >
-                <Share2 className="h-5 w-5" aria-hidden="true" />
+                <Share2 className="h-4 w-4" aria-hidden="true" />
               </button>
-              {/* Favorite button */}
               <button
+                type="button"
                 onClick={(e) => { e.stopPropagation(); void handleFavorite(); }}
-                 className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-lg backdrop-blur-sm transition-transform hover:scale-110"
-                 aria-label={isFavorited ? "إزالة الشقة من المفضلة" : "إضافة الشقة إلى المفضلة"}
-               >
-                 <Heart className={`h-5 w-5 ${isFavorited ? "fill-red-500 text-red-500" : "text-gray-400"}`} aria-hidden="true" />
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-white/95 dark:bg-neutral-900/90 shadow-lg backdrop-blur-md transition-all hover:scale-110"
+                aria-label={isFavorited ? "إزالة الشقة من المفضلة" : "إضافة الشقة إلى المفضلة"}
+              >
+                <Heart className={`h-4 w-4 ${isFavorited ? "fill-red-500 text-red-500" : "text-gray-400"}`} aria-hidden="true" />
               </button>
             </div>
-            <div className="flex gap-2 p-3 overflow-x-auto">
-               {apartment.images.map((img, i) => (
-                 <button key={i} type="button" onClick={() => setSelectedImage(i)} className={`h-16 w-20 shrink-0 overflow-hidden rounded-xl border-2 transition-all ${selectedImage === i ? "border-[var(--clay-accent)] shadow-md" : "border-transparent opacity-70 hover:opacity-100"}`} aria-label={`عرض الصورة ${i + 1}`} aria-pressed={selectedImage === i}>
-                   <img src={img} alt={`${getApartmentTitle(apartment)} - صورة ${i + 1}`} className="h-full w-full object-cover" />
-                </button>
+
+            {/* Badges Overlay */}
+            <div className="absolute top-4 left-4 flex flex-wrap gap-2 z-20">
+              {apartment.tourismLicenseNumber && (
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-700/95 text-white shadow-lg backdrop-blur-md">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  مرخص سياحياً
+                </span>
+              )}
+              {displayBadges.map((badge, i) => (
+                <span key={i} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold shadow-md backdrop-blur-md ${badge.color}`}>
+                  <badge.icon className="w-3.5 h-3.5" />{badge.label}
+                </span>
               ))}
             </div>
+
+            {/* "Show All Photos" Button */}
+            <button
+              type="button"
+              onClick={() => setShowLightbox(true)}
+              className="absolute bottom-4 left-4 z-20 flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/95 dark:bg-neutral-900/90 text-[var(--foreground)] text-xs font-bold shadow-xl backdrop-blur-md hover:bg-white transition-all hover:scale-102 border border-black/10"
+            >
+              <Maximize className="w-3.5 h-3.5 text-[var(--clay-accent)]" />
+              <span>عرض جميع الصور ({apartment.images.length})</span>
+            </button>
+          </div>
+
+          {/* Mobile swipe thumbnails */}
+          <div className="md:hidden flex gap-2 mb-8 overflow-x-auto pb-2">
+            {apartment.images.map((img, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setSelectedImage(i)}
+                className={`h-16 w-20 shrink-0 overflow-hidden rounded-xl border-2 transition-all ${
+                  selectedImage === i ? "border-[var(--clay-accent)] shadow-md" : "border-transparent opacity-70 hover:opacity-100"
+                }`}
+                aria-label={`عرض الصورة ${i + 1}`}
+              >
+                <img src={img} alt={`${getApartmentTitle(apartment)} - صورة ${i + 1}`} className="h-full w-full object-cover" />
+              </button>
+            ))}
           </div>
         </motion.div>
 
