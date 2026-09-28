@@ -358,10 +358,19 @@ const schema = defineSchema(
       emailProvider: v.optional(v.string()), // sendgrid | mailgun | none
       emailApiKeyLast4: v.optional(v.string()),
       mapsProvider: v.optional(v.string()), // openstreetmap | google
+      tourismLicenseNumber: v.optional(v.string()), // رقم ترخيص وزارة السياحة أو السجل التجاري
+      isTourismLicensed: v.optional(v.boolean()), // هل الترخيص مفعل للعرض في الموقع
       notes: v.optional(v.string()),
       updatedAt: v.number(),
       updatedBy: v.optional(v.id("users")),
     }),
+
+    // سجل مؤقت لرموز التحقق لتسهيل تسجيل الدخول واختبار المنصة
+    devOtpLogs: defineTable({
+      phone: v.string(),
+      code: v.string(),
+      createdAt: v.number(),
+    }).index("by_phone", ["phone"]),
 
     // طلبات التحقق من هوية المالك
     identityVerifications: defineTable({

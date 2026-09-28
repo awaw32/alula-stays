@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/error-message";
-import { Settings, Loader2 } from "lucide-react";
+import { Settings, Loader2, Shield } from "lucide-react";
 
 interface FormState {
   brandName: string;
@@ -15,12 +15,14 @@ interface FormState {
   paymentProvider: string;
   emailProvider: string;
   mapsProvider: string;
+  tourismLicenseNumber: string;
+  isTourismLicensed: boolean;
 }
 
 const EMPTY: FormState = {
   brandName: "", contactEmail: "", contactPhone: "", whatsapp: "",
   instagram: "", twitter: "", paymentProvider: "", emailProvider: "",
-  mapsProvider: "",
+  mapsProvider: "", tourismLicenseNumber: "", isTourismLicensed: false,
 };
 
 export function AdminSettings() {
@@ -45,6 +47,8 @@ export function AdminSettings() {
         paymentProvider: values.paymentProvider || undefined,
         emailProvider: values.emailProvider || undefined,
         mapsProvider: values.mapsProvider || undefined,
+        tourismLicenseNumber: values.tourismLicenseNumber || undefined,
+        isTourismLicensed: values.isTourismLicensed,
       });
       toast.success(result);
     } catch (error) {
@@ -71,6 +75,8 @@ export function AdminSettings() {
         paymentProvider: settings.paymentProvider ?? "",
         emailProvider: settings.emailProvider ?? "",
         mapsProvider: settings.mapsProvider ?? "",
+        tourismLicenseNumber: (settings as any).tourismLicenseNumber ?? "",
+        isTourismLicensed: Boolean((settings as any).isTourismLicensed),
       } : EMPTY}
       saving={saving}
       onSubmit={handleSave}
@@ -158,7 +164,49 @@ function SettingsForm({
           </div>
         </div>
 
-        <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-800 leading-6">
+        {/* ─── قسم الترخيص السياحي للمنصة ─── */}
+        <div className="border-t border-neutral-200 dark:border-neutral-800 pt-5 mt-5">
+          <h4 className="font-extrabold mb-2 flex items-center gap-2 text-sm text-neutral-900 dark:text-neutral-100">
+            <Shield className="w-4 h-4 text-emerald-600" />
+            بيانات الترخيص السياحي للمنصة
+          </h4>
+          <p className="text-xs text-[var(--muted-foreground)] mb-4 leading-relaxed">
+            تحكّم في إظهار شارة الاعتماد والترخيص السياحي في الموقع. المنصة غير مرخصة حالياً ولن تظهر الشارة إلا إذا قمت بتفعيل هذا الخيار وإدخال رقم الترخيص هنا.
+          </p>
+
+          <div className="space-y-3 bg-neutral-50 dark:bg-neutral-800/40 p-3.5 rounded-2xl border border-neutral-200/70 dark:border-neutral-700/50">
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={form.isTourismLicensed}
+                onChange={(e) => set("isTourismLicensed", e.target.checked)}
+                className="w-4 h-4 rounded text-[var(--clay-accent)] focus:ring-[var(--clay-accent)] accent-[var(--clay-accent)] cursor-pointer"
+              />
+              <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">
+                تفعيل إظهار الشارة والترخيص السياحي في الموقع العام
+              </span>
+            </label>
+
+            {form.isTourismLicensed && (
+              <div className="pt-2 animate-in fade-in duration-200">
+                <label htmlFor="st-license" className={labelCls}>
+                  رقم ترخيص وزارة السياحة أو السجل التجاري / وثيقة العمل الحر
+                </label>
+                <input
+                  id="st-license"
+                  type="text"
+                  dir="ltr"
+                  value={form.tourismLicenseNumber}
+                  onChange={(e) => set("tourismLicenseNumber", e.target.value)}
+                  placeholder="مثال: 7310000000 أو 1010XXXXXX"
+                  className={inputCls}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-800 leading-6 mt-4">
           🔐 <strong>المفاتيح الحقيقية</strong> لا تُخزَّن هنا — أضِفها في
           <a href="https://dashboard.convex.dev" target="_blank" rel="noreferrer" className="underline mx-1">Convex Dashboard</a>
           ← Settings ← Environment Variables (مثل STRIPE_SECRET_KEY وSTRIPE_WEBHOOK_SECRET). هنا تسجّل المزود فقط.

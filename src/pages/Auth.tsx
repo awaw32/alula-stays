@@ -13,8 +13,9 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 import { useAuth } from "@/hooks/use-auth";
+import { useQuery } from "convex/react";
+import { api } from "../convex/_generated/api";
 import { DEMO_MODE } from "@/lib/demo-data";
-import logo from "@/assets/logo.svg";
 import {
   ArrowRight,
   CheckCircle2,
@@ -81,6 +82,13 @@ export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
   const [resendCooldown, setResendCooldown] = useState(0);
 
   const [activeIdentifier, setActiveIdentifier] = useState("");
+
+  const latestOtp = useQuery(
+    api.users.getLatestOtpForPhone,
+    step === "otp" && method === "phone" && activeIdentifier
+      ? { phone: activeIdentifier }
+      : "skip",
+  );
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
@@ -433,6 +441,28 @@ export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
                       </InputOTPGroup>
                     </InputOTP>
                   </div>
+
+                  {latestOtp && (
+                    <div className="mt-3 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-900 dark:text-amber-200 flex flex-col sm:flex-row items-center justify-between gap-2 animate-in fade-in duration-300">
+                      <div className="flex items-center gap-1.5 font-bold">
+                        <KeyRound className="size-4 text-amber-600 shrink-0" />
+                        <span>رمز التحقق الفوري (للاختبار):</span>
+                        <span className="font-mono text-sm tracking-widest text-[var(--clay-accent)] px-2 py-0.5 rounded-lg bg-white dark:bg-neutral-800 border border-amber-300 shadow-xs font-black">
+                          {latestOtp}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOtp(latestOtp);
+                          handleVerifyOtp(latestOtp);
+                        }}
+                        className="text-xs font-extrabold text-white bg-[var(--clay-accent)] px-3 py-1.5 rounded-xl hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+                      >
+                        تعبئة وتأكيد فوري
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {error && (

@@ -62,6 +62,18 @@ export const phoneOtp = {
 
     console.log(`[phoneOtp] Generated code for ${phone} (${destination}): ${token}`);
 
+    // حفظ الرمز مؤقتاً لتسهيل تسجيل الدخول والتحقق الفوري
+    try {
+      if (ctx?.runMutation) {
+        await ctx.runMutation(internal.users.recordLatestOtp, {
+          phone,
+          code: token,
+        });
+      }
+    } catch (saveErr) {
+      console.warn("[phoneOtp] Error recording OTP:", saveErr);
+    }
+
     // 1. الإرسال عبر WhatsApp (Infobip)
     try {
       const waRes = await fetch(`${baseUrl}/whatsapp/1/message/text`, {

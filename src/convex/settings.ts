@@ -39,6 +39,8 @@ export const update = mutation({
     paymentProvider: v.optional(v.string()),
     emailProvider: v.optional(v.string()),
     mapsProvider: v.optional(v.string()),
+    tourismLicenseNumber: v.optional(v.string()),
+    isTourismLicensed: v.optional(v.boolean()),
     notes: v.optional(v.string()),
   },
   handler: async (ctx: MutationCtx, args) => {
@@ -97,6 +99,8 @@ export const update = mutation({
         paymentProvider: args.paymentProvider,
         emailProvider: args.emailProvider,
         mapsProvider: args.mapsProvider,
+        tourismLicenseNumber: args.tourismLicenseNumber,
+        isTourismLicensed: args.isTourismLicensed,
         notes: args.notes,
         updatedAt: Date.now(),
         updatedBy: admin._id,

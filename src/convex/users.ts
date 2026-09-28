@@ -216,5 +216,44 @@ export const getEmailByPhone = internalQuery({
   },
 });
 
+/**
+ * حفظ رمز التحقق مؤقتاً لتسهيل تسجيل الدخول واختبار المنصة إذا تعطل مزود SMS
+ */
+export const recordLatestOtp = internalMutation({
+  args: { phone: v.string(), code: v.string() },
+  handler: async (ctx, args) => {
+    const raw = args.phone.trim().replace(/[^\d]/g, "");
+    if (!raw) return;
+    const existing = await ctx.db
+      .query("devOtpLogs")
+      .withIndex("by_phone", (q) => q.eq("phone", raw))
+      .first();
+    if (existing) {
+      await ctx.db.patch(existing._id, { code: args.code, createdAt: Date.now() });
+    } else {
+      await ctx.db.insert("devOtpLogs", { phone: raw, code: args.code, createdAt: Date.now() });
+    }
+  },
+});
+
+/**
+ * جلب رمز التحقق الأخير لرقم الجوال (صالح لمدة 10 دقائق)
+ */
+export const getLatestOtpForPhone = query({
+  args: { phone: v.string() },
+  handler: async (ctx, args) => {
+    const raw = args.phone.trim().replace(/[^\d]/g, "");
+    if (!raw) return null;
+    const item = await ctx.db
+      .query("devOtpLogs")
+      .withIndex("by_phone", (q) => q.eq("phone", raw))
+      .first();
+    if (!item) return null;
+    const data = item as any;
+    if (Date.now() - (data.createdAt ?? 0) > 10 * 60 * 1000) return null;
+    return data.code ?? null;
+  },
+});
+
 
 

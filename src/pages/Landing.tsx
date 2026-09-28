@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Navigation } from "@/components/Navigation";
 import { ApartmentCarousel } from "@/components/apartments/ApartmentCarousel";
 import { useQuery } from "convex/react";
@@ -7,6 +7,7 @@ import { api } from "../convex/_generated/api";
 import { DEMO_MODE, DEMO_APARTMENTS } from "@/lib/demo-data";
 import { Link, useNavigate } from "react-router";
 import type { ApartmentRecord } from "@/types/apartment";
+import { cn } from "@/lib/utils";
 import {
   Search,
   MapPin,
@@ -17,7 +18,27 @@ import {
   Building2,
   CreditCard,
   Lock,
+  Users,
 } from "lucide-react";
+
+const HERO_IMAGES = [
+  {
+    url: "https://images.unsplash.com/photo-1682687220063-4742bd7fd538?w=1800&q=85&auto=format&fit=crop",
+    title: "جبل الفيل وتكوينات العلا الصخرية الساحرة",
+  },
+  {
+    url: "https://images.unsplash.com/photo-1578895101408-1a36b834405b?w=1800&q=85&auto=format&fit=crop",
+    title: "آثار الحِجر ومدائن صالح التاريخية",
+  },
+  {
+    url: "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=1800&q=85&auto=format&fit=crop",
+    title: "واحات ونخيل العلا الغنّاء بين الجبال",
+  },
+  {
+    url: "https://images.unsplash.com/photo-1544644181-1484b3fdfc62?w=1800&q=85&auto=format&fit=crop",
+    title: "جبال وسهول العلا الخلابة في لحظات الغروب",
+  },
+];
 
 const alUlaDestinations = [
   {
@@ -86,6 +107,16 @@ export default function Landing() {
   const siteSettings = useQuery(api.settings.get, {});
   const navigate = useNavigate();
 
+  // Hero background slideshow timer
+  const [currentBgIndex, setCurrentBgIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentBgIndex((prev) => (prev + 1) % HERO_IMAGES.length);
+    }, 4500);
+    return () => clearInterval(timer);
+  }, []);
+
   // Search state
   const [searchLocation, setSearchLocation] = useState("");
   const [searchCheckIn, setSearchCheckIn] = useState("");
@@ -146,13 +177,24 @@ export default function Landing() {
 
       {/* ─── Hero Section with Saudi Welcome Banner (Gathern Style) ─── */}
       <section className="relative overflow-hidden">
-        {/* Background Image of AlUla with warm gradient overlay */}
-        <div className="relative w-full h-[380px] sm:h-[440px] md:h-[480px]">
-          <img
-            src="https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=1800&q=85&auto=format&fit=crop"
-            alt="طبيعة وجبال العلا الساحرة"
-            className="w-full h-full object-cover object-center brightness-75 contrast-105"
-          />
+        {/* Background Slideshow of AlUla with warm gradient overlay */}
+        <div className="relative w-full h-[370px] sm:h-[430px] md:h-[470px] overflow-hidden">
+          {HERO_IMAGES.map((img, idx) => (
+            <div
+              key={img.url}
+              className={cn(
+                "absolute inset-0 transition-opacity duration-1000 ease-in-out",
+                idx === currentBgIndex ? "opacity-100 scale-100" : "opacity-0 scale-105 pointer-events-none",
+              )}
+              style={{ transitionProperty: "opacity, transform", transitionDuration: "1200ms" }}
+            >
+              <img
+                src={img.url}
+                alt={img.title}
+                className="w-full h-full object-cover object-center brightness-75 contrast-105"
+              />
+            </div>
+          ))}
           <div className="absolute inset-0 bg-gradient-to-t from-[#FAF7F2] via-black/40 to-black/30 dark:from-[#15100C] dark:via-black/60" />
 
           {/* Welcome Text Overlay */}
@@ -194,15 +236,114 @@ export default function Landing() {
         </div>
 
         {/* ─── Floating Search Capsule (Centered over Hero bottom) ─── */}
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 -mt-16 sm:-mt-20 relative z-20">
+        <div className="max-w-5xl mx-auto px-3 sm:px-6 -mt-16 sm:-mt-20 relative z-20">
           <motion.form
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5, delay: 0.2 }}
             onSubmit={handleSearchSubmit}
-            className="bg-white/95 dark:bg-neutral-900/95 backdrop-blur-2xl p-3 sm:p-4 rounded-3xl shadow-2xl border border-neutral-200/80 dark:border-neutral-800"
+            className="bg-white/95 dark:bg-neutral-900/95 backdrop-blur-2xl p-2.5 sm:p-4 rounded-2xl sm:rounded-3xl shadow-2xl border border-neutral-200/80 dark:border-neutral-800"
           >
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-2.5 items-center">
+            {/* ── واجهة الجوال المدمجة والفاخرة (صغيرة وجميلة جنباً إلى جنب) ── */}
+            <div className="block md:hidden space-y-2">
+              {/* السطر الأول: الوجهة والتاريخ جنباً إلى جنب */}
+              <div className="grid grid-cols-2 gap-2">
+                {/* الوجهة أو الحي */}
+                <div className="flex items-center gap-1.5 p-2 rounded-xl bg-neutral-100/80 dark:bg-neutral-800/80 border border-neutral-200/60 dark:border-neutral-700/60 min-w-0">
+                  <div className="w-6 h-6 rounded-lg bg-[var(--clay-accent-soft)] flex items-center justify-center shrink-0">
+                    <MapPin className="w-3 h-3 text-[var(--clay-accent)]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[9px] font-bold text-neutral-400 dark:text-neutral-500 block leading-tight">
+                      الوجهة أو الحي
+                    </span>
+                    <select
+                      value={searchLocation}
+                      onChange={(e) => setSearchLocation(e.target.value)}
+                      className="w-full bg-transparent text-[11px] font-black text-neutral-900 dark:text-neutral-100 focus:outline-none cursor-pointer truncate"
+                    >
+                      <option value="">جميع مناطق العلا</option>
+                      {(liveLocations ?? []).map((loc) => (
+                        <option key={loc} value={loc}>
+                          {loc}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* التواريخ: الوصول والمغادرة معاً */}
+                <div className="flex items-center gap-1.5 p-2 rounded-xl bg-neutral-100/80 dark:bg-neutral-800/80 border border-neutral-200/60 dark:border-neutral-700/60 min-w-0">
+                  <div className="w-6 h-6 rounded-lg bg-[var(--clay-gold-soft)] flex items-center justify-center shrink-0">
+                    <Clock className="w-3 h-3 text-[var(--clay-gold)]" />
+                  </div>
+                  <div className="flex-1 min-w-0 grid grid-cols-2 gap-1">
+                    <div className="min-w-0">
+                      <span className="text-[9px] font-bold text-neutral-400 dark:text-neutral-500 block leading-tight">
+                        الوصول
+                      </span>
+                      <input
+                        type="date"
+                        value={searchCheckIn}
+                        min={new Date().toISOString().split("T")[0]}
+                        onChange={(e) => setSearchCheckIn(e.target.value)}
+                        className="w-full bg-transparent text-[10px] font-extrabold text-neutral-900 dark:text-neutral-100 focus:outline-none p-0 cursor-pointer"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-[9px] font-bold text-neutral-400 dark:text-neutral-500 block leading-tight">
+                        المغادرة
+                      </span>
+                      <input
+                        type="date"
+                        value={searchCheckOut}
+                        min={searchCheckIn || new Date().toISOString().split("T")[0]}
+                        onChange={(e) => setSearchCheckOut(e.target.value)}
+                        className="w-full bg-transparent text-[10px] font-extrabold text-neutral-900 dark:text-neutral-100 focus:outline-none p-0 cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* السطر الثاني: عدد الضيوف وزر البحث جنباً إلى جنب */}
+              <div className="grid grid-cols-2 gap-2">
+                {/* الضيوف */}
+                <div className="flex items-center gap-1.5 p-2 rounded-xl bg-neutral-100/80 dark:bg-neutral-800/80 border border-neutral-200/60 dark:border-neutral-700/60 min-w-0">
+                  <div className="w-6 h-6 rounded-lg bg-neutral-200/70 dark:bg-neutral-700/70 flex items-center justify-center shrink-0">
+                    <Users className="w-3 h-3 text-neutral-600 dark:text-neutral-300" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[9px] font-bold text-neutral-400 dark:text-neutral-500 block leading-tight">
+                      الضيوف
+                    </span>
+                    <select
+                      value={searchGuests}
+                      onChange={(e) => setSearchGuests(Number(e.target.value))}
+                      className="w-full bg-transparent text-[11px] font-black text-neutral-900 dark:text-neutral-100 focus:outline-none cursor-pointer"
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                        <option key={n} value={n}>
+                          {n} {n === 1 ? "ضيف" : "ضيوف"}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* زر البحث */}
+                <button
+                  type="submit"
+                  className="w-full h-full min-h-[38px] rounded-xl bg-gradient-to-r from-[var(--clay-accent)] via-[#D4A574] to-[var(--clay-accent)] text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-[var(--clay-accent)]/20 hover:opacity-95 active:scale-98 transition-all cursor-pointer"
+                >
+                  <Search className="w-3.5 h-3.5" />
+                  <span>بحث</span>
+                </button>
+              </div>
+            </div>
+
+            {/* ── واجهة الشاشات المتوسطة والكبيرة (Desktop) ── */}
+            <div className="hidden md:grid md:grid-cols-12 gap-2.5 items-center">
               {/* الوجهة */}
               <div className="md:col-span-4 flex items-center gap-3 px-3.5 py-2.5 rounded-2xl hover:bg-neutral-100/70 dark:hover:bg-neutral-800/70 transition-colors">
                 <div className="w-10 h-10 rounded-xl bg-[var(--clay-accent-soft)] flex items-center justify-center shrink-0">
@@ -244,7 +385,7 @@ export default function Landing() {
                       value={searchCheckIn}
                       min={new Date().toISOString().split("T")[0]}
                       onChange={(e) => setSearchCheckIn(e.target.value)}
-                      className="w-full bg-transparent text-xs font-bold text-neutral-900 dark:text-neutral-100 focus:outline-none"
+                      className="w-full bg-transparent text-xs font-bold text-neutral-900 dark:text-neutral-100 focus:outline-none cursor-pointer"
                     />
                   </div>
                   <div>
@@ -256,7 +397,7 @@ export default function Landing() {
                       value={searchCheckOut}
                       min={searchCheckIn || new Date().toISOString().split("T")[0]}
                       onChange={(e) => setSearchCheckOut(e.target.value)}
-                      className="w-full bg-transparent text-xs font-bold text-neutral-900 dark:text-neutral-100 focus:outline-none"
+                      className="w-full bg-transparent text-xs font-bold text-neutral-900 dark:text-neutral-100 focus:outline-none cursor-pointer"
                     />
                   </div>
                 </div>
@@ -288,7 +429,7 @@ export default function Landing() {
               <div className="md:col-span-2">
                 <button
                   type="submit"
-                  className="w-full h-12 rounded-2xl bg-gradient-to-r from-[var(--clay-accent)] via-[#D4A574] to-[var(--clay-accent)] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg shadow-[var(--clay-accent)]/25 hover:opacity-95 active:scale-98 transition-all"
+                  className="w-full h-12 rounded-2xl bg-gradient-to-r from-[var(--clay-accent)] via-[#D4A574] to-[var(--clay-accent)] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg shadow-[var(--clay-accent)]/25 hover:opacity-95 active:scale-98 transition-all cursor-pointer"
                 >
                   <Search className="w-4 h-4" />
                   <span>بحث</span>
@@ -486,10 +627,12 @@ export default function Landing() {
               <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed mb-4">
                 منصة حجز وإدارة شقق وإقامات العلا الأولى. تجربة ضيافة سعودية فريدة بإطلالات ساحرة على التاريخ والطبيعة.
               </p>
-              <div className="flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-200/50">
-                <Lock className="w-3.5 h-3.5 shrink-0" />
-                <span>مرخصة سياحياً لخدمات الإيواء السياحي بالعلا</span>
-              </div>
+              {siteSettings?.isTourismLicensed && siteSettings?.tourismLicenseNumber && (
+                <div className="flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-200/50">
+                  <Lock className="w-3.5 h-3.5 shrink-0" />
+                  <span>مرخصة سياحياً برقم ترخيص: {siteSettings.tourismLicenseNumber}</span>
+                </div>
+              )}
             </div>
 
             <div>
