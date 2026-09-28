@@ -211,7 +211,7 @@ export default function Landing() {
                 className="w-7 h-7 object-contain drop-shadow"
               />
               <span className="text-white font-bold text-sm tracking-wide">
-                منصة شقق وإقامات العلا المعتمدة
+                {siteSettings?.heroBadge || "منصة شقق وإقامات العلا المعتمدة"}
               </span>
             </motion.div>
 
@@ -221,7 +221,7 @@ export default function Landing() {
               transition={{ duration: 0.6, delay: 0.1 }}
               className="text-3xl sm:text-5xl md:text-6xl font-black text-white drop-shadow-lg tracking-tight mb-2"
             >
-              حيّا الله في العلا
+              {siteSettings?.heroTitle || "حيّا الله في العلا"}
             </motion.h1>
 
             <motion.p
@@ -230,7 +230,7 @@ export default function Landing() {
               transition={{ duration: 0.6, delay: 0.2 }}
               className="text-base sm:text-xl text-white/90 font-medium drop-shadow-md max-w-xl"
             >
-              وين ودّك تقضي إقامتك بين الجبال والواحات؟
+              {siteSettings?.heroSubtitle || "وين ودّك تقضي إقامتك بين الجبال والواحات؟"}
             </motion.p>
           </div>
         </div>
@@ -444,7 +444,7 @@ export default function Landing() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 pt-12 pb-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl md:text-2xl font-black text-neutral-900 dark:text-neutral-100 tracking-tight">
-            في كل زاوية من العلا لك إقامة
+            {siteSettings?.destinationsTitle || "في كل زاوية من العلا لك إقامة"}
           </h2>
           <Link
             to="/apartments"
@@ -483,8 +483,8 @@ export default function Landing() {
         {/* الصف الأول: اسكن حول المعالم التراثية */}
         {heritageApartments.length > 0 && (
           <ApartmentCarousel
-            title="اسكن حول المعالم التراثية (الحِجر ودادان)"
-            subtitle="شقق وأجنحة في قلب عبق التاريخ والبلدة القديمة"
+            title={siteSettings?.heritageSectionTitle || "اسكن حول المعالم التراثية (الحِجر ودادان)"}
+            subtitle={siteSettings?.heritageSectionSubtitle || "شقق وأجنحة في قلب عبق التاريخ والبلدة القديمة"}
             apartments={heritageApartments}
             onViewAll={() => navigate("/apartments")}
           />
@@ -493,8 +493,8 @@ export default function Landing() {
         {/* الصف الثاني: أجنحة بإطلالات جبلية وصخرة الفيل */}
         {mountainApartments.length > 0 && (
           <ApartmentCarousel
-            title="أجنحة بإطلالات جبلية وصخرة الفيل"
-            subtitle="إطلالات ساحرة على تشكيلات صخور وجبال العلا الصحراوية"
+            title={siteSettings?.mountainSectionTitle || "أجنحة بإطلالات جبلية وصخرة الفيل"}
+            subtitle={siteSettings?.mountainSectionSubtitle || "إطلالات ساحرة على تشكيلات صخور وجبال العلا الصحراوية"}
             apartments={mountainApartments}
             onViewAll={() => navigate("/apartments")}
           />
@@ -503,8 +503,8 @@ export default function Landing() {
         {/* الصف الثالث: إقامات واحة النخيل */}
         {oasisApartments.length > 0 && (
           <ApartmentCarousel
-            title="إقامات قلب واحة النخيل والهدوء"
-            subtitle="استوديوهات وشاليهات وسط بساتين النخيل والحمضيات"
+            title={siteSettings?.oasisSectionTitle || "إقامات قلب واحة النخيل والهدوء"}
+            subtitle={siteSettings?.oasisSectionSubtitle || "استوديوهات وشاليهات وسط بساتين النخيل والحمضيات"}
             apartments={oasisApartments}
             onViewAll={() => navigate("/apartments")}
           />
@@ -513,8 +513,8 @@ export default function Landing() {
         {/* الصف الرابع: فلل ملكية ومزارع بمسابح خاصة */}
         {luxuryVillas.length > 0 && (
           <ApartmentCarousel
-            title="فلل ملكية ومزارع بمسابح خاصة"
-            subtitle="مساحات رحبة وخصوصية تامة للعائلات والمجموعات"
+            title={siteSettings?.villasSectionTitle || "فلل ملكية ومزارع بمسابح خاصة"}
+            subtitle={siteSettings?.villasSectionSubtitle || "مساحات رحبة وخصوصية تامة للعائلات والمجموعات"}
             apartments={luxuryVillas}
             onViewAll={() => navigate("/apartments")}
           />
@@ -528,13 +528,13 @@ export default function Landing() {
             <div className="text-right max-w-xl">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 mb-3">
                 <Sparkles className="w-3.5 h-3.5" />
-                لأصحاب العقارات والشقق في العلا
+                {siteSettings?.hostBannerBadge || "لأصحاب العقارات والشقق في العلا"}
               </span>
               <h3 className="text-2xl sm:text-3xl font-black mb-2">
-                تبي تعرض وحدتك أو عقارك للإيجار؟
+                {siteSettings?.hostBannerTitle || "تبي تعرض وحدتك أو عقارك للإيجار؟"}
               </h3>
               <p className="text-sm sm:text-base text-neutral-300 leading-relaxed">
-                انضم إلى نخبة مضيفي شقق العلا، واستقبل زوار وسياح العلا من كافة أنحاء العالم مع نظام دفع إلكتروني آمن ودعم مستمر.
+                {siteSettings?.hostBannerSubtitle || "انضم إلى نخبة مضيفي شقق العلا، واستقبل زوار وسياح العلا من كافة أنحاء العالم مع نظام دفع إلكتروني آمن ودعم مستمر."}
               </p>
             </div>
 
@@ -566,10 +566,10 @@ export default function Landing() {
             </div>
             <div>
               <h4 className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
-                مرخص ومعتمد رسمياً
+                {siteSettings?.trustFeature1Title || "مرخص ومعتمد رسمياً"}
               </h4>
               <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-                شقق مرخصة ومطابقة لاشتراطات وزارة السياحة
+                {siteSettings?.trustFeature1Desc || "شقق مرخصة ومطابقة لاشتراطات وزارة السياحة"}
               </p>
             </div>
           </div>
@@ -580,10 +580,10 @@ export default function Landing() {
             </div>
             <div>
               <h4 className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
-                دفع إلكتروني آمن
+                {siteSettings?.trustFeature2Title || "دفع إلكتروني آمن"}
               </h4>
               <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-                مدى، Apple Pay، فيزا وماستركارد بأمان تام
+                {siteSettings?.trustFeature2Desc || "مدى، Apple Pay، فيزا وماستركارد بأمان تام"}
               </p>
             </div>
           </div>
@@ -594,10 +594,10 @@ export default function Landing() {
             </div>
             <div>
               <h4 className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
-                تأكيد حجز فوري
+                {siteSettings?.trustFeature3Title || "تأكيد حجز فوري"}
               </h4>
               <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-                رمز حجز مباشر مع تفاصيل الوصول للموقع
+                {siteSettings?.trustFeature3Desc || "رمز حجز مباشر مع تفاصيل الوصول للموقع"}
               </p>
             </div>
           </div>
@@ -625,7 +625,7 @@ export default function Landing() {
                 </div>
               </div>
               <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed mb-4">
-                منصة حجز وإدارة شقق وإقامات العلا الأولى. تجربة ضيافة سعودية فريدة بإطلالات ساحرة على التاريخ والطبيعة.
+                {siteSettings?.footerDescription || "منصة حجز وإدارة شقق وإقامات العلا الأولى. تجربة ضيافة سعودية فريدة بإطلالات ساحرة على التاريخ والطبيعة."}
               </p>
               {siteSettings?.isTourismLicensed && siteSettings?.tourismLicenseNumber && (
                 <div className="flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-200/50">
