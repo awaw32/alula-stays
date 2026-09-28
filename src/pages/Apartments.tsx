@@ -5,6 +5,7 @@ import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { DEMO_MODE, DEMO_APARTMENTS } from "@/lib/demo-data";
 import { useState, useMemo } from "react";
+import { useSearchParams } from "react-router";
 import type { ApartmentRecord } from "@/types/apartment";
 import {
   Search,
@@ -55,8 +56,13 @@ const bedroomOptions = [
 ];
 
 export default function Apartments() {
+  const [searchParams] = useSearchParams();
+  const urlLocation = searchParams.get("location");
+  const urlType = searchParams.get("type");
+
   const [search, setSearch] = useState("");
-  const [selectedLocation, setSelectedLocation] = useState("all");
+  const [selectedLocation, setSelectedLocation] = useState(urlLocation || "all");
+  const [selectedType, setSelectedType] = useState(urlType || "all");
   const [sortBy, setSortBy] = useState("recommended");
   const [bedrooms, setBedrooms] = useState(0);
   const [minPrice, setMinPrice] = useState<number | "">("");
@@ -82,14 +88,32 @@ export default function Apartments() {
 
   const filteredApartments = useMemo(() => {
     if (!apartments) return [];
-    if (!search.trim()) return apartments;
+    let list = apartments;
+    if (selectedType && selectedType !== "all") {
+      list = list.filter((a) => {
+        if (selectedType === "resort" || selectedType === "chalet") {
+          return a.propertyType === "chalet" || a.amenities.includes("pool");
+        }
+        if (selectedType === "camp") {
+          return a.propertyType === "camp" || a.titleAr?.includes("مخيم") || a.titleAr?.includes("كرفان");
+        }
+        if (selectedType === "villa") {
+          return a.propertyType === "villa" || (a.bedrooms && a.bedrooms >= 3);
+        }
+        if (selectedType === "apartment") {
+          return a.propertyType === "apartment" || !a.propertyType;
+        }
+        return true;
+      });
+    }
+    if (!search.trim()) return list;
     const q = search.toLocaleLowerCase("ar-SA");
-    return apartments.filter((apartment) =>
+    return list.filter((apartment) =>
       [apartment.title, apartment.titleAr, apartment.location, apartment.locationAr, apartment.description, apartment.descriptionAr]
         .filter(Boolean)
         .some((value) => value!.toLocaleLowerCase("ar-SA").includes(q)),
     );
-  }, [apartments, search]);
+  }, [apartments, search, selectedType]);
 
   const activeFilters =
     (selectedLocation !== "all" ? 1 : 0) +

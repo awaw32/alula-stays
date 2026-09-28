@@ -19,6 +19,8 @@ import {
   CreditCard,
   Lock,
   Users,
+  ChevronDown,
+  X,
 } from "lucide-react";
 
 const HERO_IMAGES = [
@@ -119,17 +121,55 @@ export default function Landing() {
 
   // Search state
   const [searchLocation, setSearchLocation] = useState("");
+  const [searchPropertyType, setSearchPropertyType] = useState("");
   const [searchCheckIn, setSearchCheckIn] = useState("");
   const [searchCheckOut, setSearchCheckOut] = useState("");
-  const [searchGuests, setSearchGuests] = useState(2);
+  const [searchGuests, setSearchGuests] = useState(0);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  const unitTypes = useMemo(
+    () => [
+      { value: "", label: "شقق، استوديو، غرف، فلل" },
+      { value: "apartment", label: "شقق واستوديوهات" },
+      { value: "chalet", label: "شاليهات واستراحات" },
+      { value: "villa", label: "فلل ومزارع بمسابح" },
+      { value: "camp", label: "مخيمات وكرفانات" },
+    ],
+    [],
+  );
+
+  const formatArabicDayDate = (date: Date) => {
+    const days = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+    const months = [
+      "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+      "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
+    ];
+    return `${days[date.getDay()]}، ${date.getDate()} ${months[date.getMonth()]}`;
+  };
+
+  const dateDisplayString = useMemo(() => {
+    if (searchCheckIn && searchCheckOut) {
+      const dIn = new Date(searchCheckIn);
+      const dOut = new Date(searchCheckOut);
+      return `${formatArabicDayDate(dIn)} ← ${formatArabicDayDate(dOut)}`;
+    }
+    if (searchCheckIn) {
+      const dIn = new Date(searchCheckIn);
+      return `${formatArabicDayDate(dIn)} ← حدد المغادرة`;
+    }
+    const today = new Date();
+    const tomorrow = new Date(today.getTime() + 86400000);
+    return `${formatArabicDayDate(today)} ← ${formatArabicDayDate(tomorrow)}`;
+  }, [searchCheckIn, searchCheckOut]);
 
   const handleSearchSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const params = new URLSearchParams();
     if (searchLocation) params.set("location", searchLocation);
+    if (searchPropertyType) params.set("type", searchPropertyType);
     if (searchCheckIn) params.set("checkIn", searchCheckIn);
     if (searchCheckOut) params.set("checkOut", searchCheckOut);
-    if (searchGuests > 1) params.set("guests", String(searchGuests));
+    if (searchGuests > 0) params.set("guests", String(searchGuests));
     navigate(`/apartments${params.toString() ? `?${params.toString()}` : ""}`);
   };
 
@@ -235,130 +275,43 @@ export default function Landing() {
           </div>
         </div>
 
-        {/* ─── Floating Search Capsule (Centered over Hero bottom) ─── */}
+        {/* ─── Floating Search Capsule (Matching Gathern Luxury Image Exactly) ─── */}
         <div className="max-w-5xl mx-auto px-3 sm:px-6 -mt-16 sm:-mt-20 relative z-20">
           <motion.form
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5, delay: 0.2 }}
             onSubmit={handleSearchSubmit}
-            className="bg-white/95 dark:bg-neutral-900/95 backdrop-blur-2xl p-2.5 sm:p-4 rounded-2xl sm:rounded-3xl shadow-2xl border border-neutral-200/80 dark:border-neutral-800"
+            className="bg-white dark:bg-neutral-900 rounded-2xl sm:rounded-3xl shadow-2xl border border-neutral-200/90 dark:border-neutral-800 p-2 sm:p-3"
           >
-            {/* ── واجهة الجوال المدمجة والفاخرة (صغيرة وجميلة جنباً إلى جنب) ── */}
+            {/* ── واجهة الجوال الفاخرة المدمجة (نفس الحقول بوضوح تام ودون رموز إنجليزية) ── */}
             <div className="block md:hidden space-y-2">
-              {/* السطر الأول: الوجهة والتاريخ جنباً إلى جنب */}
+              {/* السطر الأول: اختر المدينة + نوع الوحدة جنباً إلى جنب */}
               <div className="grid grid-cols-2 gap-2">
-                {/* الوجهة أو الحي */}
-                <div className="flex items-center gap-1.5 p-2 rounded-xl bg-neutral-100/80 dark:bg-neutral-800/80 border border-neutral-200/60 dark:border-neutral-700/60 min-w-0">
-                  <div className="w-6 h-6 rounded-lg bg-[var(--clay-accent-soft)] flex items-center justify-center shrink-0">
-                    <MapPin className="w-3 h-3 text-[var(--clay-accent)]" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="text-[9px] font-bold text-neutral-400 dark:text-neutral-500 block leading-tight">
-                      الوجهة أو الحي
-                    </span>
-                    <select
-                      value={searchLocation}
-                      onChange={(e) => setSearchLocation(e.target.value)}
-                      className="w-full bg-transparent text-[11px] font-black text-neutral-900 dark:text-neutral-100 focus:outline-none cursor-pointer truncate"
-                    >
-                      <option value="">جميع مناطق العلا</option>
-                      {(liveLocations ?? []).map((loc) => (
-                        <option key={loc} value={loc}>
-                          {loc}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* التواريخ: الوصول والمغادرة معاً */}
-                <div className="flex items-center gap-1.5 p-2 rounded-xl bg-neutral-100/80 dark:bg-neutral-800/80 border border-neutral-200/60 dark:border-neutral-700/60 min-w-0">
-                  <div className="w-6 h-6 rounded-lg bg-[var(--clay-gold-soft)] flex items-center justify-center shrink-0">
-                    <Clock className="w-3 h-3 text-[var(--clay-gold)]" />
-                  </div>
-                  <div className="flex-1 min-w-0 grid grid-cols-2 gap-1">
-                    <div className="min-w-0">
-                      <span className="text-[9px] font-bold text-neutral-400 dark:text-neutral-500 block leading-tight">
-                        الوصول
-                      </span>
-                      <input
-                        type="date"
-                        value={searchCheckIn}
-                        min={new Date().toISOString().split("T")[0]}
-                        onChange={(e) => setSearchCheckIn(e.target.value)}
-                        className="w-full bg-transparent text-[10px] font-extrabold text-neutral-900 dark:text-neutral-100 focus:outline-none p-0 cursor-pointer"
-                      />
-                    </div>
-                    <div className="min-w-0">
-                      <span className="text-[9px] font-bold text-neutral-400 dark:text-neutral-500 block leading-tight">
-                        المغادرة
-                      </span>
-                      <input
-                        type="date"
-                        value={searchCheckOut}
-                        min={searchCheckIn || new Date().toISOString().split("T")[0]}
-                        onChange={(e) => setSearchCheckOut(e.target.value)}
-                        className="w-full bg-transparent text-[10px] font-extrabold text-neutral-900 dark:text-neutral-100 focus:outline-none p-0 cursor-pointer"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* السطر الثاني: عدد الضيوف وزر البحث جنباً إلى جنب */}
-              <div className="grid grid-cols-2 gap-2">
-                {/* الضيوف */}
-                <div className="flex items-center gap-1.5 p-2 rounded-xl bg-neutral-100/80 dark:bg-neutral-800/80 border border-neutral-200/60 dark:border-neutral-700/60 min-w-0">
-                  <div className="w-6 h-6 rounded-lg bg-neutral-200/70 dark:bg-neutral-700/70 flex items-center justify-center shrink-0">
-                    <Users className="w-3 h-3 text-neutral-600 dark:text-neutral-300" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="text-[9px] font-bold text-neutral-400 dark:text-neutral-500 block leading-tight">
-                      الضيوف
-                    </span>
-                    <select
-                      value={searchGuests}
-                      onChange={(e) => setSearchGuests(Number(e.target.value))}
-                      className="w-full bg-transparent text-[11px] font-black text-neutral-900 dark:text-neutral-100 focus:outline-none cursor-pointer"
-                    >
-                      {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-                        <option key={n} value={n}>
-                          {n} {n === 1 ? "ضيف" : "ضيوف"}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* زر البحث */}
-                <button
-                  type="submit"
-                  className="w-full h-full min-h-[38px] rounded-xl bg-gradient-to-r from-[var(--clay-accent)] via-[#D4A574] to-[var(--clay-accent)] text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-[var(--clay-accent)]/20 hover:opacity-95 active:scale-98 transition-all cursor-pointer"
-                >
-                  <Search className="w-3.5 h-3.5" />
-                  <span>بحث</span>
-                </button>
-              </div>
-            </div>
-
-            {/* ── واجهة الشاشات المتوسطة والكبيرة (Desktop) ── */}
-            <div className="hidden md:grid md:grid-cols-12 gap-2.5 items-center">
-              {/* الوجهة */}
-              <div className="md:col-span-4 flex items-center gap-3 px-3.5 py-2.5 rounded-2xl hover:bg-neutral-100/70 dark:hover:bg-neutral-800/70 transition-colors">
-                <div className="w-10 h-10 rounded-xl bg-[var(--clay-accent-soft)] flex items-center justify-center shrink-0">
-                  <MapPin className="w-5 h-5 text-[var(--clay-accent)]" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span className="text-[11px] font-bold text-neutral-400 dark:text-neutral-500 block">
-                    الوجهة أو الحي
+                {/* اختر المدينة */}
+                <div className="relative p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200/60 dark:border-neutral-700/60">
+                  <span className="block text-[10px] font-bold text-neutral-400 dark:text-neutral-500 leading-tight">
+                    اختر المدينة
                   </span>
+                  <div className="flex items-center justify-between gap-1 mt-0.5">
+                    <span className="text-xs font-black text-neutral-900 dark:text-neutral-100 truncate">
+                      {searchLocation ? searchLocation : "العلا"}
+                    </span>
+                    <ChevronDown className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                  </div>
                   <select
                     value={searchLocation}
                     onChange={(e) => setSearchLocation(e.target.value)}
-                    className="w-full bg-transparent text-sm font-extrabold text-neutral-900 dark:text-neutral-100 focus:outline-none cursor-pointer truncate"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                   >
-                    <option value="">جميع مناطق ومعالم العلا</option>
+                    <option value="">العلا (جميع المناطق)</option>
+                    <option value="AlUla Old Town">ديرة العلا القديمة</option>
+                    <option value="Elephant Rock">صخرة الفيل</option>
+                    <option value="Hegra">الحِجر (مدائن صالح)</option>
+                    <option value="Dadan">مملكة دادان</option>
+                    <option value="AlUla Oasis">واحة النخيل</option>
+                    <option value="AlUla Arts District">حي الفنون (الجديدة)</option>
+                    <option value="Jabal Ithlib">جبال شرعان</option>
                     {(liveLocations ?? []).map((loc) => (
                       <option key={loc} value={loc}>
                         {loc}
@@ -366,56 +319,66 @@ export default function Landing() {
                     ))}
                   </select>
                 </div>
-              </div>
 
-              <div className="hidden md:block w-px h-8 bg-neutral-200 dark:bg-neutral-800" />
-
-              {/* التواريخ */}
-              <div className="md:col-span-4 flex items-center gap-3 px-3.5 py-2.5 rounded-2xl hover:bg-neutral-100/70 dark:hover:bg-neutral-800/70 transition-colors">
-                <div className="w-10 h-10 rounded-xl bg-[var(--clay-gold-soft)] flex items-center justify-center shrink-0">
-                  <Clock className="w-5 h-5 text-[var(--clay-gold)]" />
-                </div>
-                <div className="grid grid-cols-2 gap-2 flex-1">
-                  <div>
-                    <span className="text-[10px] font-bold text-neutral-400 dark:text-neutral-500 block">
-                      الوصول
-                    </span>
-                    <input
-                      type="date"
-                      value={searchCheckIn}
-                      min={new Date().toISOString().split("T")[0]}
-                      onChange={(e) => setSearchCheckIn(e.target.value)}
-                      className="w-full bg-transparent text-xs font-bold text-neutral-900 dark:text-neutral-100 focus:outline-none cursor-pointer"
-                    />
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-bold text-neutral-400 dark:text-neutral-500 block">
-                      المغادرة
-                    </span>
-                    <input
-                      type="date"
-                      value={searchCheckOut}
-                      min={searchCheckIn || new Date().toISOString().split("T")[0]}
-                      onChange={(e) => setSearchCheckOut(e.target.value)}
-                      className="w-full bg-transparent text-xs font-bold text-neutral-900 dark:text-neutral-100 focus:outline-none cursor-pointer"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="hidden md:block w-px h-8 bg-neutral-200 dark:bg-neutral-800" />
-
-              {/* الضيوف */}
-              <div className="md:col-span-2 flex items-center gap-2 px-3.5 py-2.5 rounded-2xl hover:bg-neutral-100/70 dark:hover:bg-neutral-800/70 transition-colors">
-                <div className="flex-1 min-w-0">
-                  <span className="text-[10px] font-bold text-neutral-400 dark:text-neutral-500 block">
-                    الضيوف
+                {/* نوع الوحدة */}
+                <div className="relative p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200/60 dark:border-neutral-700/60">
+                  <span className="block text-[10px] font-bold text-neutral-400 dark:text-neutral-500 leading-tight">
+                    نوع الوحدة
                   </span>
+                  <div className="flex items-center justify-between gap-1 mt-0.5">
+                    <span className="text-xs font-black text-neutral-900 dark:text-neutral-100 truncate">
+                      {unitTypes.find((u) => u.value === searchPropertyType)?.label || "شقق، استوديو..."}
+                    </span>
+                    <ChevronDown className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                  </div>
+                  <select
+                    value={searchPropertyType}
+                    onChange={(e) => setSearchPropertyType(e.target.value)}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  >
+                    {unitTypes.map((t) => (
+                      <option key={t.value} value={t.value}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* السطر الثاني: تاريخ الحجز بالعربي الصريح بدون أي حروف إنجليزية أو رموز المتصفح */}
+              <div
+                onClick={() => setShowDatePicker(true)}
+                className="p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200/60 dark:border-neutral-700/60 cursor-pointer active:scale-99 transition-transform"
+              >
+                <span className="block text-[10px] font-bold text-neutral-400 dark:text-neutral-500 leading-tight">
+                  تاريخ الحجز
+                </span>
+                <div className="flex items-center justify-between gap-1 mt-0.5">
+                  <span className="text-xs font-black text-neutral-900 dark:text-neutral-100 truncate">
+                    {dateDisplayString}
+                  </span>
+                  <ChevronDown className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                </div>
+              </div>
+
+              {/* السطر الثالث: عدد الضيوف بجانب زر البحث البنفسجي الفاخر */}
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1 p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200/60 dark:border-neutral-700/60">
+                  <span className="block text-[10px] font-bold text-neutral-400 dark:text-neutral-500 leading-tight">
+                    عدد الضيوف
+                  </span>
+                  <div className="flex items-center justify-between gap-1 mt-0.5">
+                    <span className="text-xs font-black text-neutral-900 dark:text-neutral-100 truncate">
+                      {searchGuests > 0 ? `${searchGuests} ضيوف` : "حدد عدد الضيوف"}
+                    </span>
+                    <ChevronDown className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                  </div>
                   <select
                     value={searchGuests}
                     onChange={(e) => setSearchGuests(Number(e.target.value))}
-                    className="w-full bg-transparent text-xs font-extrabold text-neutral-900 dark:text-neutral-100 focus:outline-none cursor-pointer"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                   >
+                    <option value={0}>حدد عدد الضيوف</option>
                     {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
                       <option key={n} value={n}>
                         {n} {n === 1 ? "ضيف" : "ضيوف"}
@@ -423,20 +386,238 @@ export default function Landing() {
                     ))}
                   </select>
                 </div>
-              </div>
 
-              {/* زر البحث */}
-              <div className="md:col-span-2">
+                {/* زر البحث البنفسجي */}
                 <button
                   type="submit"
-                  className="w-full h-12 rounded-2xl bg-gradient-to-r from-[var(--clay-accent)] via-[#D4A574] to-[var(--clay-accent)] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg shadow-[var(--clay-accent)]/25 hover:opacity-95 active:scale-98 transition-all cursor-pointer"
+                  className="w-12 h-12 rounded-xl bg-[#542382] hover:bg-[#431969] text-white flex items-center justify-center shadow-md active:scale-95 transition-all cursor-pointer shrink-0"
+                  aria-label="بحث"
                 >
-                  <Search className="w-4 h-4" />
-                  <span>بحث</span>
+                  <Search className="w-5 h-5 text-white" />
+                </button>
+              </div>
+            </div>
+
+            {/* ── واجهة الشاشات المتوسطة والكبيرة (مطابقة لصورة جاذر إن 100%) ── */}
+            <div className="hidden md:flex items-center justify-between divide-x divide-x-reverse divide-neutral-200/80 dark:divide-neutral-800">
+              {/* 1. اختر المدينة */}
+              <div className="relative flex-1 px-4 py-2 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 rounded-2xl transition-colors cursor-pointer group">
+                <span className="block text-[11px] font-bold text-neutral-400 dark:text-neutral-500 mb-0.5">
+                  اختر المدينة
+                </span>
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-sm font-black text-neutral-900 dark:text-neutral-100 truncate">
+                    {searchLocation ? searchLocation : "العلا"}
+                  </span>
+                  <ChevronDown className="w-3.5 h-3.5 text-neutral-400 group-hover:text-neutral-700 transition-transform" />
+                </div>
+                <select
+                  value={searchLocation}
+                  onChange={(e) => setSearchLocation(e.target.value)}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  title="اختر المدينة"
+                >
+                  <option value="">العلا (جميع المناطق)</option>
+                  <option value="AlUla Old Town">ديرة العلا القديمة</option>
+                  <option value="Elephant Rock">صخرة الفيل</option>
+                  <option value="Hegra">الحِجر (مدائن صالح)</option>
+                  <option value="Dadan">مملكة دادان</option>
+                  <option value="AlUla Oasis">واحة النخيل</option>
+                  <option value="AlUla Arts District">حي الفنون (الجديدة)</option>
+                  <option value="Jabal Ithlib">جبال شرعان</option>
+                  {(liveLocations ?? [])
+                    .filter(
+                      (loc) =>
+                        ![
+                          "AlUla Old Town",
+                          "Elephant Rock",
+                          "Hegra",
+                          "Dadan",
+                          "AlUla Oasis",
+                          "AlUla Arts District",
+                          "Jabal Ithlib",
+                        ].includes(loc),
+                    )
+                    .map((loc) => (
+                      <option key={loc} value={loc}>
+                        {loc}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              {/* 2. نوع الوحدة */}
+              <div className="relative flex-[1.1] px-4 py-2 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 rounded-2xl transition-colors cursor-pointer group">
+                <span className="block text-[11px] font-bold text-neutral-400 dark:text-neutral-500 mb-0.5">
+                  نوع الوحدة
+                </span>
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-sm font-black text-neutral-900 dark:text-neutral-100 truncate">
+                    {unitTypes.find((u) => u.value === searchPropertyType)?.label || "شقق، استوديو، غرف، فلل"}
+                  </span>
+                  <ChevronDown className="w-3.5 h-3.5 text-neutral-400 group-hover:text-neutral-700 transition-transform" />
+                </div>
+                <select
+                  value={searchPropertyType}
+                  onChange={(e) => setSearchPropertyType(e.target.value)}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  title="نوع الوحدة"
+                >
+                  {unitTypes.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 3. تاريخ الحجز */}
+              <div
+                onClick={() => setShowDatePicker(true)}
+                className="flex-[1.5] px-4 py-2 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 rounded-2xl transition-colors cursor-pointer group"
+              >
+                <span className="block text-[11px] font-bold text-neutral-400 dark:text-neutral-500 mb-0.5">
+                  تاريخ الحجز
+                </span>
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-sm font-black text-neutral-900 dark:text-neutral-100 truncate">
+                    {dateDisplayString}
+                  </span>
+                  <ChevronDown className="w-3.5 h-3.5 text-neutral-400 group-hover:text-neutral-700 transition-transform shrink-0" />
+                </div>
+              </div>
+
+              {/* 4. عدد الضيوف */}
+              <div className="relative flex-1 px-4 py-2 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 rounded-2xl transition-colors cursor-pointer group">
+                <span className="block text-[11px] font-bold text-neutral-400 dark:text-neutral-500 mb-0.5">
+                  عدد الضيوف
+                </span>
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-sm font-black text-neutral-900 dark:text-neutral-100 truncate">
+                    {searchGuests > 0 ? `${searchGuests} ضيوف` : "حدد عدد الضيوف"}
+                  </span>
+                  <ChevronDown className="w-3.5 h-3.5 text-neutral-400 group-hover:text-neutral-700 transition-transform" />
+                </div>
+                <select
+                  value={searchGuests}
+                  onChange={(e) => setSearchGuests(Number(e.target.value))}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  title="عدد الضيوف"
+                >
+                  <option value={0}>حدد عدد الضيوف</option>
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                    <option key={n} value={n}>
+                      {n} {n === 1 ? "ضيف" : "ضيوف"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 5. زر البحث البنفسجي الفخم كما في الصورة */}
+              <div className="pr-3 pl-1">
+                <button
+                  type="submit"
+                  className="w-12 h-12 rounded-2xl bg-[#542382] hover:bg-[#431969] text-white flex items-center justify-center shadow-lg shadow-[#542382]/25 active:scale-95 transition-all cursor-pointer shrink-0"
+                  aria-label="بحث"
+                >
+                  <Search className="w-5 h-5 text-white" />
                 </button>
               </div>
             </div>
           </motion.form>
+
+          {/* ─── نافذة اختيار التواريخ المنبثقة (Date Picker Modal) ─── */}
+          {showDatePicker && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="relative w-full max-w-md bg-white dark:bg-neutral-900 rounded-3xl p-6 shadow-2xl border border-neutral-200 dark:border-neutral-800 text-right">
+                <div className="flex items-center justify-between pb-4 border-b border-neutral-100 dark:border-neutral-800">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-[#542382]" />
+                    <h3 className="font-black text-base text-neutral-900 dark:text-neutral-100">
+                      تحديد تواريخ الإقامة في العلا
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowDatePicker(false)}
+                    className="w-8 h-8 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-500 hover:text-neutral-900 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="space-y-4 py-4">
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300 mb-1.5">
+                      تاريخ الوصول
+                    </label>
+                    <input
+                      type="date"
+                      value={searchCheckIn}
+                      min={new Date().toISOString().split("T")[0]}
+                      onChange={(e) => setSearchCheckIn(e.target.value)}
+                      className="w-full p-3 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 font-bold text-sm focus:outline-none focus:ring-2 focus:ring-[#542382]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300 mb-1.5">
+                      تاريخ المغادرة
+                    </label>
+                    <input
+                      type="date"
+                      value={searchCheckOut}
+                      min={searchCheckIn || new Date().toISOString().split("T")[0]}
+                      onChange={(e) => setSearchCheckOut(e.target.value)}
+                      className="w-full p-3 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 font-bold text-sm focus:outline-none focus:ring-2 focus:ring-[#542382]"
+                    />
+                  </div>
+
+                  {/* اختصارات تواريخ سريعة */}
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const now = new Date();
+                        const tomorrow = new Date(now.getTime() + 86400000);
+                        const dayAfter = new Date(now.getTime() + 86400000 * 2);
+                        setSearchCheckIn(tomorrow.toISOString().split("T")[0]);
+                        setSearchCheckOut(dayAfter.toISOString().split("T")[0]);
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-xs font-bold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200"
+                    >
+                      غداً (ليلة واحدة)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const now = new Date();
+                        const dayOfWeek = now.getDay();
+                        const daysUntilThursday = (4 - dayOfWeek + 7) % 7 || 7;
+                        const thursday = new Date(now.getTime() + daysUntilThursday * 86400000);
+                        const saturday = new Date(thursday.getTime() + 86400000 * 2);
+                        setSearchCheckIn(thursday.toISOString().split("T")[0]);
+                        setSearchCheckOut(saturday.toISOString().split("T")[0]);
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-xs font-bold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200"
+                    >
+                      عطلة نهاية الأسبوع (الخميس - السبت)
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowDatePicker(false)}
+                    className="w-full py-3 rounded-xl bg-[#542382] text-white font-black text-sm shadow-md hover:bg-[#431969] transition-colors"
+                  >
+                    تأكيد التواريخ
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
