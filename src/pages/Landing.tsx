@@ -516,7 +516,7 @@ export default function Landing() {
               </h4>
               <div className="flex flex-col gap-2 text-xs text-neutral-500 dark:text-neutral-400">
                 <span>📍 العلا، المملكة العربية السعودية</span>
-                <span>📧 {siteSettings?.contactEmail || "info@soqaqalaula.world"}</span>
+                <span>📧 {siteSettings?.contactEmail || "info@alulahome.com"}</span>
                 <span>📱 {siteSettings?.contactPhone && !siteSettings.contactPhone.includes("XX") ? siteSettings.contactPhone : "+966 50 123 4567"}</span>
                 {siteSettings?.whatsapp && <span>💬 واتساب: {siteSettings.whatsapp}</span>}
               </div>

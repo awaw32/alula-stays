@@ -195,7 +195,7 @@ async function processTapRefund(args: {
  * الحصول على رابط التطبيق مع التحقق
  */
 function getPublicAppUrl() {
-  const publicAppUrl = process.env.SITE_URL || process.env.PUBLIC_APP_URL || "https://soqaqalaula.world";
+  const publicAppUrl = process.env.SITE_URL || process.env.PUBLIC_APP_URL || "https://alulahome.com";
   return validateUrl(
     publicAppUrl,
     "SITE_URL أو PUBLIC_APP_URL"

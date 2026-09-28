@@ -198,7 +198,7 @@ export function InvoiceModal({ open, onOpenChange, invoice }: InvoiceModalProps)
 
           {/* Footer Note */}
           <div className="mt-6 pt-4 border-t border-zinc-100 dark:border-zinc-900 text-center text-[11px] text-zinc-400">
-            <p>فاتورة إلكترونية صادرة تلقائياً من منصة شقق العلا (soqaqalaula.world).</p>
+            <p>فاتورة إلكترونية صادرة تلقائياً من منصة شقق العلا (alulahome.com).</p>
             <p className="mt-0.5">شكراً لاختياركم شقق العلا، نتمنى لكم إقامة ممتعة وسعيدة في واحة العلا التاريخية.</p>
           </div>
         </div>

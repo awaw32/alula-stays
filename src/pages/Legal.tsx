@@ -4,7 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { useEffect } from "react";
 
 const BRAND = "شقق العلا";
-const CONTACT_EMAIL = "info@soqaqalaula.world";
+const CONTACT_EMAIL = "info@alulahome.com";
 const CONTACT_PHONE = "+966-XX-XXX-XXXX"; // ← حدّثه بالرقم الرسمي قبل الإطلاق
 
 type Section = { heading: string; body: string[] };
