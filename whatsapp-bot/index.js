@@ -4,9 +4,9 @@
  * يعمل عبر بيئة Termux (Poco X5 Pro) أو أي بيئة Node.js.
  * - يراقب طابور whatsappQueue في Convex كل 5 ثوانٍ ويرسل الرسائل.
  * - يراقب صحة الجهاز والبطارية كل 15 دقيقة وينبه الإدارة عند الطوارئ.
- * - يستقبل أوامر الإدارة (ChatOps) عبر الرقم المعتمد: 966506709265
- * - يستقبل ردود الملاك (1 أو 2) وتقييمات النزلاء (1 إلى 5).
- * - يتفاعل مع العملاء بقائمة ترحيبية ذكية وروابط سريعة مع Cooldown ساعتين.
+ * - يتعرف بشكل قطعي ومضمون 100% على الأدمن (رقم الجوال أو LID).
+ * - يوفر لوحة تحكم إدارية تفاعلية بالأرقام (1 إلى 6).
+ * - يعزل الإدارة تماماً عن رسائل العملاء، ويمنع إرسال قوائم العملاء للأدمن.
  */
 import "dotenv/config";
 import { exec } from "child_process";
@@ -22,17 +22,36 @@ if (!CONVEX_URL) {
 }
 const convex = new ConvexHttpClient(CONVEX_URL);
 
-/** رقم الإدارة المعتمد للأوامر والتنبيهات والتقارير */
-const ADMIN_PHONE = "966506709265";
+/** معرفات الأدمن القطعية (آخر 9 أرقام ومعرف LID) */
+const ADMIN_PHONE_SUFFIX = "506709265";
 const ADMIN_LID = "255220479201491";
-const ADMIN_JID = `${ADMIN_PHONE}@s.whatsapp.net`;
+const ADMIN_FALLBACK_JID = "966506709265@s.whatsapp.net";
 
-/** تتبع Cooldown للتنبيهات والقوائم */
+/** تتبع Cooldown للتنبيهات وقوائم العملاء */
 let lastBatteryAlertTime = 0;
 let lastTempAlertTime = 0;
 const ONE_HOUR_MS = 60 * 60 * 1000;
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 const customerWelcomeCooldown = new Map();
+
+/**
+ * فحص قطعي ومضمون 100% لمعرفة ما إذا كان المرسل هو الأدمن
+ * يتحقق من كافة حقول Baileys المحتملة:
+ * remoteJid, remoteJidAlt, participant, senderPn
+ */
+function isAdminSender(msg) {
+  if (!msg || !msg.key) return false;
+  const k = msg.key;
+  const fields = [
+    k.remoteJid,
+    k.remoteJidAlt,
+    k.participant,
+    k.senderPn,
+  ].filter(Boolean).map(String);
+
+  const combined = fields.join(" ");
+  return combined.includes(ADMIN_PHONE_SUFFIX) || combined.includes(ADMIN_LID);
+}
 
 // ━━━ فحص صحة الجهاز وسيرفر Termux ━━━
 function checkServerHealth(sock) {
@@ -54,7 +73,7 @@ function checkServerHealth(sock) {
             `🔋 نسبة البطارية منخفضة: *${percentage}%*\n` +
             `🔌 حالة الشحن: *${status}*\n\n` +
             `يرجى توصيل الشاحن فوراً لتجنب توقف بوت الواتساب وأكواد التحقق! ⚡`;
-          sock.sendMessage(ADMIN_JID, { text: msg }).catch(() => {});
+          sock.sendMessage(ADMIN_FALLBACK_JID, { text: msg }).catch(() => {});
         }
       }
 
@@ -67,19 +86,32 @@ function checkServerHealth(sock) {
             `🌡️ درجة الحرارة: *${temperature}°C*\n` +
             `🔋 البطارية: *${percentage}%*\n\n` +
             `يرجى نقل الجهاز لمكان بارد أو فصل الشحن السريع لحمايته! ❄️`;
-          sock.sendMessage(ADMIN_JID, { text: msg }).catch(() => {});
+          sock.sendMessage(ADMIN_FALLBACK_JID, { text: msg }).catch(() => {});
         }
       }
     } catch {}
   });
 }
 
-// ━━━ معالجة أوامر الإدارة ChatOps ━━━
-async function handleAdminCommand(sock, from, text) {
-  const cmd = text.trim();
+// ━━━ نص لوحة تحكم الإدارة (Admin Menu) ━━━
+const ADMIN_MENU_TEXT =
+  `👑 *لوحة تحكم شقق العلا (الإدارة)*\n\n` +
+  `اختر رقماً للتنفيذ المباشر:\n` +
+  `1️⃣ حالة السيرفر (البطارية، الشاحن، الحرارة)\n` +
+  `2️⃣ ملخص اليوم (الزيارات، الدفع المتروك، الحجوزات، الإيرادات)\n` +
+  `3️⃣ الإحصائيات الشهرية وإجمالي الإيرادات\n` +
+  `4️⃣ البلاغات المفتوحة ومعالجتها\n` +
+  `5️⃣ تحديث السيرفر من GitHub وإعادة التشغيل\n` +
+  `6️⃣ إعادة تشغيل البوت فقط (PM2)`;
 
-  // 1. أمر فحص الحالة
-  if (cmd === "/حالة" || cmd === "/status") {
+// ━━━ معالجة خيارات وأوامر الإدارة ChatOps ━━━
+async function handleAdminMessage(sock, from, rawText) {
+  const text = (rawText || "").trim();
+  // تنظيف النص لمعرفة الخيار (مثال: "-حالة" -> "حالة" أو "1")
+  const cleanCmd = text.replace(/^[-/]\s*/, "").trim();
+
+  // خيار 1: حالة السيرفر
+  if (text === "1" || cleanCmd === "حالة" || cleanCmd === "status") {
     const uptimeSec = Math.floor(process.uptime());
     const hours = Math.floor(uptimeSec / 3600);
     const minutes = Math.floor((uptimeSec % 3600) / 60);
@@ -111,11 +143,11 @@ async function handleAdminCommand(sock, from, text) {
 
       await sock.sendMessage(from, { text: statusMsg });
     });
-    return true;
+    return;
   }
 
-  // 2. أمر التقرير اليومي الفوري
-  if (cmd === "/اليوم" || cmd === "/today") {
+  // خيار 2: ملخص اليوم
+  if (text === "2" || cleanCmd === "اليوم" || cleanCmd === "today") {
     try {
       await sock.sendMessage(from, { text: "⏳ جارٍ جلب التقرير اليومي من قاعدة البيانات..." });
       const reportText = await convex.query("analytics:getDailyAdminReportText", {});
@@ -123,18 +155,30 @@ async function handleAdminCommand(sock, from, text) {
     } catch (err) {
       await sock.sendMessage(from, { text: `❌ تعذر جلب التقرير اليومي: ${err.message}` });
     }
-    return true;
+    return;
   }
 
-  // 3. أمر عرض البلاغات المفتوحة
-  if (cmd === "/بلاغات" || cmd === "/reports") {
+  // خيار 3: الإحصائيات الشهرية
+  if (text === "3" || cleanCmd === "الشهر" || cleanCmd === "month") {
+    try {
+      await sock.sendMessage(from, { text: "⏳ جارٍ استخراج الإحصائيات الشهرية وإجمالي الإيرادات..." });
+      const monthReportText = await convex.query("analytics:getMonthlyAdminReportText", {});
+      await sock.sendMessage(from, { text: monthReportText });
+    } catch (err) {
+      await sock.sendMessage(from, { text: `❌ تعذر جلب إحصائيات الشهر: ${err.message}` });
+    }
+    return;
+  }
+
+  // خيار 4: البلاغات المفتوحة
+  if (text === "4" || cleanCmd === "بلاغات" || cleanCmd === "reports") {
     try {
       const reports = await convex.query("reports:getLatestOpenReports", { limit: 5 });
       if (!reports || reports.length === 0) {
         await sock.sendMessage(from, {
           text: "✅ لا توجد أي بلاغات معلقة حالياً. المنصة تعمل بسلاسة وبدون شكاوى!",
         });
-        return true;
+        return;
       }
 
       let repMsg = `🚨 *آخر البلاغات المفتوحة (${reports.length})*:\n\n`;
@@ -151,31 +195,15 @@ async function handleAdminCommand(sock, from, text) {
     } catch (err) {
       await sock.sendMessage(from, { text: `❌ تعذر جلب البلاغات: ${err.message}` });
     }
-    return true;
+    return;
   }
 
-  // 4. أمر إعادة التشغيل
-  if (cmd === "/إعادة" || cmd === "/restart") {
-    await sock.sendMessage(from, { text: "🔄 جاري إعادة تشغيل البوت عبر PM2..." });
-    setTimeout(() => {
-      exec("pm2 restart whatsapp-bot", (err) => {
-        if (err) {
-          console.error("فشل أمر pm2 restart:", err);
-          process.exit(1); // إغلاق ليقوم pm2 بإعادة تشغيله تلقائياً
-        }
-      });
-    }, 1500);
-    return true;
-  }
-
-  // 5. أمر التحديث التلقائي وسحب كود GitHub عن بُعد
-  if (cmd === "/تحديث" || cmd === "/update") {
+  // خيار 5: تحديث السيرفر من GitHub
+  if (text === "5" || cleanCmd === "تحديث" || cleanCmd === "update") {
     await sock.sendMessage(from, {
       text: "⏳ جاري سحب آخر التحديثات من GitHub وتثبيت التبعيات وإعادة تشغيل البوت...",
     });
 
-    // التنفيذ في المجلد الأب (المستودع الرئيسي) ثم مجلد البوت
-    // يدعم كل من Termux و Linux و Windows
     const updateCommand = "git pull && npm install && pm2 restart whatsapp-bot";
 
     exec(updateCommand, async (err, stdout, stderr) => {
@@ -190,19 +218,25 @@ async function handleAdminCommand(sock, from, text) {
         console.log("✅ تم التحديث بنجاح:", stdout);
       }
     });
-    return true;
+    return;
   }
 
-  // أوامر غير معروفة للإدارة
-  const helpMsg =
-    `🛠️ *أوامر تحكم الإدارة المتاحة*:\n\n` +
-    `🔹 */حالة* : فحص بطارية وحرارة الجوال والاتصال\n` +
-    `🔹 */اليوم* : استخراج التقرير اليومي المختصر فوراً\n` +
-    `🔹 */بلاغات* : عرض آخر 5 بلاغات مفتوحة\n` +
-    `🔹 */تحديث* : سحب آخر التحديثات من GitHub وإعادة التشغيل تلقائياً\n` +
-    `🔹 */إعادة* : إعادة تشغيل البوت عبر PM2`;
-  await sock.sendMessage(from, { text: helpMsg });
-  return true;
+  // خيار 6: إعادة تشغيل البوت فقط
+  if (text === "6" || cleanCmd === "إعادة" || cleanCmd === "restart") {
+    await sock.sendMessage(from, { text: "🔁 جاري إعادة تشغيل بوت شقق العلا عبر PM2..." });
+    setTimeout(() => {
+      exec("pm2 restart whatsapp-bot", (err) => {
+        if (err) {
+          console.error("فشل أمر pm2 restart:", err);
+          process.exit(1);
+        }
+      });
+    }, 1500);
+    return;
+  }
+
+  // إذا كتب الأدمن أي نص آخر، أرسل له لوحة تحكم الإدارة فوراً
+  await sock.sendMessage(from, { text: ADMIN_MENU_TEXT });
 }
 
 // ━━━ تشغيل البوت والربط ━━━
@@ -224,11 +258,8 @@ async function startBot() {
 
     if (connection === "open") {
       console.log("✅ تم الاتصال بواتساب بنجاح!");
-      // بدء مراقبة الطابور
       processQueue(sock);
-      // فحص أولي لصحة السيرفر
       checkServerHealth(sock);
-      // جدولة فحص صحة السيرفر كل 15 دقيقة
       setInterval(() => checkServerHealth(sock), 15 * 60 * 1000);
     }
 
@@ -250,7 +281,6 @@ async function startBot() {
 
       const from = msg.key.remoteJid;
       if (!from) continue;
-      // السماح بالحسابات الفردية ورسائل الـ LID
       if (!from.endsWith("@s.whatsapp.net") && !from.endsWith("@lid")) continue;
 
       const text = (
@@ -261,30 +291,22 @@ async function startBot() {
 
       if (!text) continue;
 
-      // فحص المرسل وهل هو الإدارة (سواء جاء عبر رقم 966506709265 أو LID 255220479201491 أو participant)
-      const senderJid = from;
-      const participantJid = msg.key.participant || "";
-      const remoteJidAlt = msg.key.remoteJidAlt || "";
-      const allSenders = [senderJid, participantJid, remoteJidAlt].join(" ");
+      // 1. التحقق القطعي 100% من الأدمن
+      const isAdmin = isAdminSender(msg);
+      console.log(`📩 رسالة من [${from}] | أدمن: ${isAdmin ? "👑 نعم" : "👤 عميل"} | المحتوى: "${text}"`);
 
-      const isAdmin =
-        allSenders.includes(ADMIN_PHONE) ||
-        allSenders.includes(ADMIN_LID);
-
-      console.log(`📩 رسالة جديدة من [${from}] (أدمن: ${isAdmin ? "نعم" : "لا"}): "${text}"`);
-
-      // 1. أوامر الإدارة (تبدأ بـ / وترسل الرد لنفس remoteJid الذي أرسل منه الأدمن)
-      if (isAdmin && text.startsWith("/")) {
-        await handleAdminCommand(sock, from, text);
+      // إذا كان المرسل هو الأدمن: تحويل مباشر للوحة تحكم الإدارة ويُمنع منعاً باتاً وصوله لمنطق العملاء
+      if (isAdmin) {
+        await handleAdminMessage(sock, from, text);
         continue;
       }
 
+      // ━━━ منطق العملاء والملاك العاديين حصراً ━━━
       const cleanPhone = from.replace(/@(s\.whatsapp\.net|lid)/g, "").replace(/\D/g, "");
 
       // 2. إذا كانت الرسالة رقماً (1 إلى 5)
       const num = Number(text);
       if (!isNaN(num) && num >= 1 && num <= 5) {
-        // محاولة تسجيل الرد في Convex (موافقة/رفض حجز، توفر شقة، أو تقييم إقامة)
         try {
           const res = await convex.mutation("whatsapp:recordReply", {
             ownerPhone: cleanPhone,
@@ -321,10 +343,9 @@ async function startBot() {
             continue;
           }
         } catch {
-          // لم يكن الرد متعلقاً بحجز أو رسالة انتظار، ننتقل لمعالجة خيارات القائمة
+          // ليس رداً على حجز، ننتقل لخيارات القائمة الترحيبية للعملاء
         }
 
-        // معالجة خيارات القائمة السريعة (1، 2، 3)
         if (num === 1) {
           const msg1 =
             `🏠 *شقق وشاليهات العلا الفاخرة*\n\n` +
@@ -355,7 +376,7 @@ async function startBot() {
         }
       }
 
-      // 3. رسائل العملاء العادية (ليست رقماً ولا أمر إدارة): إرسال القائمة الترحيبية مع Cooldown ساعتين
+      // 3. رسائل العملاء العادية: إرسال القائمة الترحيبية مع Cooldown ساعتين
       const now = Date.now();
       const lastWelcome = customerWelcomeCooldown.get(cleanPhone) || 0;
 

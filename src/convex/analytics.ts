@@ -293,3 +293,62 @@ export const getDailyAdminReportText = query({
     );
   },
 });
+
+/**
+ * نص الإحصائيات الشهرية وإجمالي الإيرادات (للإدارة عبر الواتساب)
+ */
+export const getMonthlyAdminReportText = query({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const saudiOffset = 3 * 60 * 60 * 1000;
+    const saudiNow = new Date(now + saudiOffset);
+    const monthStart = new Date(
+      Date.UTC(
+        saudiNow.getUTCFullYear(),
+        saudiNow.getUTCMonth(),
+        1
+      ) - saudiOffset
+    ).getTime();
+
+    // 1. زيارات الشهر
+    const monthlyVisits = await ctx.db
+      .query("siteVisits")
+      .withIndex("by_created", (q) => q.gte("createdAt", monthStart))
+      .collect();
+    const uniqueVisitors = new Set(monthlyVisits.map((v) => v.visitorId)).size;
+
+    // 2. حجوزات الشهر
+    const allBookings = await ctx.db.query("bookings").collect();
+    const monthlyBookings = allBookings.filter((b) => b.createdAt >= monthStart);
+
+    const paidBookings = monthlyBookings.filter((b) => b.paymentStatus === "paid").length;
+    const pendingBookings = monthlyBookings.filter(
+      (b) => b.status === "pending" && b.paymentStatus !== "paid"
+    ).length;
+    const cancelledBookings = monthlyBookings.filter((b) => b.status === "cancelled").length;
+
+    // 3. إجمالي إيرادات الشهر
+    const totalMonthlyRevenue = allBookings
+      .filter((b) => b.paymentStatus === "paid" && (b.paidAt ? b.paidAt >= monthStart : b.createdAt >= monthStart))
+      .reduce((sum, b) => sum + (b.totalPrice || 0), 0);
+
+    const monthName = saudiNow.toLocaleDateString("ar-SA", {
+      month: "long",
+      year: "numeric",
+      timeZone: "Asia/Riyadh",
+    });
+
+    return (
+      `📈 *إحصائيات وإيرادات شهر (${monthName})* 🌴\n\n` +
+      `👥 *الزوار الفريدون خلال الشهر:* ${uniqueVisitors.toLocaleString()} زائر\n` +
+      `📄 *إجمالي مشاهدات الصفحات:* ${monthlyVisits.length.toLocaleString()}\n\n` +
+      `📦 *إجمالي طلبات الحجز:* ${monthlyBookings.length}\n` +
+      `  - حجوزات مؤكدة ومدفوعة: ${paidBookings} ✅\n` +
+      `  - حجوزات قيد الانتظار: ${pendingBookings} ⏳\n` +
+      `  - حجوزات ملغية: ${cancelledBookings} ❌\n\n` +
+      `💰 *إجمالي الإيرادات الشهرية المحققة:* ${totalMonthlyRevenue.toLocaleString()} ر.س\n\n` +
+      `منصة شقق العلا تنمو بنجاح وتستقبل ضيوفها دائماً! ✨`
+    );
+  },
+});
