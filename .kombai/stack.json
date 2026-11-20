@@ -1,0 +1,24 @@
+// Kombai Tech Stack Configuration
+// Each value must be a string or an array of strings.
+// Example: "Framework": "Vite" or "Project Type": ["React", "Vue"]
+{
+  "Project Type": "React",
+  "Framework": "Vite",
+  "Build Tool": "Vite",
+  "Component Library": "shadcn v4 (Radix UI)",
+  "Tailwind Version": "v4",
+  "TS/JS": "TS",
+  "Router": "React Router v7 (data mode)",
+  "State Management": "Zustand",
+  "API Client": "Fetch API",
+  "Testing Framework": "Vitest",
+  "ORM/Client Library": "Convex",
+  "HTTP Server Framework": "Hono",
+  "Charting Library": "Recharts",
+  "Animation Library": "Framer Motion",
+  "Authentication": "Supabase Auth",
+  "Package Manager": "bun",
+  "Deployment Platform": "Vercel",
+  "Icon Set": "Lucide",
+  "React Version": "19"
+}

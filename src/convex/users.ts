@@ -216,13 +216,21 @@ export const getEmailByPhone = internalQuery({
   },
 });
 
+function normalizePhoneKey(phone: string): string {
+  let cleaned = (phone || "").trim().replace(/[^\d]/g, "");
+  if (cleaned.startsWith("00966")) cleaned = cleaned.slice(5);
+  else if (cleaned.startsWith("966")) cleaned = cleaned.slice(3);
+  else if (cleaned.startsWith("05") && cleaned.length === 10) cleaned = cleaned.slice(1);
+  return cleaned;
+}
+
 /**
  * حفظ رمز التحقق مؤقتاً لتسهيل تسجيل الدخول واختبار المنصة إذا تعطل مزود SMS
  */
 export const recordLatestOtp = internalMutation({
   args: { phone: v.string(), code: v.string() },
   handler: async (ctx, args) => {
-    const raw = args.phone.trim().replace(/[^\d]/g, "");
+    const raw = normalizePhoneKey(args.phone);
     if (!raw) return;
     const existing = await ctx.db
       .query("devOtpLogs")
@@ -242,7 +250,7 @@ export const recordLatestOtp = internalMutation({
 export const getLatestOtpForPhone = query({
   args: { phone: v.string() },
   handler: async (ctx, args) => {
-    const raw = args.phone.trim().replace(/[^\d]/g, "");
+    const raw = normalizePhoneKey(args.phone);
     if (!raw) return null;
     const item = await ctx.db
       .query("devOtpLogs")

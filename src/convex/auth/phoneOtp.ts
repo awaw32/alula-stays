@@ -4,14 +4,15 @@ import { internal } from "../_generated/api";
 import axios from "axios";
 
 /**
- * تجهيز رقم الجوال إلى الصيغة المطلوبة في Infobip (مثلاً 9665xxxxxxxx)
+ * توحيد رقم الجوال بصيغة الأرقام المباشرة للدول (مثلاً 9665xxxxxxxx)
  */
-function formatPhoneForInfobip(phone: string): string {
-  let cleaned = (phone || "").trim().replace(/[^\d+]/g, "");
-  if (cleaned.startsWith("+")) cleaned = cleaned.substring(1);
-  cleaned = cleaned.replace(/[٠-٩]/g, (d) => "0123456789"["٠١٢٣٤٥٦٧٨٩".indexOf(d)]);
+function formatPhoneDigits(phone: string): string {
+  let cleaned = (phone || "").trim().replace(/[^\d]/g, "");
+  cleaned = cleaned.replace(/[٠-٩]/g, (d) => "0123456789"["٠١٢٣٤٥٦٧٨٩".indexOf(d)] || d);
 
-  if (cleaned.startsWith("00")) {
+  if (cleaned.startsWith("00966")) {
+    cleaned = "966" + cleaned.slice(5);
+  } else if (cleaned.startsWith("00")) {
     cleaned = cleaned.slice(2);
   } else if (cleaned.startsWith("05") && cleaned.length === 10) {
     cleaned = "966" + cleaned.slice(1);
@@ -19,6 +20,81 @@ function formatPhoneForInfobip(phone: string): string {
     cleaned = "966" + cleaned;
   }
   return cleaned;
+}
+
+/**
+ * إرسال SMS عبر بوابة تقنيات (Taqnyat) السعودية
+ */
+async function sendViaTaqnyat(phoneDigits: string, text: string): Promise<boolean> {
+  const bearerToken = process.env.TAQNYAT_BEARER_TOKEN;
+  if (!bearerToken) return false;
+  const sender = process.env.TAQNYAT_SENDER || "AlUlaStays";
+
+  try {
+    const res = await fetch("https://api.taqnyat.sa/v1/messages", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${bearerToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        recipients: [phoneDigits],
+        sender,
+        body: text,
+      }),
+    });
+    if (res.ok) {
+      console.log(`[Taqnyat] SMS sent successfully to ${phoneDigits}`);
+      return true;
+    }
+    const errText = await res.text();
+    console.warn(`[Taqnyat] HTTP ${res.status}: ${errText}`);
+  } catch (err: any) {
+    console.warn(`[Taqnyat] Dispatch error:`, err?.message);
+  }
+  return false;
+}
+
+/**
+ * إرسال SMS عبر بوابة Infobip
+ */
+async function sendViaInfobip(phoneDigits: string, text: string): Promise<boolean> {
+  const apiKey =
+    process.env.INFOBIP_API_KEY ||
+    "e7923b67d7307866885e643173c76eaf-08b56421-648d-44a2-955a-9fe6d95e27e8";
+  const rawBaseUrl = process.env.INFOBIP_BASE_URL || "https://55nw9j.api.infobip.com";
+  const baseUrl = rawBaseUrl.startsWith("http") ? rawBaseUrl : `https://${rawBaseUrl}`;
+  const sender = process.env.INFOBIP_SENDER || "AlulaStays";
+
+  try {
+    const res = await fetch(`${baseUrl}/sms/2/text/advanced`, {
+      method: "POST",
+      headers: {
+        Authorization: `App ${apiKey}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        messages: [
+          {
+            destinations: [{ to: phoneDigits }],
+            from: sender,
+            text,
+          },
+        ],
+      }),
+    });
+    if (res.ok) {
+      const data: any = await res.json();
+      console.log(`[Infobip] SMS Status:`, data?.messages?.[0]?.status?.name || "SENT");
+      return true;
+    }
+    const errText = await res.text();
+    console.warn(`[Infobip] HTTP ${res.status}: ${errText}`);
+  } catch (err: any) {
+    console.warn(`[Infobip] Dispatch error:`, err?.message);
+  }
+  return false;
 }
 
 export const phoneOtp = {
@@ -47,22 +123,12 @@ export const phoneOtp = {
     },
     ctx: any,
   ) {
-    const apiKey =
-      process.env.INFOBIP_API_KEY ||
-      "e7923b67d7307866885e643173c76eaf-08b56421-648d-44a2-955a-9fe6d95e27e8";
-    const rawBaseUrl = process.env.INFOBIP_BASE_URL || "https://55nw9j.api.infobip.com";
-    const baseUrl = rawBaseUrl.startsWith("http")
-      ? rawBaseUrl
-      : `https://${rawBaseUrl}`;
-    const sender = process.env.INFOBIP_SENDER || "AlulaStays";
-    const whatsappSender = process.env.INFOBIP_WHATSAPP_SENDER || "447860088970";
-
-    const destination = formatPhoneForInfobip(phone);
+    const destination = formatPhoneDigits(phone);
     const messageText = `رمز الدخول إلى منصة شقق العلا: ${token}\nينتهي خلال 10 دقائق. لا تشارك الرمز مع أي شخص.`;
 
-    console.log(`[phoneOtp] Generated code for ${phone} (${destination}): ${token}`);
+    console.log(`[phoneOtp] Generated OTP token for ${phone} (${destination}): ${token}`);
 
-    // حفظ الرمز مؤقتاً لتسهيل تسجيل الدخول والتحقق الفوري
+    // 1. تسجيل الرمز في داتابيز المنصة فوراً لتيسير التحقق والاختبار الفوري
     try {
       if (ctx?.runMutation) {
         await ctx.runMutation(internal.users.recordLatestOtp, {
@@ -71,82 +137,25 @@ export const phoneOtp = {
         });
       }
     } catch (saveErr) {
-      console.warn("[phoneOtp] Error recording OTP:", saveErr);
+      console.warn("[phoneOtp] Error recording OTP token:", saveErr);
     }
 
-    // 1. الإرسال عبر WhatsApp (Infobip)
-    try {
-      const waRes = await fetch(`${baseUrl}/whatsapp/1/message/text`, {
-        method: "POST",
-        headers: {
-          Authorization: `App ${apiKey}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
-          from: whatsappSender,
-          to: destination,
-          content: {
-            text: messageText,
-          },
-        }),
-      });
+    // 2. المحاولة المتسلسلة لإرسال الـ SMS عبر المزودات الفعالة بالترتيب:
+    // تقنيات (Taqnyat) -> Infobip
+    let sent = await sendViaTaqnyat(destination, messageText);
 
-      if (waRes.ok) {
-        const waData: any = await waRes.json();
-        console.log(`[Infobip] WhatsApp Status:`, waData?.status?.name || "SENT");
-      } else {
-        const waErrText = await waRes.text();
-        console.warn(`[Infobip] WhatsApp HTTP ${waRes.status}:`, waErrText);
-      }
-    } catch (waErr: any) {
-      console.warn("[Infobip] Error during WhatsApp dispatch:", waErr?.message);
+    if (!sent) {
+      sent = await sendViaInfobip(destination, messageText);
     }
 
-    // 2. الإرسال عبر SMS (Infobip) كقناة موثوقة ومباشرة للهاتف
-    const payload = {
-      messages: [
-        {
-          destinations: [{ to: destination }],
-          from: sender,
-          text: messageText,
-        },
-      ],
-    };
-
-    try {
-      const response = await fetch(`${baseUrl}/sms/2/text/advanced`, {
-        method: "POST",
-        headers: {
-          Authorization: `App ${apiKey}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.warn(`[Infobip] SMS Response HTTP ${response.status}:`, errorText);
-      } else {
-        const data: any = await response.json();
-        console.log(
-          `[Infobip] SMS Result:`,
-          data?.messages?.[0]?.status?.name || data?.messages?.[0]?.status?.groupName,
-        );
-      }
-    } catch (err: any) {
-      console.warn("[Infobip] Error during SMS dispatch:", err?.message);
-    }
-
-    // 2. قناة احتياطية: إذا كان رقم الجوال مرتبطاً بحساب مسجل وله بريد إلكتروني، يُرسل الرمز للإيميل فوراً لضمان عدم تعطل المستخدم
+    // 3. مسار احتياطي إضافي عبر البريد الإلكتروني إن وُجد للمستخدم
     try {
       if (ctx?.runQuery) {
         const backupEmail = await ctx.runQuery(internal.users.getEmailByPhone, {
           phone,
         });
         if (backupEmail) {
-          console.log(`[phoneOtp] Sending backup OTP to email: ${backupEmail}...`);
+          console.log(`[phoneOtp] Sending backup OTP to registered email: ${backupEmail}...`);
           await axios.post(
             "https://auth.freebuff.app/send_otp",
             {
