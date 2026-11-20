@@ -262,47 +262,19 @@ function normalizePhoneKey(phone: string): string {
 }
 
 /**
- * حفظ رمز التحقق مؤقتاً لتسهيل تسجيل الدخول واختبار المنصة إذا تعطل مزود SMS
+ * تم إيقاف كود التحقق التجريبي نهائياً واعتماد نظام رسائل الواتساب الحقيقي فقط.
  */
 export const recordLatestOtp = internalMutation({
   args: { phone: v.string(), code: v.string() },
-  handler: async (ctx, args) => {
-    const raw = normalizePhoneKey(args.phone);
-    if (!raw) return;
-    const existing = await ctx.db
-      .query("devOtpLogs")
-      .withIndex("by_phone", (q) => q.eq("phone", raw))
-      .first();
-    if (existing) {
-      await ctx.db.patch(existing._id, { code: args.code, createdAt: Date.now() });
-    } else {
-      await ctx.db.insert("devOtpLogs", { phone: raw, code: args.code, createdAt: Date.now() });
-    }
+  handler: async () => {
+    return;
   },
 });
 
-/**
- * جلب رمز التحقق الأخير لرقم الجوال (للاختبار أثناء التطوير فقط)
- * ────────────────────────────────────────────────────────────
- * ⚠️ محمي: هذه الدالة تكشف رمز SMS الحقيقي، لذلك تُقيَّد ببيئة التطوير.
- *    في الإنتاج تُعيد null دائماً. لتفعيلها: npx convex env set ALLOW_DEV_TOOLS true
- *    الدالة نفسها ورمز الإرسال لم يُحذفا — الفحص فقط هو ما تغيّر.
- */
 export const getLatestOtpForPhone = query({
   args: { phone: v.string() },
-  handler: async (ctx, args) => {
-    if (!isDevelopmentDeployment()) return null;
-
-    const raw = normalizePhoneKey(args.phone);
-    if (!raw) return null;
-    const item = await ctx.db
-      .query("devOtpLogs")
-      .withIndex("by_phone", (q) => q.eq("phone", raw))
-      .first();
-    if (!item) return null;
-    const data = item as any;
-    if (Date.now() - (data.createdAt ?? 0) > 10 * 60 * 1000) return null;
-    return data.code ?? null;
+  handler: async () => {
+    return null;
   },
 });
 

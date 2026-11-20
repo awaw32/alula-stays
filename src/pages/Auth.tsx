@@ -13,14 +13,11 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 import { useAuth } from "@/hooks/use-auth";
-import { useQuery } from "convex/react";
-import { api } from "../convex/_generated/api";
 import { DEMO_MODE } from "@/lib/demo-data";
 import {
   ArrowRight,
   CheckCircle2,
   ChevronDown,
-  KeyRound,
   Loader2,
   Lock,
   Mail,
@@ -91,13 +88,6 @@ export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
 
   const [activeIdentifier, setActiveIdentifier] = useState("");
 
-  const latestOtp = useQuery(
-    api.users.getLatestOtpForPhone,
-    step === "otp" && method === "phone" && activeIdentifier
-      ? { phone: activeIdentifier }
-      : "skip",
-  );
-
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
       navigate(redirect);
@@ -139,13 +129,13 @@ export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
         setStep("otp");
         setOtp("");
         setResendCooldown(60);
-        toast.success("تم إرسال رمز التحقق في رسالة نصية (SMS)");
+        toast.success("تم إرسال رمز التحقق عبر تطبيق واتساب 💬");
       } catch (err) {
         console.error("[Phone Auth Error]", err);
         setError(
           getErrorMessage(
             err,
-            "تعذر إرسال رمز التحقق عبر الرسائل القصيرة. يرجى التأكد من الرقم والمحاولة مرة أخرى.",
+            "تعذر إرسال رمز التحقق عبر واتساب. يرجى التأكد من الرقم والمحاولة مرة أخرى.",
           ),
         );
       } finally {
@@ -351,8 +341,9 @@ export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
                       />
                     </div>
 
-                    <p className="text-[11px] leading-relaxed text-neutral-500 dark:text-neutral-400 pr-1">
-                      بيوصلك رمز التحقق على الرقم المدخل .. تأكد من صحة الرقم.
+                    <p className="text-[11px] leading-relaxed text-neutral-500 dark:text-neutral-400 pr-1 flex items-center gap-1">
+                      <span>💬</span>
+                      <span>ستصلك رسالة فورية برمز التحقق (6 أرقام) عبر تطبيق واتساب.</span>
                     </p>
                   </div>
                 ) : (
@@ -415,7 +406,7 @@ export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
                     {method === "phone" ? <Phone className="size-5" /> : <Mail className="size-5" />}
                   </div>
                   <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">
-                    {method === "phone" ? "أرسلنا رمز التحقق إلى جوالك" : "أرسلنا رمز التحقق إلى بريدك"}
+                    {method === "phone" ? "أرسلنا رمز التحقق عبر تطبيق واتساب 💬" : "أرسلنا رمز التحقق إلى بريدك"}
                   </h3>
                   <p dir="ltr" className="mt-1 font-mono text-sm font-bold text-[var(--clay-accent)]">
                     {method === "phone" ? formatPhoneDisplay(activeIdentifier) : activeIdentifier}
@@ -449,28 +440,6 @@ export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
                       </InputOTPGroup>
                     </InputOTP>
                   </div>
-
-                  {latestOtp && (
-                    <div className="mt-3 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-900 dark:text-amber-200 flex flex-col sm:flex-row items-center justify-between gap-2 animate-in fade-in duration-300">
-                      <div className="flex items-center gap-1.5 font-bold">
-                        <KeyRound className="size-4 text-amber-600 shrink-0" />
-                        <span>رمز التحقق الفوري (للاختبار):</span>
-                        <span className="font-mono text-sm tracking-widest text-[var(--clay-accent)] px-2 py-0.5 rounded-lg bg-white dark:bg-neutral-800 border border-amber-300 shadow-xs font-black">
-                          {latestOtp}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setOtp(latestOtp);
-                          handleVerifyOtp(latestOtp);
-                        }}
-                        className="text-xs font-extrabold text-white bg-[var(--clay-accent)] px-3 py-1.5 rounded-xl hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
-                      >
-                        تعبئة وتأكيد فوري
-                      </button>
-                    </div>
-                  )}
                 </div>
 
                 {error && (

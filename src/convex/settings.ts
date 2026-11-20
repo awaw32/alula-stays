@@ -17,8 +17,8 @@ const PHONE_REGEX = /^\+?[0-9\s-]{8,20}$/;
 
 export const DEFAULT_CONTACT = {
   email: "alulahome2026@gmail.com",
-  phone: "0590051074",
-  whatsapp: "0590051074",
+  phone: "0535080498",
+  whatsapp: "0535080498",
 };
 
 /** قراءة الإعدادات — عامة (تحتاجها الصفحة الرئيسية والتذييل) */

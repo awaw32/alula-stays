@@ -30,10 +30,15 @@ build.log
 
 # Environment variables & secrets
 .env
+# WhatsApp bot auth & dependencies
+whatsapp-bot/auth_info
+whatsapp-bot/node_modules/
+whatsapp-bot/.env
 .env.local
 .env.*.local
 .env.ftp
 .env.keys
+.env.production
 .jwt-*.pem
 .jwt.pem
 .jwt-pub.pem

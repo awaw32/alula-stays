@@ -19,6 +19,9 @@ import {
   FileText,
   MessageCircle,
   Phone,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -68,7 +71,14 @@ export default function OwnerDashboard() {
     api.bookings.ownerBookings,
     DEMO_MODE || ownerStatus?.status !== "approved" ? "skip" : undefined
   );
+  const ownerWarnings = useQuery(
+    api.admin.getOwnerWarnings,
+    DEMO_MODE || ownerStatus?.status !== "approved" ? "skip" : {}
+  );
   const deleteApartment = useMutation(api.admin.deleteApartment);
+  const acceptBooking = useMutation(api.bookings.ownerAcceptBooking);
+  const rejectBooking = useMutation(api.bookings.ownerRejectBooking);
+  const [processingBookingId, setProcessingBookingId] = useState<string | null>(null);
 
   useSeo({
     title: "بوابة المضيفين",
@@ -82,6 +92,31 @@ export default function OwnerDashboard() {
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceData | null>(null);
   const [now] = useState(() => Date.now());
   const [retryRejected, setRetryRejected] = useState(false);
+
+  const handleAcceptBooking = async (bId: Id<"bookings">) => {
+    setProcessingBookingId(bId);
+    try {
+      await acceptBooking({ bookingId: bId });
+      toast.success("تمت الموافقة على الحجز بنجاح وإشعار الضيف 🌴");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "فشل قبول الحجز"));
+    } finally {
+      setProcessingBookingId(null);
+    }
+  };
+
+  const handleRejectBooking = async (bId: Id<"bookings">) => {
+    if (!window.confirm("هل أنت متأكد من رفض هذا الحجز وإشعار الضيف؟")) return;
+    setProcessingBookingId(bId);
+    try {
+      await rejectBooking({ bookingId: bId });
+      toast.success("تم رفض الحجز وإتاحة التواريخ مجدداً");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "فشل رفض الحجز"));
+    } finally {
+      setProcessingBookingId(null);
+    }
+  };
 
   // حالة انتظار تحميل حالة المالك
   if (ownerStatus === undefined) {
@@ -196,6 +231,50 @@ export default function OwnerDashboard() {
             {myProfile?.phone ? ` · جوال: ${myProfile.phone}` : ""}
           </p>
         </motion.div>
+
+        {/* شريط الإنذارات الإدارية للمالك إن وجدت */}
+        {ownerWarnings && ownerWarnings.filter((w) => w.status === "active").length > 0 && (
+          <div className="mt-6 mb-2 space-y-3">
+            {ownerWarnings
+              .filter((w) => w.status === "active")
+              .map((warning) => (
+                <div
+                  key={warning._id}
+                  className={`p-4 rounded-2xl border flex items-start gap-3 shadow-xs ${
+                    warning.level === "final"
+                      ? "bg-red-50/95 border-red-300 text-red-900 dark:bg-red-950/40 dark:border-red-900/60 dark:text-red-200"
+                      : "bg-amber-50/95 border-amber-300 text-amber-900 dark:bg-amber-950/40 dark:border-amber-900/60 dark:text-amber-200"
+                  }`}
+                >
+                  <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <span className="font-bold text-sm">
+                        {warning.level === "first"
+                          ? "إنذار إداري أول ⚠️"
+                          : warning.level === "second"
+                            ? "إنذار إداري ثانٍ ⚠️⚠️"
+                            : "إنذار إداري نهائي 🚨"}
+                      </span>
+                      <span className="font-semibold text-xs">· {warning.title}</span>
+                      {warning.apartmentTitle && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-white/80 dark:bg-black/30 border border-amber-200/50">
+                          {warning.apartmentTitle}
+                        </span>
+                      )}
+                      <span className="text-[10px] opacity-70">
+                        {new Date(warning.createdAt).toLocaleDateString("ar-SA")}
+                      </span>
+                    </div>
+                    <p className="text-xs leading-relaxed opacity-90">{warning.reason}</p>
+                    <p className="text-[11px] mt-1.5 opacity-70">
+                      يرجى الالتزام بضوابط ومعايير المنصة أو التواصل مع الإدارة عبر واتساب.
+                    </p>
+                  </div>
+                </div>
+              ))}
+          </div>
+        )}
 
         {/* Identity Verification */}
         <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={0} className="mb-6">
@@ -332,6 +411,36 @@ export default function OwnerDashboard() {
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0">
+                          {booking.status === "pending" && (
+                            <div className="flex items-center gap-1.5 ml-2">
+                              <button
+                                type="button"
+                                onClick={() => void handleAcceptBooking(booking._id)}
+                                disabled={processingBookingId === booking._id}
+                                className="clay-sm flex items-center gap-1 px-3 py-1 text-xs font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40"
+                              >
+                                {processingBookingId === booking._id ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <CheckCircle className="w-3.5 h-3.5" />
+                                )}
+                                قبول الحجز
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleRejectBooking(booking._id)}
+                                disabled={processingBookingId === booking._id}
+                                className="clay-sm flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/40"
+                              >
+                                {processingBookingId === booking._id ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <XCircle className="w-3.5 h-3.5" />
+                                )}
+                                رفض
+                              </button>
+                            </div>
+                          )}
                           <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
                             booking.status === "confirmed" ? "bg-emerald-100 text-emerald-700" :
                             booking.status === "pending" ? "bg-amber-100 text-amber-700" :

@@ -12,7 +12,10 @@
 - **Frontend:** React 19, TypeScript, Vite, Tailwind CSS v4.
 - **UI Components:** Radix UI primitives, Lucide Icons (`lucide-react`), Framer Motion animations.
 - **Backend & Database:** Convex (`convex.json`, `src/convex/`).
-- **Auth (المصادقة):** `@convex-dev/auth` تدعم الدخول برقم الهاتف ورمز التحقق (SMS OTP عبر Infobip API مع Fallback فوري للتطوير في `src/convex/auth/phoneOtp.ts`).
+- **Auth (المصادقة) والتواصل:** 
+  - مصادقة `@convex-dev/auth` بدخول برقم الهاتف ورمز التحقق (WhatsApp OTP مباشر ومستقل).
+  - **سيرفر بوابة الواتساب الذاتية (WhatsApp Gateway):** يعمل على جوال Poco X5 Pro عبر Termux + Node.js (pm2) برقم الأعمال `+966535080498` ومتصل بـ Convex Production (`whatsappQueue`).
+  - **بوت تليجرام الإداري:** `@alulahome_bot` للتنبيهات وإدارة توفر الشقق.
 
 ---
 

@@ -38,6 +38,7 @@ const schema = defineSchema(
       // تعطيل الحساب من الأدمن
       isDisabled: v.optional(v.boolean()),
       disabledReason: v.optional(v.string()),
+    telegramChatId: v.optional(v.string()),
     })
       .index("email", ["email"])
       .index("phone", ["phone"]), // index for email and phone
@@ -132,17 +133,63 @@ const schema = defineSchema(
       .index("by_apartment", ["apartmentId"])
       .index("by_user", ["userId"]),
 
+    // طابور رسائل واتساب (إشعارات الملاك وأكواد التحقق وتذكيرات الشقق والفواتير)
+    whatsappQueue: defineTable({
+      apartmentId: v.optional(v.id("apartments")),
+      bookingId: v.optional(v.id("bookings")),
+      type: v.optional(
+        v.union(
+          v.literal("otp"),
+          v.literal("booking_request"),
+          v.literal("booking_update"),
+          v.literal("invoice"),
+          v.literal("daily_check"),
+          v.literal("test"),
+          v.literal("general"),
+        ),
+      ),
+      ownerId: v.optional(v.id("users")),
+      ownerPhone: v.string(), // رقم الجوال بصيغة دولية (مثل 9665xxxxxxxx)
+      message: v.string(),
+      status: v.union(
+        v.literal("pending"),
+        v.literal("sent"),
+        v.literal("replied"),
+        v.literal("expired"),
+        v.literal("failed"),
+      ),
+      reply: v.optional(v.union(v.literal(1), v.literal(2))),
+      retryCount: v.optional(v.number()),
+      error: v.optional(v.string()),
+      sentAt: v.optional(v.number()),
+      createdAt: v.number(),
+      repliedAt: v.optional(v.number()),
+    })
+      .index("by_owner", ["ownerId"])
+      .index("by_status", ["status"])
+      .index("by_phone", ["ownerPhone"])
+      .index("by_booking", ["bookingId"]),
+
+    // سجل أكواد التحقق (OTP) عبر الواتساب
+    phoneVerifications: defineTable({
+      phone: v.string(), // رقم الجوال الموحد (مثل 9665xxxxxxxx)
+      code: v.string(), // كود التحقق 6 أرقام
+      expiresAt: v.number(), // تاريخ انتهاء الصلاحية
+      attempts: v.number(), // عدد المحاولات الفاشلة
+      lastSentAt: v.number(), // تاريخ آخر إرسال للحد من الإزعاج (Rate Limit)
+    }).index("by_phone", ["phone"]),
+
     // Bookings
     bookings: defineTable({
       apartmentId: v.id("apartments"),
-      userId: v.id("users"),
-      checkIn: v.number(), // timestamp
-      checkOut: v.number(), // timestamp
+      userId: v.optional(v.id("users")),
+      checkIn: v.number(),
+      checkOut: v.number(),
       guests: v.number(),
       totalNights: v.number(),
       pricePerNight: v.number(),
       totalPrice: v.number(),
-      platformFee: v.number(), // 10% commission
+      platformFee: v.number(),
       status: v.union(
         v.literal("pending"),
         v.literal("confirmed"),
@@ -159,6 +206,7 @@ const schema = defineSchema(
       guestName: v.optional(v.string()),
       guestPhone: v.optional(v.string()),
       guestEmail: v.optional(v.string()),
+      bookingReference: v.optional(v.string()),
       paidAt: v.optional(v.number()),
       createdAt: v.number(),
     })
@@ -169,12 +217,12 @@ const schema = defineSchema(
       .index("by_payment_session", ["paymentSessionId"])
       .index("by_invoice", ["invoiceNumber"]),
 
-    // التواريخ المحجوبة يدوياً من المالك (صيانة، حظر أيام، إلخ)
+    // التواريخ المحجوبة يدوياً من المالك
     blockedDates: defineTable({
       apartmentId: v.id("apartments"),
-      startDate: v.number(), // بداية الفترة المحجوبة (timestamp، بداية اليوم)
-      endDate: v.number(), // نهاية الفترة المحجوبة (timestamp، نهاية اليوم)
-      reason: v.optional(v.string()), // سبب الحجب (صيانة، استخدام شخصي...)
+      startDate: v.number(),
+      endDate: v.number(),
+      reason: v.optional(v.string()),
       ownerId: v.id("users"),
       createdAt: v.number(),
     })
@@ -428,6 +476,24 @@ const schema = defineSchema(
     })
       .index("by_status", ["status"])
       .index("by_target", ["targetType", "targetId"]),
+
+    // الإنذارات الإدارية لأصحاب الشقق والمستضيفين
+    ownerWarnings: defineTable({
+      ownerId: v.id("users"),
+      apartmentId: v.optional(v.id("apartments")),
+      reportId: v.optional(v.id("reports")),
+      adminId: v.id("users"),
+      title: v.string(), // عنوان الإنذار (مثال: مخالفة شروط الخدمة، عدم دقة الصور، شكوى متكررة)
+      reason: v.string(), // تفاصيل وملاحظات الإنذار
+      level: v.union(v.literal("first"), v.literal("second"), v.literal("final")), // إنذار أول، ثانٍ، نهائي
+      status: v.union(v.literal("active"), v.literal("resolved"), v.literal("cancelled")),
+      sentViaWhatsApp: v.boolean(),
+      resolutionNote: v.optional(v.string()),
+      resolvedAt: v.optional(v.number()),
+      createdAt: v.number(),
+    })
+      .index("by_owner", ["ownerId"])
+      .index("by_status", ["status"]),
 
     // طلبات الانضمام كمالك عقار مع دورة المراجعة والاعتماد
     ownerRequests: defineTable({

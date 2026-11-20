@@ -7,12 +7,13 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { getApartmentLocation, getApartmentTitle, formatArabicDate } from "@/lib/apartment-content";
 import { getErrorMessage } from "@/lib/error-message";
 import { motion } from "framer-motion";
-import { Calendar, MapPin, Clock, CheckCircle, XCircle, Loader2, AlertCircle, Search, FileText, Phone, MessageCircle } from "lucide-react";
+import { Calendar, MapPin, Clock, CheckCircle, XCircle, Loader2, AlertCircle, Search, FileText, Phone, MessageCircle, Flag, Send } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { useSeo } from "@/lib/seo";
 import { toast } from "sonner";
 import { InvoiceModal, type InvoiceData } from "@/components/InvoiceModal";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -47,7 +48,16 @@ export default function MyBookings() {
   const cancelAndRefund = useAction(api.payments.cancelAndRefund);
   const verifyPayment = useAction(api.payments.verifyPayment);
   const createCheckoutSession = useAction(api.payments.createCheckoutSession);
+  const resendInvoice = useMutation(api.whatsapp.resendInvoiceViaWhatsApp);
+  const createReport = useMutation(api.reports.create);
   const [payingBookingId, setPayingBookingId] = useState<string | null>(null);
+  const [sendingInvoiceId, setSendingInvoiceId] = useState<string | null>(null);
+
+  // حالة بلاغ المستأجر للإدارة
+  const [reportingBooking, setReportingBooking] = useState<any | null>(null);
+  const [reportReason, setReportReason] = useState<"inaccurate" | "misleading" | "inappropriate_images" | "scam" | "other">("inaccurate");
+  const [reportDetails, setReportDetails] = useState("");
+  const [submittingReport, setSubmittingReport] = useState(false);
 
   const sessionId = searchParams.get("tap_id") || searchParams.get("session_id");
   const bookingId = searchParams.get("booking");
@@ -92,6 +102,39 @@ export default function MyBookings() {
       toast.error(getErrorMessage(err, "فشل بدء عملية الدفع"));
     } finally {
       setPayingBookingId(null);
+    }
+  };
+
+  const handleSendWhatsAppInvoice = async (bId: Id<"bookings">) => {
+    setSendingInvoiceId(bId);
+    try {
+      const res = await resendInvoice({ bookingId: bId });
+      toast.success(`تم إرسال الفاتورة عبر واتساب إلى ${res.phone} بنجاح 📲`);
+    } catch (err) {
+      toast.error(getErrorMessage(err, "تعذر إرسال الفاتورة عبر واتساب"));
+    } finally {
+      setSendingInvoiceId(null);
+    }
+  };
+
+  const handleSubmitReport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reportingBooking) return;
+    setSubmittingReport(true);
+    try {
+      await createReport({
+        targetType: "apartment",
+        targetId: reportingBooking.apartmentId,
+        reason: reportReason,
+        details: `[بلاغ من مستأجر - حجز #${reportingBooking._id.slice(-6).toUpperCase()}]\n${reportDetails.trim()}`,
+      });
+      toast.success("تم إرسال بلاغك لإدارة المنصة بنجاح — سنقوم بمراجعة الأمر فوراً 🚩");
+      setReportingBooking(null);
+      setReportDetails("");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "تعذر إرسال البلاغ"));
+    } finally {
+      setSubmittingReport(false);
     }
   };
 
@@ -211,6 +254,23 @@ export default function MyBookings() {
                             عرض الفاتورة
                           </button>
 
+                          {booking.paymentStatus === "paid" && (
+                            <button
+                              type="button"
+                              onClick={() => void handleSendWhatsAppInvoice(booking._id)}
+                              disabled={sendingInvoiceId === booking._id}
+                              className="clay-sm flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
+                              title="إرسال الفاتورة لرقم الواتساب"
+                            >
+                              {sendingInvoiceId === booking._id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                              ) : (
+                                <MessageCircle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+                              )}
+                              واتساب الفاتورة
+                            </button>
+                          )}
+
                           {booking.status === "pending" && booking.paymentStatus === "unpaid" && (
                             <button
                               type="button"
@@ -243,6 +303,16 @@ export default function MyBookings() {
                               إلغاء الحجز
                             </button>
                           )}
+
+                          <button
+                            type="button"
+                            onClick={() => setReportingBooking(booking)}
+                            className="clay-sm flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-50 dark:hover:bg-amber-950/40"
+                            title="تقديم بلاغ أو ملاحظة للإدارة بخصوص الشقة أو الحجز"
+                          >
+                            <Flag className="h-3 w-3 text-amber-600" />
+                            بلاغ للإدارة
+                          </button>
                         </div>
 
                         {/* كارت معلومات المالك والتواصل للضيف بعد تأكيد الحجز */}
@@ -332,6 +402,72 @@ export default function MyBookings() {
           if (cancelTarget) await handleCancel(cancelTarget);
         }}
       />
+
+      {/* مودال تقديم بلاغ / شكوى من المستأجر للإدارة */}
+      <Dialog open={Boolean(reportingBooking)} onOpenChange={(open) => !open && setReportingBooking(null)}>
+        <DialogContent className="max-w-md bg-[var(--background)] border border-[var(--border)] p-6">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold flex items-center gap-2 text-amber-700 dark:text-amber-400">
+              <Flag className="w-5 h-5 text-amber-600" />
+              تقديم بلاغ / ملاحظة لإدارة المنصة
+            </DialogTitle>
+          </DialogHeader>
+
+          {reportingBooking && (
+            <form onSubmit={handleSubmitReport} className="space-y-4 mt-2 text-right">
+              <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border text-xs space-y-1">
+                <div><strong>الوحدة:</strong> {reportingBooking.apartment?.title || "شقة"}</div>
+                <div><strong>رقم الحجز:</strong> #{reportingBooking._id.slice(-6).toUpperCase()}</div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold mb-1">سبب البلاغ</label>
+                <select
+                  value={reportReason}
+                  onChange={(e) => setReportReason(e.target.value as any)}
+                  className="w-full text-xs p-2.5 rounded-xl border bg-white dark:bg-zinc-950 font-medium"
+                >
+                  <option value="inaccurate">بيانات وموقع غير دقيق</option>
+                  <option value="misleading">وصف أو صور غير مطابقة للواقع</option>
+                  <option value="inappropriate_images">مشكلة في النظافة أو المرافق</option>
+                  <option value="scam">اشتباه احتيال أو طلب دفع خارجي</option>
+                  <option value="other">ملاحظة أو شكوى أخرى</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold mb-1">تفاصيل الملاحظة أو المشكلة</label>
+                <textarea
+                  value={reportDetails}
+                  onChange={(e) => setReportDetails(e.target.value)}
+                  rows={4}
+                  placeholder="يرجى كتابة ما حدث معك بوضوح لنتمكن من متابعة الأمر مع المالك وحله..."
+                  className="w-full text-xs p-2.5 rounded-xl border bg-white dark:bg-zinc-950 leading-relaxed"
+                  required
+                />
+              </div>
+
+              <div className="pt-3 flex items-center justify-end gap-2 border-t">
+                <button
+                  type="button"
+                  onClick={() => setReportingBooking(null)}
+                  className="clay-sm px-4 py-2 text-xs font-medium"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingReport}
+                  className="clay-btn px-5 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 flex items-center gap-1.5"
+                >
+                  {submittingReport ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  إرسال البلاغ للإدارة
+                </button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { v } from "convex/values";
 import { requireAnyRole, requireApartmentOwner, requireRole, requireUser } from "./lib/authorization";
 import { ERROR_MESSAGES, ValidationError } from "./lib/errors";
 import { logActivity } from "./lib/activityLog";
+import { normalizeSaudiPhone } from "./whatsapp";
 
 // ─── حالات دورة حياة الشقة ───
 
@@ -337,8 +338,11 @@ export const allUsers = query({
     const profiles = await ctx.db.query("userProfiles").collect();
     const profileMap = new Map(profiles.map((p) => [p.userId, p]));
     const bookings = await ctx.db.query("bookings").collect();
+    const warnings = await ctx.db.query("ownerWarnings").collect();
 
-    return users.map((u) => {
+    const sortedUsers = users.sort((a, b) => b._creationTime - a._creationTime);
+
+    return sortedUsers.map((u) => {
       const p = profileMap.get(u._id);
       const userBookings = bookings.filter((b) => b.userId === u._id);
       const paidBookings = userBookings.filter((b) => b.paymentStatus === "paid");
@@ -349,10 +353,13 @@ export const allUsers = query({
         (b) => b.status === "cancelled",
       );
       const totalSpent = paidBookings.reduce((sum, b) => sum + b.totalPrice, 0);
+      const userWarnings = warnings.filter((w) => w.ownerId === u._id);
+      const activeWarnings = userWarnings.filter((w) => w.status === "active");
 
       return {
         ...u,
-        phone: p?.phone || "",
+        phone: u.phone || p?.phone || "",
+        name: u.name || "مستخدم",
         city: p?.city || "",
         country: p?.country || "",
         bookingsCount: userBookings.length,
@@ -360,8 +367,153 @@ export const allUsers = query({
         pendingBookingsCount: pendingBookings.length,
         cancelledBookingsCount: cancelledBookings.length,
         totalSpent,
+        warningsCount: userWarnings.length,
+        activeWarningsCount: activeWarnings.length,
       };
     });
+  },
+});
+
+/**
+ * إصدار إنذار إداري رسمي لمالك الشقة مع إشعار داخل المنصة ورسالة واتساب
+ */
+export const issueOwnerWarning = mutation({
+  args: {
+    ownerId: v.id("users"),
+    apartmentId: v.optional(v.id("apartments")),
+    reportId: v.optional(v.id("reports")),
+    title: v.string(),
+    reason: v.string(),
+    level: v.union(v.literal("first"), v.literal("second"), v.literal("final")),
+    sendWhatsApp: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const admin = await requireRole(ctx, "admin");
+    const owner = await ctx.db.get(args.ownerId);
+    if (!owner) throw new ValidationError("مالك العقار غير موجود");
+
+    const now = Date.now();
+    const warningId = await ctx.db.insert("ownerWarnings", {
+      ownerId: args.ownerId,
+      apartmentId: args.apartmentId,
+      reportId: args.reportId,
+      adminId: admin._id,
+      title: args.title.trim(),
+      reason: args.reason.trim(),
+      level: args.level,
+      status: "active",
+      sentViaWhatsApp: args.sendWhatsApp,
+      createdAt: now,
+    });
+
+    const levelLabel =
+      args.level === "first"
+        ? "إنذار أول ⚠️"
+        : args.level === "second"
+          ? "إنذار ثانٍ ⚠️⚠️"
+          : "إنذار نهائي 🚨";
+
+    // إشعار داخلي في لوحة تحكم المالك
+    await ctx.db.insert("notifications", {
+      userId: args.ownerId,
+      type: "owner_warning",
+      title: `تنبيه إداري رسمي: ${levelLabel}`,
+      message: `${args.title.trim()}: ${args.reason.trim()}`,
+      actionUrl: "/owner",
+      read: false,
+      createdAt: now,
+    });
+
+    // إرسال إنذار رسمي فوري عبر واتساب
+    if (args.sendWhatsApp) {
+      try {
+        const profile = await ctx.db
+          .query("userProfiles")
+          .withIndex("by_user", (q) => q.eq("userId", args.ownerId))
+          .unique();
+        const rawPhone = owner.phone || profile?.phone;
+        if (rawPhone) {
+          const normPhone = normalizeSaudiPhone(rawPhone);
+          const warningMsg =
+            `⚠️ *إنذار إداري رسمي من إدارة شقق العلا*\n\n` +
+            `عزيزي المستضيف / المالك، نود إشعارك بصدور:\n` +
+            `*${levelLabel} - ${args.title.trim()}*\n\n` +
+            `📋 *تفاصيل المخالفة والملاحظات:*\n` +
+            `${args.reason.trim()}\n\n` +
+            `نرجو منكم تصحيح الملاحظات والالتزام بمعايير جودة الخدمة تفادياً لتعليق ظهور وحداتكم في المنصة.\n\n` +
+            `للاستفسار والتواصل مع الإدارة: https://wa.me/966535080498`;
+
+          await ctx.db.insert("whatsappQueue", {
+            ownerId: args.ownerId,
+            apartmentId: args.apartmentId,
+            ownerPhone: normPhone,
+            message: warningMsg,
+            type: "general",
+            status: "pending",
+            createdAt: now,
+          });
+        }
+      } catch (e) {
+        console.error("Failed to enqueue owner warning via whatsapp:", e);
+      }
+    }
+
+    return { success: true, warningId };
+  },
+});
+
+/**
+ * معالجة وإغلاق إنذار إداري
+ */
+export const resolveOwnerWarning = mutation({
+  args: {
+    warningId: v.id("ownerWarnings"),
+    resolutionNote: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await requireRole(ctx, "admin");
+    const warning = await ctx.db.get(args.warningId);
+    if (!warning) throw new ValidationError("الإنذار غير موجود");
+
+    await ctx.db.patch(args.warningId, {
+      status: "resolved",
+      resolutionNote: args.resolutionNote?.trim() || undefined,
+      resolvedAt: Date.now(),
+    });
+
+    return { success: true, message: "تمت معالجة الإنذار وإغلاقه" };
+  },
+});
+
+/**
+ * جلب إنذارات المالك
+ */
+export const getOwnerWarnings = query({
+  args: { ownerId: v.optional(v.id("users")) },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    let targetOwnerId = args.ownerId;
+    if (!targetOwnerId) {
+      targetOwnerId = user._id;
+    } else if (user.role !== "admin" && targetOwnerId !== user._id) {
+      throw new ValidationError("غير مصرح لك بعرض إنذارات مستخدم آخر");
+    }
+
+    const warnings = await ctx.db
+      .query("ownerWarnings")
+      .withIndex("by_owner", (q) => q.eq("ownerId", targetOwnerId!))
+      .collect();
+
+    const sorted = warnings.sort((a, b) => b.createdAt - a.createdAt);
+    return Promise.all(
+      sorted.map(async (w) => {
+        const apt = w.apartmentId ? await ctx.db.get(w.apartmentId) : null;
+        return {
+          ...w,
+          apartmentTitle: apt?.titleAr || apt?.title || undefined,
+        };
+      }),
+    );
   },
 });
 
@@ -696,8 +848,8 @@ export const adminInvoicesList = query({
 
     const invoices = bookings.map((b) => {
       const apt = aptMap.get(b.apartmentId);
-      const guestUser = userMap.get(b.userId);
-      const guestProfile = profileMap.get(b.userId);
+      const guestUser = b.userId ? userMap.get(b.userId) : null;
+      const guestProfile = b.userId ? profileMap.get(b.userId) : null;
 
       let ownerName = "مالك";
       let ownerPhone = "";

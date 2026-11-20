@@ -67,6 +67,8 @@ export default function AdminDashboard() {
   const featureApartment = useMutation(api.admin.adminFeatureApartment);
   const updateRole = useMutation(api.admin.adminUpdateUserRole);
   const setUserDisabled = useMutation(api.admin.adminSetUserDisabled);
+  const acceptBooking = useMutation(api.bookings.ownerAcceptBooking);
+  const cancelBooking = useMutation(api.bookings.cancel);
 
   useSeo({
     title: "لوحة الإدارة",
@@ -805,6 +807,12 @@ export default function AdminDashboard() {
                               {u.isDisabled && (
                                 <span className="rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-semibold">معطّل</span>
                               )}
+                              {(u as any).activeWarningsCount > 0 && (
+                                <span className="rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[10px] font-bold flex items-center gap-1">
+                                  <span>⚠️</span>
+                                  <span>{(u as any).activeWarningsCount} إنذار نشط</span>
+                                </span>
+                              )}
                             </div>
 
                             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--muted-foreground)]">
@@ -909,6 +917,40 @@ export default function AdminDashboard() {
                       }`}>
                         {booking.paymentStatus === "paid" ? "مدفوع" : booking.paymentStatus === "refunded" ? "مسترد" : "غير مدفوع"}
                       </span>
+
+                      {booking.status === "pending" && (
+                        <div className="flex items-center gap-1.5 mr-2">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                await acceptBooking({ bookingId: booking._id });
+                                toast.success("تمت الموافقة على الحجز بنجاح");
+                              } catch (e) {
+                                toast.error(getErrorMessage(e, "فشل قبول الحجز"));
+                              }
+                            }}
+                            className="clay-sm px-2.5 py-1 text-xs font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                          >
+                            قبول الحجز
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!window.confirm("هل أنت متأكد من إلغاء هذا الحجز؟")) return;
+                              try {
+                                await cancelBooking({ bookingId: booking._id });
+                                toast.success("تم إلغاء الحجز");
+                              } catch (e) {
+                                toast.error(getErrorMessage(e, "فشل إلغاء الحجز"));
+                              }
+                            }}
+                            className="clay-sm px-2.5 py-1 text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100"
+                          >
+                            إلغاء
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}

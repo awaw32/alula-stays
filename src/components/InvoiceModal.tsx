@@ -1,6 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Printer, CheckCircle, Clock, XCircle, ShieldCheck, Download } from "lucide-react";
+import { Printer, CheckCircle, Clock, XCircle, ShieldCheck, MessageCircle, Loader2 } from "lucide-react";
+import { useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
+import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/error-message";
 
 export interface InvoiceData {
   invoiceNumber: string;
@@ -35,8 +40,26 @@ interface InvoiceModalProps {
 export function InvoiceModal({ open, onOpenChange, invoice }: InvoiceModalProps) {
   if (!invoice) return null;
 
+  const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
+  const resendInvoice = useMutation(api.whatsapp.resendInvoiceViaWhatsApp);
+
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleSendWhatsApp = async () => {
+    if (!invoice?.bookingId) return;
+    setSendingWhatsApp(true);
+    try {
+      const res = await resendInvoice({
+        bookingId: invoice.bookingId as Id<"bookings">,
+      });
+      toast.success(`تم إرسال الفاتورة عبر واتساب إلى ${res.phone} بنجاح 📲`);
+    } catch (err) {
+      toast.error(getErrorMessage(err, "تعذر إرسال الفاتورة عبر واتساب"));
+    } finally {
+      setSendingWhatsApp(false);
+    }
   };
 
   const isPaid = invoice.paymentStatus === "paid" || invoice.status === "confirmed";
@@ -52,13 +75,28 @@ export function InvoiceModal({ open, onOpenChange, invoice }: InvoiceModalProps)
               #{invoice.invoiceNumber}
             </span>
           </DialogTitle>
-          <button
-            onClick={handlePrint}
-            className="clay-sm px-3 py-1.5 text-xs font-medium flex items-center gap-1.5 hover:bg-[var(--clay-accent-soft)]"
-          >
-            <Printer className="w-3.5 h-3.5" />
-            طباعة / حفظ PDF
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleSendWhatsApp}
+              disabled={sendingWhatsApp}
+              className="clay-sm px-3 py-1.5 text-xs font-medium flex items-center gap-1.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
+              title="إرسال نسخة من الفاتورة إلى جوالك عبر واتساب"
+            >
+              {sendingWhatsApp ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <MessageCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              )}
+              إرسال عبر واتساب
+            </button>
+            <button
+              onClick={handlePrint}
+              className="clay-sm px-3 py-1.5 text-xs font-medium flex items-center gap-1.5 hover:bg-[var(--clay-accent-soft)]"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              طباعة / حفظ PDF
+            </button>
+          </div>
         </DialogHeader>
 
         {/* Invoice Printable Sheet */}
@@ -166,7 +204,9 @@ export function InvoiceModal({ open, onOpenChange, invoice }: InvoiceModalProps)
                     إقامة في {invoice.apartmentTitle}
                   </td>
                   <td className="text-center py-2.5">{invoice.totalNights} ليلة</td>
-                  <td className="text-left py-2.5 font-medium">{invoice.totalPrice.toLocaleString()} ر.س</td>
+                  <td className="text-left py-2.5 font-medium">
+                    {(invoice.totalPrice - invoice.platformFee).toLocaleString()} ر.س
+                  </td>
                 </tr>
                 <tr>
                   <td className="py-2.5 text-zinc-500 text-xs">
@@ -178,9 +218,9 @@ export function InvoiceModal({ open, onOpenChange, invoice }: InvoiceModalProps)
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-zinc-300 dark:border-zinc-700">
-                  <th colSpan={2} className="text-right py-3 text-base font-bold">المجموع الإجمالي المستحق</th>
+                  <th colSpan={2} className="text-right py-3 text-base font-bold">المجموع الإجمالي المسدد</th>
                   <th className="text-left py-3 text-base font-bold text-[var(--clay-accent)]">
-                    {(invoice.totalPrice + invoice.platformFee).toLocaleString()} ر.س
+                    {invoice.totalPrice.toLocaleString()} ر.س
                   </th>
                 </tr>
               </tfoot>

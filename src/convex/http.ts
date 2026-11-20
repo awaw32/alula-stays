@@ -131,4 +131,76 @@ http.route({
   }),
 });
 
+// Telegram webhook for binding guests and handling callbacks
+http.route({
+  path: "/telegram-webhook",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const body = await request.json();
+
+      // Handle /start command to bind chatId to user
+      if (body.message && body.message.text && body.message.text.startsWith("/start")) {
+        const parts = body.message.text.split(/\s+/);
+        const payload = parts[1] || "";
+        const chatId = body.message.from?.id?.toString();
+        if (!chatId) return new Response(JSON.stringify({ error: "missing chatId" }), { status: 400 });
+
+        if (payload) {
+          const res = await ctx.runMutation(internal.telegramDb.bindTelegramChat, {
+            payload,
+            chatId,
+          });
+
+          if (res.success) {
+            await ctx.runAction(internal.telegram.sendTelegramMessage, {
+              chatId,
+              text: `✅ مرحباً بك ${res.name}!\nتم ربط حسابك في شقق العلا بنجاح. ستصلك الآن الإشعارات والتذكيرات اليومية هنا.`,
+            });
+          } else {
+            await ctx.runAction(internal.telegram.sendTelegramMessage, {
+              chatId,
+              text: "⚠️ لم نتمكن من العثور على حساب مطابق. تأكد من استخدام الرابط المخصص من لوحة تحكمك.",
+            });
+          }
+        }
+        return new Response(JSON.stringify({ ok: true }));
+      }
+
+      // Handle inline button callbacks
+      if (body.callback_query) {
+        const data = body.callback_query.data as string;
+        const fromId = body.callback_query.from?.id?.toString();
+        const [action, apartmentId] = data.split(":");
+        const avail = action === "avail_yes";
+
+        if (apartmentId) {
+          const res = await ctx.runMutation(internal.telegramDb.updateApartmentAvailability, {
+            apartmentId,
+            available: avail,
+          });
+
+          if (fromId) {
+            const statusText = avail ? "✅ متاحة للحجز" : "❌ محجوزة خارجياً";
+            const text = res.success
+              ? `تم تحديث حالة (${res.title}) بنجاح إلى: ${statusText}`
+              : `تم تحديث حالة الشقة إلى: ${statusText}`;
+
+            await ctx.runAction(internal.telegram.sendTelegramMessage, {
+              chatId: fromId,
+              text,
+            });
+          }
+        }
+        return new Response(JSON.stringify({ ok: true }));
+      }
+
+      return new Response(JSON.stringify({ ok: true }));
+    } catch (err: any) {
+      console.error("Telegram webhook error:", err);
+      return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+    }
+  }),
+});
+
 export default http;

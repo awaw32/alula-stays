@@ -125,7 +125,7 @@ export default function Landing() {
         addressLocality: "العلا",
         addressCountry: "SA",
       },
-      telephone: "+966590051074",
+      telephone: "+966535080498",
       sameAs: [],
     },
   });
@@ -877,22 +877,22 @@ export default function Landing() {
                   <span>📧</span>
                 </a>
                 <a
-                  href={`tel:${siteSettings?.contactPhone || "0590051074"}`}
+                  href={`tel:${siteSettings?.contactPhone || "0535080498"}`}
                   className="flex items-center gap-2 hover:text-[#542382] dark:hover:text-purple-400 transition-colors"
                   dir="ltr"
                 >
-                  <span className="text-right flex-1">{siteSettings?.contactPhone || "0590051074"}</span>
+                  <span className="text-right flex-1">{siteSettings?.contactPhone || "0535080498"}</span>
                   <span>📱</span>
                 </a>
                 <a
-                  href="https://wa.me/966590051074"
+                  href="https://wa.me/966535080498"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 text-emerald-600 hover:text-emerald-700 font-semibold transition-colors"
                   dir="ltr"
                 >
-                  <span className="text-right flex-1">0590051074</span>
-                  <span>💬 واتساب:</span>
+                  <span className="text-right flex-1">0535080498</span>
+                  <span>💬 واتساب الدعم المباشر:</span>
                 </a>
               </div>
             </div>

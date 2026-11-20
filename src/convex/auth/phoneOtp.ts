@@ -229,90 +229,27 @@ async function handleSendVerificationRequest(
   },
   ctx: any,
 ) {
-  const destination = formatPhoneDigits(phone);
-  const messageText = `رمز الدخول إلى منصة شقق العلا: ${token}\nينتهي خلال 10 دقائق. لا تشارك الرمز مع أي شخص.`;
+  console.log(`[phoneOtp] Generated OTP token for ${phone}: ${token}`);
 
-  console.log(`[phoneOtp] Generated OTP token for ${phone} (${destination}): ${token}`);
-
-  // 1. تسجيل الرمز في داتابيز المنصة فوراً لتيسير التحقق والاختبار الفوري
-  try {
-    if (ctx?.runMutation) {
-      await ctx.runMutation(internal.users.recordLatestOtp, {
+  // إرسال كود التحقق فوراً عبر طابور الواتساب (whatsappQueue) للبوت المربوط
+  if (ctx?.runMutation) {
+    try {
+      await ctx.runMutation(internal.whatsapp.enqueueOtpMessage, {
         phone,
         code: token,
       });
-      console.log(`[phoneOtp] Recorded OTP token for ${phone} in devOtpLogs.`);
+      console.log(`[phoneOtp] Enqueued WhatsApp OTP for ${phone}`);
+    } catch (err: any) {
+      console.error("[phoneOtp] Error enqueuing WhatsApp OTP:", err?.message);
+      throw err;
     }
-  } catch (saveErr) {
-    console.warn("[phoneOtp] Error recording OTP token in devOtpLogs:", saveErr);
-  }
-
-  // 2. إرسال عبر واتساب Infobip أولاً (حسب طلب المستخدم وإعدادات الخادم)
-  let dispatched = false;
-  try {
-    dispatched = await sendViaInfobipWhatsApp(destination, messageText, token);
-  } catch (waErr) {
-    console.warn("[phoneOtp] WhatsApp dispatch error:", waErr);
-  }
-
-  // 3. محاولة إرسال SMS عبر Infobip إن لم تُرسل عبر واتساب
-  if (!dispatched) {
-    try {
-      dispatched = await sendViaInfobipSms(destination, messageText);
-    } catch (smsErr) {
-      console.warn("[phoneOtp] Infobip SMS dispatch error:", smsErr);
-    }
-  }
-
-  // 4. محاولة إرسال SMS عبر تقنيات (Taqnyat) كمسار احتياطي
-  if (!dispatched) {
-    try {
-      dispatched = await sendViaTaqnyat(destination, messageText);
-    } catch (taqErr) {
-      console.warn("[phoneOtp] Taqnyat dispatch error:", taqErr);
-    }
-  }
-
-  // 5. مسار احتياطي إضافي عبر البريد الإلكتروني إن وُجد للمستخدم
-  try {
-    if (ctx?.runQuery) {
-      const backupEmail = await ctx.runQuery(internal.users.getEmailByPhone, {
-        phone,
-      });
-      if (backupEmail) {
-        console.log(
-          `[phoneOtp] Sending backup OTP to registered email: ${backupEmail}...`,
-        );
-        await axios.post(
-          "https://auth.freebuff.app/send_otp",
-          {
-            to: backupEmail,
-            otp: token,
-            appName: "شقق العلا (رمز التحقق للجوال)",
-          },
-          {
-            headers: {
-              "x-api-key": "fb_email_2crN1hqIArZP2bEfvjp5Qik4",
-            },
-          },
-        );
-      }
-    }
-  } catch (emailErr) {
-    console.warn("[phoneOtp] Error sending backup email OTP:", emailErr);
-  }
-
-  if (!dispatched) {
-    console.log(
-      `[phoneOtp] OTP registered for ${destination}. Dev fallback is active if needed.`,
-    );
   }
 }
 
 const phoneConfig = {
   id: "phone-otp",
   type: "phone" as const,
-  maxAge: 60 * 10, // 10 دقائق لصلاحية الرمز
+  maxAge: 60 * 5, // 5 دقائق لصلاحية الرمز
   generateVerificationToken: handleGenerateVerificationToken,
   sendVerificationRequest: handleSendVerificationRequest,
 };

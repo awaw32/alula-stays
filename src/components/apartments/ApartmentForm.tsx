@@ -164,7 +164,10 @@ export function ApartmentForm({ mode, initialValues, loading = false, disabled =
     setUploading(true);
     setError(null);
     try {
-      const baseUrl = import.meta.env.VITE_CONVEX_URL as string;
+      const rawBaseUrl = (
+        (import.meta.env.VITE_CONVEX_URL as string) ||
+        "https://wry-mosquito-572.convex.cloud"
+      ).replace(/\/+$/, "");
       const uploaded: string[] = [];
       for (const file of fileList) {
         // ضغط تلقائي قبل الرفع
@@ -180,7 +183,7 @@ export function ApartmentForm({ mode, initialValues, loading = false, disabled =
           throw new Error("فشل رفع الصورة، حاول مرة أخرى");
         }
         const { storageId } = (await result.json()) as { storageId: string };
-        uploaded.push(`${baseUrl}/api/storage/${storageId}`);
+        uploaded.push(`${rawBaseUrl}/api/storage/${storageId}`);
       }
       update("images", [...form.images, ...uploaded]);
     } catch (uploadError) {

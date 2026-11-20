@@ -16,12 +16,16 @@ import type * as auth_emailOtp from "../auth/emailOtp.js";
 import type * as auth_phoneOtp from "../auth/phoneOtp.js";
 import type * as bookings from "../bookings.js";
 import type * as calendar from "../calendar.js";
+import type * as cronHelpers from "../cronHelpers.js";
+import type * as cronQueries from "../cronQueries.js";
+import type * as crons from "../crons.js";
 import type * as email from "../email.js";
 import type * as favorites from "../favorites.js";
 import type * as features from "../features.js";
 import type * as http from "../http.js";
 import type * as identity from "../identity.js";
 import type * as images from "../images.js";
+import type * as infobip from "../infobip.js";
 import type * as lib_activityLog from "../lib/activityLog.js";
 import type * as lib_authorization from "../lib/authorization.js";
 import type * as lib_env from "../lib/env.js";
@@ -40,7 +44,10 @@ import type * as reviews from "../reviews.js";
 import type * as seed from "../seed.js";
 import type * as seedReviews from "../seedReviews.js";
 import type * as settings from "../settings.js";
+import type * as telegram from "../telegram.js";
+import type * as telegramDb from "../telegramDb.js";
 import type * as users from "../users.js";
+import type * as whatsapp from "../whatsapp.js";
 
 import type {
   ApiFromModules,
@@ -57,12 +64,16 @@ declare const fullApi: ApiFromModules<{
   "auth/phoneOtp": typeof auth_phoneOtp;
   bookings: typeof bookings;
   calendar: typeof calendar;
+  cronHelpers: typeof cronHelpers;
+  cronQueries: typeof cronQueries;
+  crons: typeof crons;
   email: typeof email;
   favorites: typeof favorites;
   features: typeof features;
   http: typeof http;
   identity: typeof identity;
   images: typeof images;
+  infobip: typeof infobip;
   "lib/activityLog": typeof lib_activityLog;
   "lib/authorization": typeof lib_authorization;
   "lib/env": typeof lib_env;
@@ -81,7 +92,10 @@ declare const fullApi: ApiFromModules<{
   seed: typeof seed;
   seedReviews: typeof seedReviews;
   settings: typeof settings;
+  telegram: typeof telegram;
+  telegramDb: typeof telegramDb;
   users: typeof users;
+  whatsapp: typeof whatsapp;
 }>;
 
 /**

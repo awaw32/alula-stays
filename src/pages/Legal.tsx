@@ -6,7 +6,7 @@ import { useSeo } from "@/lib/seo";
 
 const BRAND = "شقق العلا";
 const CONTACT_EMAIL = "alulahome2026@gmail.com";
-const CONTACT_PHONE = "0590051074";
+const CONTACT_PHONE = "0535080498";
 
 type Section = { heading: string; body: string[] };
 

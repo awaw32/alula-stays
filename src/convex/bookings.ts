@@ -25,11 +25,9 @@ import {
   ValidationError,
   assertExists,
 } from "./lib/errors";
-import {
-  calculatePlatformFee,
-  calculateRefund,
-} from "./lib/money";
+import { calculatePlatformFee, calculateRefund } from "./lib/money";
 import { checkRateLimit } from "./lib/rateLimiting";
+import { normalizeSaudiPhone } from "./whatsapp";
 
 const bookingStatusValidator = v.union(
   v.literal("pending"),
@@ -55,11 +53,13 @@ export function isBookingActive(booking: Doc<"bookings">, now: number = Date.now
 
 async function enrichBooking(ctx: DatabaseCtx, booking: Doc<"bookings">) {
   const apartment = await ctx.db.get(booking.apartmentId);
-  const guestUser = await ctx.db.get(booking.userId);
-  const guestProfile = await ctx.db
-    .query("userProfiles")
-    .withIndex("by_user", (q) => q.eq("userId", booking.userId))
-    .unique();
+  const guestUser = booking.userId ? await ctx.db.get(booking.userId) : null;
+  const guestProfile = booking.userId
+    ? await ctx.db
+        .query("userProfiles")
+        .withIndex("by_user", (q) => q.eq("userId", booking.userId!))
+        .unique()
+    : null;
 
   let ownerName: string | undefined;
   let ownerPhone: string | undefined;
@@ -347,6 +347,79 @@ export const create = mutation({
           read: false,
           createdAt: Date.now(),
         });
+
+        // إشعار واتساب تلقائي لصاحب الشقة للرد بـ 1 (موافقة) أو 2 (رفض)
+        try {
+          const ownerDoc = await ctx.db.get(apartment.ownerId);
+          const ownerProf = await ctx.db
+            .query("userProfiles")
+            .withIndex("by_user", (q) => q.eq("userId", apartment.ownerId!))
+            .unique();
+          const rawOwnerPhone = ownerProf?.phone || ownerDoc?.phone;
+          if (rawOwnerPhone) {
+            const normOwnerPhone = normalizeSaudiPhone(rawOwnerPhone);
+            if (normOwnerPhone) {
+              const checkInDate = new Date(args.checkIn).toLocaleDateString("ar-SA");
+              const checkOutDate = new Date(args.checkOut).toLocaleDateString("ar-SA");
+              const guestDisplay = user.name || "ضيف العلا";
+              const aptTitle = apartment.titleAr || apartment.title;
+
+              const waMessage = `🛎️ لديك طلب حجز جديد في شقق العلا!\n\n` +
+                `🏠 الشقة: ${aptTitle}\n` +
+                `👤 الضيف: ${guestDisplay}\n` +
+                `📅 الفترة: من ${checkInDate} إلى ${checkOutDate} (${totalNights} ليالٍ)\n` +
+                `💰 إجمالي المبلغ: ${totalPrice.toLocaleString()} ر.س\n` +
+                `🧾 رقم الفاتورة: #${invoiceNumber}\n\n` +
+                `الرجاء الرد على هذه الرسالة:\n` +
+                `1️⃣ للموافقة على الحجز ✅\n` +
+                `2️⃣ لرفض الحجز ❌`;
+
+              await ctx.db.insert("whatsappQueue", {
+                ownerId: apartment.ownerId,
+                apartmentId: args.apartmentId,
+                bookingId,
+                type: "booking_request",
+                ownerPhone: normOwnerPhone,
+                message: waMessage,
+                status: "pending",
+                createdAt: Date.now(),
+              });
+            }
+          }
+        } catch (waErr) {
+          console.warn("[Booking] Error enqueuing owner WhatsApp message:", waErr);
+        }
+
+        // إشعار واتساب تلقائي للضيف بتأكيد استلام طلبه
+        const rawGuestPhone = userProfile?.phone || user.phone;
+        if (rawGuestPhone) {
+          const normGuestPhone = normalizeSaudiPhone(rawGuestPhone);
+          if (normGuestPhone) {
+            const checkInDate = new Date(args.checkIn).toLocaleDateString("ar-SA");
+            const checkOutDate = new Date(args.checkOut).toLocaleDateString("ar-SA");
+            const aptTitle = apartment.titleAr || apartment.title;
+            const guestDisplay = user.name || "ضيف العلا";
+
+            const guestWaMsg =
+              `مرحباً بك ${guestDisplay}! 🌿\n\n` +
+              `تم استلام طلب حجزك بنجاح في شقق العلا:\n` +
+              `🏠 الوحدة: ${aptTitle}\n` +
+              `📅 الفترة: من ${checkInDate} إلى ${checkOutDate} (${totalNights} ليالٍ)\n` +
+              `💰 المبلغ الإجمالي: ${totalPrice.toLocaleString()} ر.س\n` +
+              `🧾 رقم الفاتورة: #${invoiceNumber}\n\n` +
+              `طلبك الآن بانتظار موافقة المالك، وسنوافيك برسالة فورية هنا بمجرد اعتماده لتأكيد الدفع 🌴✨`;
+
+            await ctx.db.insert("whatsappQueue", {
+              bookingId,
+              apartmentId: args.apartmentId,
+              ownerPhone: normGuestPhone,
+              message: guestWaMsg,
+              type: "booking_update",
+              status: "pending",
+              createdAt: Date.now(),
+            });
+          }
+        }
       }
 
       // إشعار فوري لجميع مديري المنصة (Admins)
@@ -412,6 +485,168 @@ export const confirm = mutation({
         error instanceof Error ? error.message : "فشل تأكيد الحجز"
       );
     }
+  },
+});
+
+/**
+ * قبول وموافقة المالك (أو الأدمن) على طلب الحجز المعلق مباشرة من لوحة التحكم
+ */
+export const ownerAcceptBooking = mutation({
+  args: { bookingId: v.id("bookings") },
+  handler: async (ctx, { bookingId }) => {
+    const user = await requireUser(ctx);
+    const booking = await ctx.db.get(bookingId);
+    if (!booking) throw new ValidationError(ERROR_MESSAGES.BOOKING_NOT_FOUND);
+
+    const apartment = await ctx.db.get(booking.apartmentId);
+    const isAdmin = user.role === "admin";
+    const isOwner = apartment && apartment.ownerId === user._id;
+
+    if (!isAdmin && !isOwner) {
+      throw new ValidationError("غير مصرح لك بقبول هذا الحجز");
+    }
+
+    if (booking.status !== "pending") {
+      throw new ValidationError("لا يمكن قبول حجز تمت معالجته مسبقاً");
+    }
+
+    const now = Date.now();
+    await ctx.db.patch(bookingId, {
+      status: "confirmed",
+    });
+
+    const invoiceNum = booking.invoiceNumber || `INV-${booking._id.slice(-6).toUpperCase()}`;
+
+    // إشعار داخل المنصة للضيف
+    if (booking.userId) {
+      await ctx.db.insert("notifications", {
+        userId: booking.userId,
+        type: "booking_confirmed",
+        title: "✅ تمت الموافقة على طلب حجزك!",
+        message: `وافق المستضيف على طلب حجزك في "${apartment?.titleAr || apartment?.title || "العلا"}" (فاتورة #${invoiceNum}). يرجى إتمام السداد لتأكيد الإقامة.`,
+        relatedBookingId: bookingId,
+        relatedApartmentId: booking.apartmentId,
+        actionUrl: `/my-bookings?booking=${bookingId}`,
+        read: false,
+        createdAt: now,
+      });
+    }
+
+    // إرسال رسالة واتساب للضيف
+    try {
+      const guestPhone =
+        booking.guestPhone ||
+        (booking.userId ? (await ctx.db.get(booking.userId))?.phone : undefined);
+      if (guestPhone) {
+        const normPhone = normalizeSaudiPhone(guestPhone);
+        const aptTitle = apartment?.titleAr || apartment?.title || "شقة في العلا";
+        const checkInDate = new Date(booking.checkIn).toLocaleDateString("ar-SA");
+        const checkOutDate = new Date(booking.checkOut).toLocaleDateString("ar-SA");
+
+        const guestMsg =
+          `🎉 *بشرى سارة - تمت الموافقة على حجزك!*\n\n` +
+          `وافق مالك الوحدة على طلب إقامتك في: *${aptTitle}*\n` +
+          `📅 *الفترة:* من ${checkInDate} إلى ${checkOutDate}\n` +
+          `💰 *المبلغ:* ${booking.totalPrice.toLocaleString()} ر.س\n` +
+          `🧾 *الفاتورة:* #${invoiceNum}\n\n` +
+          `يرجى الدخول وتأكيد السداد عبر الرابط:\n` +
+          `🔗 https://alulahome.com/my-bookings?booking=${booking._id}\n\n` +
+          `نتمنى لك أوقاتاً سعيدة في العلا! 🌴✨`;
+
+        await ctx.db.insert("whatsappQueue", {
+          bookingId: booking._id,
+          apartmentId: booking.apartmentId,
+          ownerPhone: normPhone,
+          message: guestMsg,
+          type: "booking_update",
+          status: "pending",
+          createdAt: now,
+        });
+      }
+    } catch (e) {
+      console.error("Failed to enqueue guest approval whatsapp message:", e);
+    }
+
+    return { success: true, message: "تمت الموافقة على الحجز بنجاح" };
+  },
+});
+
+/**
+ * رفض المالك (أو الأدمن) لطلب الحجز المعلق وإشعار الضيف وإتاحة التواريخ
+ */
+export const ownerRejectBooking = mutation({
+  args: {
+    bookingId: v.id("bookings"),
+    reason: v.optional(v.string()),
+  },
+  handler: async (ctx, { bookingId, reason }) => {
+    const user = await requireUser(ctx);
+    const booking = await ctx.db.get(bookingId);
+    if (!booking) throw new ValidationError(ERROR_MESSAGES.BOOKING_NOT_FOUND);
+
+    const apartment = await ctx.db.get(booking.apartmentId);
+    const isAdmin = user.role === "admin";
+    const isOwner = apartment && apartment.ownerId === user._id;
+
+    if (!isAdmin && !isOwner) {
+      throw new ValidationError("غير مصرح لك برفض هذا الحجز");
+    }
+
+    if (booking.status !== "pending") {
+      throw new ValidationError("لا يمكن رفض حجز تمت معالجته مسبقاً");
+    }
+
+    const now = Date.now();
+    await ctx.db.patch(bookingId, {
+      status: "cancelled",
+    });
+
+    // إشعار داخل المنصة للضيف
+    if (booking.userId) {
+      await ctx.db.insert("notifications", {
+        userId: booking.userId,
+        type: "booking_cancelled",
+        title: "نعتذر منك، تعذر قبول الحجز",
+        message: `نعتذر منك، الشقة "${apartment?.titleAr || apartment?.title || "العلا"}" غير متاحة في التواريخ المطلوبة${reason ? ` (السبب: ${reason})` : ""}. يمكنك تصفح وحدات بديلة في العلا.`,
+        relatedBookingId: bookingId,
+        relatedApartmentId: booking.apartmentId,
+        actionUrl: "/apartments",
+        read: false,
+        createdAt: now,
+      });
+    }
+
+    // إرسال واتساب للضيف
+    try {
+      const guestPhone =
+        booking.guestPhone ||
+        (booking.userId ? (await ctx.db.get(booking.userId))?.phone : undefined);
+      if (guestPhone) {
+        const normPhone = normalizeSaudiPhone(guestPhone);
+        const aptTitle = apartment?.titleAr || apartment?.title || "شقة في العلا";
+
+        const guestCancelMsg =
+          `نعتذر منك عزيزنا الضيف 🙏\n` +
+          `نأسف لإبلاغك بتعذر قبول حجزك لشقة *${aptTitle}* نظراً لعدم توفرها في التواريخ المطلوبة.\n\n` +
+          `نسعد بمساعدتك في اختيار شقة بديلة تناسبك في العلا عبر الرابط:\n` +
+          `🔗 https://alulahome.com/apartments\n\n` +
+          `شقق العلا تتمنى لك دائماً رحلة موفقة! 🌿`;
+
+        await ctx.db.insert("whatsappQueue", {
+          bookingId: booking._id,
+          apartmentId: booking.apartmentId,
+          ownerPhone: normPhone,
+          message: guestCancelMsg,
+          type: "booking_update",
+          status: "pending",
+          createdAt: now,
+        });
+      }
+    } catch (e) {
+      console.error("Failed to enqueue guest cancellation whatsapp message:", e);
+    }
+
+    return { success: true, message: "تم رفض الحجز وإشعار الضيف وإتاحة التواريخ" };
   },
 });
 
@@ -564,7 +799,7 @@ export const getPaymentContext = internalQuery({
     }
 
     const apartment = await ctx.db.get(booking.apartmentId);
-    const user = await ctx.db.get(booking.userId);
+    const user = booking.userId ? await ctx.db.get(booking.userId) : null;
     return { booking, apartment, user };
   },
 });
@@ -619,18 +854,20 @@ export const markPaid = internalMutation({
         updatedBooking.invoiceNumber ||
         `INV-${new Date().getFullYear()}-${updatedBooking._id.slice(-6).toUpperCase()}`;
 
-      // إشعار فوري للضيف
-      await ctx.db.insert("notifications", {
-        userId: updatedBooking.userId,
-        type: "payment_confirmed",
-        title: "🎉 تم تأكيد حجزك ودفع المبلغ بنجاح!",
-        message: `تم سداد حجزك لشقة "${apartment?.titleAr || apartment?.title || "العلا"}" بنجاح (فاتورة #${invoiceNum}). يمكنك الآن التواصل مع المالك وعرض بيانات الوصول.`,
-        relatedBookingId: args.bookingId,
-        relatedApartmentId: updatedBooking.apartmentId,
-        actionUrl: `/my-bookings?booking=${args.bookingId}`,
-        read: false,
-        createdAt: now,
-      });
+      // إشعار فوري للضيف (إن كان مسجلاً)
+      if (updatedBooking.userId) {
+        await ctx.db.insert("notifications", {
+          userId: updatedBooking.userId,
+          type: "payment_confirmed",
+          title: "🎉 تم تأكيد حجزك ودفع المبلغ بنجاح!",
+          message: `تم سداد حجزك لشقة "${apartment?.titleAr || apartment?.title || "العلا"}" بنجاح (فاتورة #${invoiceNum}). يمكنك الآن التواصل مع المالك وعرض بيانات الوصول.`,
+          relatedBookingId: args.bookingId,
+          relatedApartmentId: updatedBooking.apartmentId,
+          actionUrl: `/my-bookings?booking=${args.bookingId}`,
+          read: false,
+          createdAt: now,
+        });
+      }
 
       // إشعار فوري لمالك الشقة
       if (apartment?.ownerId) {
@@ -645,6 +882,87 @@ export const markPaid = internalMutation({
           read: false,
           createdAt: now,
         });
+
+        // إشعار واتساب تلقائي لمالك الشقة بتأكيد واستلام الدفع
+        try {
+          const ownerDoc = await ctx.db.get(apartment.ownerId);
+          const ownerProf = await ctx.db
+            .query("userProfiles")
+            .withIndex("by_user", (q) => q.eq("userId", apartment.ownerId!))
+            .unique();
+          const rawOwnerPhone = ownerProf?.phone || ownerDoc?.phone;
+          if (rawOwnerPhone) {
+            const normOwnerPhone = normalizeSaudiPhone(rawOwnerPhone);
+            const netOwnerPayout = updatedBooking.totalPrice - updatedBooking.platformFee;
+            const checkInDate = new Date(updatedBooking.checkIn).toLocaleDateString("ar-SA");
+            const checkOutDate = new Date(updatedBooking.checkOut).toLocaleDateString("ar-SA");
+            const ownerPaymentMsg =
+              `💰 *تأكيد سداد حجز جديد - منصة شقق العلا*\n\n` +
+              `تم استلام وسداد حجز شقتك: *${apartment.titleAr || apartment.title}*\n` +
+              `👤 *النزيل:* ${updatedBooking.guestName || "ضيف"}\n` +
+              `📅 *الفترة:* من ${checkInDate} إلى ${checkOutDate}\n` +
+              `💵 *مستحقاتك الصافية:* ${netOwnerPayout.toLocaleString()} ر.س\n` +
+              `🧾 *رقم الفاتورة:* #${invoiceNum}\n\n` +
+              `يرجى تجهيز الوحدة لاستقبال الضيف في الموعد المحدد. نتمنى لك موسماً موفقاً! 🌴`;
+
+            await ctx.db.insert("whatsappQueue", {
+              ownerId: apartment.ownerId,
+              bookingId: updatedBooking._id,
+              apartmentId: updatedBooking.apartmentId,
+              ownerPhone: normOwnerPhone,
+              message: ownerPaymentMsg,
+              type: "booking_update",
+              status: "pending",
+              createdAt: now,
+            });
+          }
+        } catch (err) {
+          console.error("Failed to enqueue owner WhatsApp payment update:", err);
+        }
+      }
+
+      // إرسال الفاتورة تلقائياً عبر الواتساب للضيف عند إتمام الدفع
+      try {
+        const guestPhone =
+          updatedBooking.guestPhone ||
+          (updatedBooking.userId
+            ? (await ctx.db.get(updatedBooking.userId))?.phone
+            : undefined);
+        if (guestPhone) {
+          const normGuestPhone = normalizeSaudiPhone(guestPhone);
+          const aptTitle = apartment?.titleAr || apartment?.title || "شقة في العلا";
+          const checkInDate = new Date(updatedBooking.checkIn).toLocaleDateString("ar-SA");
+          const checkOutDate = new Date(updatedBooking.checkOut).toLocaleDateString("ar-SA");
+          const guestName = updatedBooking.guestName || "ضيف العلا";
+
+          const invoiceMessage =
+            `🧾 *فاتورة حجز مؤكد ومسدد - منصة شقق العلا*\n\n` +
+            `*رقم الفاتورة:* #${invoiceNum}\n` +
+            `*رقم الحجز:* #${updatedBooking._id.slice(-6).toUpperCase()}\n` +
+            `🏠 *الوحدة:* ${aptTitle}\n` +
+            `👤 *النزيل:* ${guestName}\n` +
+            `📅 *الدخول:* ${checkInDate}\n` +
+            `📅 *الخروج:* ${checkOutDate} (${updatedBooking.totalNights} ليالٍ)\n\n` +
+            `💵 *قيمة الإقامة:* ${(updatedBooking.totalPrice - updatedBooking.platformFee).toLocaleString()} ر.س\n` +
+            `📋 *رسوم المنصة والخدمة:* ${updatedBooking.platformFee.toLocaleString()} ر.س\n` +
+            `💰 *المبلغ المسدد:* ${updatedBooking.totalPrice.toLocaleString()} ر.س ✅\n` +
+            `💳 *حالة الدفع:* مسدد بالكامل بنجاح\n\n` +
+            `للاطلاع على الفاتورة وتفاصيل الوصول:\n` +
+            `🔗 https://alulahome.com/my-bookings?booking=${updatedBooking._id}\n\n` +
+            `نتمنى لك إقامة ممتعة واستثنائية في العلا! 🌴✨`;
+
+          await ctx.db.insert("whatsappQueue", {
+            bookingId: updatedBooking._id,
+            apartmentId: updatedBooking.apartmentId,
+            ownerPhone: normGuestPhone,
+            message: invoiceMessage,
+            type: "invoice",
+            status: "pending",
+            createdAt: now,
+          });
+        }
+      } catch (err) {
+        console.error("Failed to enqueue guest WhatsApp invoice on markPaid:", err);
       }
 
       // إشعار فوري لجميع مديري المنصة (Admins) بسداد الحجز

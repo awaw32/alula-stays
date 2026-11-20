@@ -34,13 +34,41 @@ export const adminAllReports = query({
     const all = await ctx.db.query("reports").collect();
     const sorted = all.sort((a, b) => b.createdAt - a.createdAt);
 
-    // إثراء بيانات المُبلّغ
+    // إثراء بيانات المُبلّغ والهدف (الشقة والمالك)
     return Promise.all(
       sorted.map(async (report) => {
         const reporter = await ctx.db.get(report.reporterId);
+        let targetTitle: string | undefined;
+        let ownerId: string | undefined;
+        let ownerName: string | undefined;
+        let ownerPhone: string | undefined;
+
+        if (report.targetType === "apartment") {
+          try {
+            const apt: any = await ctx.db.get(report.targetId as never);
+            if (apt) {
+              targetTitle = apt.titleAr || apt.title;
+              ownerId = apt.ownerId;
+              if (apt.ownerId) {
+                const owner: any = await ctx.db.get(apt.ownerId as never);
+                const prof = await ctx.db
+                  .query("userProfiles")
+                  .withIndex("by_user", (q) => q.eq("userId", apt.ownerId))
+                  .unique();
+                ownerName = owner?.name || "المستضيف";
+                ownerPhone = owner?.phone || prof?.phone;
+              }
+            }
+          } catch {}
+        }
+
         return {
           ...report,
           reporterName: reporter?.name ?? reporter?.email ?? "مستخدم",
+          targetTitle,
+          ownerId,
+          ownerName,
+          ownerPhone,
         };
       }),
     );
