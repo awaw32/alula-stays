@@ -167,12 +167,38 @@ async function handleAdminCommand(sock, from, text) {
     return true;
   }
 
+  // 5. أمر التحديث التلقائي وسحب كود GitHub عن بُعد
+  if (cmd === "/تحديث" || cmd === "/update") {
+    await sock.sendMessage(from, {
+      text: "⏳ جاري سحب آخر التحديثات من GitHub وتثبيت التبعيات وإعادة تشغيل البوت...",
+    });
+
+    // التنفيذ في المجلد الأب (المستودع الرئيسي) ثم مجلد البوت
+    // يدعم كل من Termux و Linux و Windows
+    const updateCommand = "git pull && npm install && pm2 restart whatsapp-bot";
+
+    exec(updateCommand, async (err, stdout, stderr) => {
+      if (err) {
+        console.error("❌ فشل أمر التحديث /تحديث:", err);
+        const errMsg =
+          `❌ *فشل التحديث التلقائي عبر Git*:\n\n` +
+          `\`\`\`\n${(err.message || stderr || "خطأ غير معروف").slice(0, 300)}\n\`\`\`\n` +
+          `يرجى التحقق من المستودع على الجوال يدوياً.`;
+        await sock.sendMessage(from, { text: errMsg }).catch(() => {});
+      } else {
+        console.log("✅ تم التحديث بنجاح:", stdout);
+      }
+    });
+    return true;
+  }
+
   // أوامر غير معروفة للإدارة
   const helpMsg =
     `🛠️ *أوامر تحكم الإدارة المتاحة*:\n\n` +
     `🔹 */حالة* : فحص بطارية وحرارة الجوال والاتصال\n` +
     `🔹 */اليوم* : استخراج التقرير اليومي المختصر فوراً\n` +
     `🔹 */بلاغات* : عرض آخر 5 بلاغات مفتوحة\n` +
+    `🔹 */تحديث* : سحب آخر التحديثات من GitHub وإعادة التشغيل تلقائياً\n` +
     `🔹 */إعادة* : إعادة تشغيل البوت عبر PM2`;
   await sock.sendMessage(from, { text: helpMsg });
   return true;
