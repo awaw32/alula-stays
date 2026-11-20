@@ -140,12 +140,65 @@ export const phoneOtp = {
       console.warn("[phoneOtp] Error recording OTP token:", saveErr);
     }
 
-    // 2. المحاولة المتسلسلة لإرسال الـ SMS عبر المزودات الفعالة بالترتيب:
-    // تقنيات (Taqnyat) -> Infobip
-    let sent = await sendViaTaqnyat(destination, messageText);
+    // 2. محاولة الإرسال المباشر عبر بوابة Infobip باستخدام المتغيرات البيئية
+    try {
+      const apiKey = process.env.INFOBIP_API_KEY;
+      const baseUrl = process.env.INFOBIP_BASE_URL || "https://55nw9j.api.infobip.com";
+      const sender = process.env.INFOBIP_SENDER || "AlulaStays";
 
-    if (!sent) {
-      sent = await sendViaInfobip(destination, messageText);
+      if (!apiKey) {
+        console.error(
+          "[phoneOtp] CRITICAL: INFOBIP_API_KEY environment variable is not defined. SMS will not be sent.",
+        );
+        throw new Error(
+          "Missing INFOBIP_API_KEY environment variable. Configure it in Convex Dashboard.",
+        );
+      }
+
+      console.log(`[phoneOtp] Attempting to send SMS via Infobip to ${destination}`);
+
+      const res = await fetch(`${baseUrl}/sms/2/text/advanced`, {
+        method: "POST",
+        headers: {
+          Authorization: `App ${apiKey}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              destinations: [{ to: destination }],
+              from: sender,
+              text: messageText,
+            },
+          ],
+        }),
+      });
+
+      // تسجيل الحالة الكاملة للرد في السجلات لمراقبة الأداء
+      const responseBody = await res.json();
+      
+      if (res.ok) {
+        console.log(
+          `[phoneOtp] Infobip SMS sent successfully. Status: ${res.status}`,
+        );
+        console.log("[phoneOtp] Infobip Response Body:", responseBody);
+        // ملاحظة: يمكن هنا إضافة رمز للتسجيل الفوري إذا أردنا التأكد من التسليم
+      } else {
+        // الخطأ هنا من Infobip (رفض الطلب، رصيد منتهي، تنسيق رقم خاطئ)
+        console.error(
+          `[phoneOtp] Infobip HTTP Error ${res.status}:`,
+          responseBody,
+        );
+        // نطرح الخطأ ليمرر للأعلى أو نتعامل معه كحالة فشل
+        throw new Error(
+          `Failed to send SMS via Infobip: HTTP ${res.status} - ${JSON.stringify(responseBody)}`,
+        );
+      }
+    } catch (err: any) {
+      console.error("[phoneOtp] Error during Infobip SMS send:", err);
+      // إعادةThrowable الخطأ لضمان تسجيله في سجلات Convex ومراقبته
+      throw new Error(`SMS sending failed: ${err.message}`);
     }
 
     // 3. مسار احتياطي إضافي عبر البريد الإلكتروني إن وُجد للمستخدم
@@ -155,7 +208,9 @@ export const phoneOtp = {
           phone,
         });
         if (backupEmail) {
-          console.log(`[phoneOtp] Sending backup OTP to registered email: ${backupEmail}...`);
+          console.log(
+            `[phoneOtp] Sending backup OTP to registered email: ${backupEmail}...`,
+          );
           await axios.post(
             "https://auth.freebuff.app/send_otp",
             {
