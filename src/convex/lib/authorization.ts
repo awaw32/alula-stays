@@ -33,6 +33,26 @@ export const AUTHORIZED_ADMIN_EMAILS = [
   "koko4800pro@gmail.com",
 ] as const;
 
+/**
+ * نهايات أرقام الهواتف المصرح لها بصلاحيات الإدارة عند الدخول برقم الجوال
+ */
+export const AUTHORIZED_ADMIN_PHONE_SUFFIXES = [
+  "506709265",
+] as const;
+
+export function isAuthorizedAdminUser(user: { email?: string | null; phone?: string | null }): boolean {
+  if (user.email && (AUTHORIZED_ADMIN_EMAILS as readonly string[]).includes(user.email.toLowerCase().trim())) {
+    return true;
+  }
+  if (user.phone) {
+    const cleanDigits = user.phone.replace(/\D/g, "");
+    if (AUTHORIZED_ADMIN_PHONE_SUFFIXES.some((s) => cleanDigits.endsWith(s))) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function isAuthorizedAdminEmail(email?: string | null): boolean {
   if (!email) return false;
   return (AUTHORIZED_ADMIN_EMAILS as readonly string[]).includes(email.toLowerCase().trim());
@@ -46,7 +66,7 @@ export async function requireRole(
   if (user.role !== role) {
     throw new AuthorizationError("غير مصرح لك بالوصول");
   }
-  if (role === "admin" && !isAuthorizedAdminEmail(user.email)) {
+  if (role === "admin" && !isAuthorizedAdminUser(user)) {
     throw new AuthorizationError("غير مصرح لك بالوصول إلى لوحة الإدارة");
   }
 
@@ -61,7 +81,7 @@ export async function requireAnyRole(
   if (!user.role || !roles.includes(user.role)) {
     throw new AuthorizationError("غير مصرح لك بالوصول");
   }
-  if (user.role === "admin" && !isAuthorizedAdminEmail(user.email)) {
+  if (user.role === "admin" && !isAuthorizedAdminUser(user)) {
     throw new AuthorizationError("غير مصرح لك بالوصول إلى لوحة الإدارة");
   }
 

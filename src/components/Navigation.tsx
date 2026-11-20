@@ -84,7 +84,7 @@ export function Navigation() {
     isAuthenticated && !DEMO_MODE ? {} : "skip",
   ) ?? 0;
 
-  const isAdmin = isAuthorizedAdmin(role, user?.email);
+  const isAdmin = isAuthorizedAdmin(role, user?.email, user?.phone);
   const ownerStatus = useQuery(
     api.owners.myOwnerStatus,
     isAuthenticated && !DEMO_MODE ? {} : "skip",

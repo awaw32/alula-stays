@@ -77,9 +77,9 @@ export function RequireRole({
     );
   }
 
-  // إذا كانت الصفحة للإدارة فقط، تحقق من القائمة البيضاء للإيميلات المصرح بها حصراً
+  // إذا كانت الصفحة للإدارة فقط، تحقق من القائمة البيضاء للإيميلات وأرقام الهواتف المصرح بها حصراً
   if (roles.includes("admin") && !roles.includes("owner")) {
-    if (!isAuthorizedAdmin(role, user?.email)) {
+    if (!isAuthorizedAdmin(role, user?.email, user?.phone)) {
       return <Navigate to="/dashboard?forbidden=1" replace />;
     }
   } else if (!role || !roles.includes(role)) {

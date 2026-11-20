@@ -31,7 +31,7 @@ export default function Dashboard() {
     noIndex: true,
   });
 
-  const isAdmin = isAuthorizedAdmin(role, user?.email);
+  const isAdmin = isAuthorizedAdmin(role, user?.email, user?.phone);
 
   const handleSignOut = async () => {
     await signOut();

@@ -81,7 +81,7 @@ export const myProfile = query({
     return {
       name: user.name ?? "",
       email: user.email ?? "",
-      phone: profile?.phone ?? "",
+      phone: profile?.phone || user.phone || "",
       city: profile?.city ?? "",
       country: profile?.country ?? "",
     };
@@ -191,6 +191,33 @@ export const setAdminByEmail = internalMutation({
 
     await ctx.db.patch(user._id, { role: "admin" });
     return `تم ترقية المستخدم (${user.name || user.email}) كمدير بنجاح`;
+  },
+});
+
+/**
+ * تعيين أي مستخدم كمدير بواسطة رقم الجوال (دالة آمنة للأرقام المصرح بها حصراً).
+ */
+export const setAdminByPhone = mutation({
+  args: { phone: v.string() },
+  handler: async (ctx, args) => {
+    const raw = args.phone.trim().replace(/\D/g, "");
+    if (!raw) {
+      throw new Error("رقم الهاتف غير صالح");
+    }
+
+    const allUsers = await ctx.db.query("users").collect();
+    const user = allUsers.find((u) => {
+      if (!u.phone) return false;
+      const uClean = u.phone.replace(/\D/g, "");
+      return uClean.endsWith(raw) || raw.endsWith(uClean);
+    });
+
+    if (!user) {
+      throw new Error(`لم يتم العثور على مستخدم برقم: ${args.phone}`);
+    }
+
+    await ctx.db.patch(user._id, { role: "admin" });
+    return `تم ترقية المستخدم (${user.name || user.phone}) كمدير بنجاح`;
   },
 });
 

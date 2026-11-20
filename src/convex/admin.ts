@@ -297,6 +297,23 @@ export const deleteApartment = mutation({
   handler: async (ctx, args) => {
     await requireApartmentOwner(ctx, args.apartmentId);
 
+    // التحقق من عدم وجود حجوزات نشطة للشقة قبل الحذف
+    const bookings = await ctx.db
+      .query("bookings")
+      .withIndex("by_apartment", (q) => q.eq("apartmentId", args.apartmentId))
+      .collect();
+
+    const now = Date.now();
+    const hasActiveBookings = bookings.some(
+      (b) => b.status === "confirmed" && b.checkOut > now
+    );
+
+    if (hasActiveBookings) {
+      throw new ValidationError(
+        "لا يمكن حذف الشقة لوجود حجوزات مؤكدة وقادمة. يمكنك إيقاف إتاحتها للحجز بدلاً من ذلك."
+      );
+    }
+
     await ctx.db.delete(args.apartmentId);
     return "تم حذف الشقة بنجاح";
   },
