@@ -163,3 +163,93 @@ export const sendReviewPrompts = internalAction({
     }
   },
 });
+
+/**
+ * مراقبة تأخر الملاك في قبول أو رفض الحجوزات المعلقة:
+ * - بعد ساعتين: تنبيه عاجل للمالك وتنبيه للأدمن.
+ * - بعد 24 ساعة: إلغاء تلقائي للطلب وإشعار الضيف والأدمن.
+ */
+export const checkPendingBookingsTimeout = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    // 1. تنبيه الملاك المتأخرين (أكثر من ساعتين)
+    const delayed: any[] = await ctx.runQuery(internal.cronQueries.getDelayedHostBookings, {});
+    for (const item of delayed) {
+      if (item.ownerPhone) {
+        const ownerAlertMsg =
+          `⚠️ *تذكير عاجل من شقق العلا*\n\n` +
+          `عزيزنا المستضيف، لديك طلب حجز معلق لشقة "*${item.apartmentTitle}*" من الضيف ${item.guestName} (فاتورة #${item.invoiceNumber}) منذ أكثر من ساعتين بانتظار قرارك.\n\n` +
+          `الرجاء الرد السريع على هذه الرسالة:\n` +
+          `1️⃣ للموافقة على الحجز ✅\n` +
+          `2️⃣ للاعتذار عن الحجز ❌\n\n` +
+          `سرعة تجاوبك ترفع تقييمك وتضمن استمرار حجز الضيف 🌴✨`;
+
+        await ctx.runMutation(internal.whatsapp.enqueueMessage, {
+          bookingId: item.bookingId,
+          apartmentId: item.apartmentId,
+          ownerPhone: item.ownerPhone,
+          message: ownerAlertMsg,
+          type: "booking_request",
+        });
+      }
+
+      // تنبيه للأدمن بتأخر المالك
+      const adminDelayMsg =
+        `⏳ *تنبيه رقابي: تأخر مضيف في الرد على حجز*\n\n` +
+        `🏠 *الشقة:* ${item.apartmentTitle}\n` +
+        `👤 *المستضيف:* ${item.ownerName} (${item.ownerPhone || "بدون هاتف"})\n` +
+        `🧾 *الفاتورة:* #${item.invoiceNumber}\n` +
+        `⚠️ الطلب معلق منذ أكثر من ساعتين دون موافقة أو رفض.\n` +
+        `🔗 https://alulahome.com/admin`;
+
+      await ctx.runMutation(internal.whatsapp.enqueueMessage, {
+        ownerPhone: ADMIN_PHONE,
+        message: adminDelayMsg,
+        type: "general",
+      });
+
+      await ctx.runMutation(internal.cronQueries.markHostDelayAlertSent, {
+        bookingId: item.bookingId,
+      });
+    }
+
+    // 2. إلغاء الطلبات المتأخرة أكثر من 24 ساعة تلقائياً
+    const expired: any[] = await ctx.runQuery(internal.cronQueries.getExpiredUnansweredBookings, {});
+    for (const item of expired) {
+      await ctx.runMutation(internal.cronQueries.autoCancelExpiredBooking, {
+        bookingId: item.bookingId,
+      });
+
+      // إشعار الضيف بلطف
+      if (item.guestPhone) {
+        const guestExpireMsg =
+          `عزيزنا الضيف ${item.guestName} 🙏\n\n` +
+          `نعتذر منك، لقد تعذر الحصول على تأكيد من مالك شقة "*${item.apartmentTitle}*" خلال مهلة الـ 24 ساعة، وتم إلغاء الطلب تلقائياً.\n\n` +
+          `يسعدنا جداً مساعدتك في اختيار وحدة بديلة وممتازة في العلا عبر الرابط:\n` +
+          `🔗 https://alulahome.com/apartments\n\n` +
+          `فريق شقق العلا دائماً في خدمتك! 🌴✨`;
+
+        await ctx.runMutation(internal.whatsapp.enqueueMessage, {
+          bookingId: item.bookingId,
+          apartmentId: item.apartmentId,
+          ownerPhone: item.guestPhone,
+          message: guestExpireMsg,
+          type: "booking_update",
+        });
+      }
+
+      // إشعار الأدمن بالإلغاء التلقائي
+      const adminExpireMsg =
+        `🛑 *إلغاء تلقائي لحجز معلق تجاوز 24 ساعة*\n\n` +
+        `الشقة: ${item.apartmentTitle}\n` +
+        `الفاتورة: #${item.invoiceNumber}\n` +
+        `تم إلغاء الحجز وإشعار الضيف وإتاحة التواريخ مجدداً.`;
+
+      await ctx.runMutation(internal.whatsapp.enqueueMessage, {
+        ownerPhone: ADMIN_PHONE,
+        message: adminExpireMsg,
+        type: "general",
+      });
+    }
+  },
+});

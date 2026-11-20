@@ -230,3 +230,112 @@ export const markReviewPromptSent = internalMutation({
     });
   },
 });
+
+/** جلب الحجوزات المعلقة التي تأخر المالك في الرد عليها لأكثر من ساعتين */
+export const getDelayedHostBookings = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const twoHours = 2 * 60 * 60 * 1000;
+    const oneDay = 24 * 60 * 60 * 1000;
+
+    const pending = await ctx.db
+      .query("bookings")
+      .withIndex("by_status", (q) => q.eq("status", "pending"))
+      .collect();
+
+    const delayed: Array<{
+      bookingId: any;
+      apartmentId: any;
+      ownerPhone?: string;
+      ownerName: string;
+      apartmentTitle: string;
+      invoiceNumber: string;
+      guestName: string;
+    }> = [];
+
+    for (const b of pending) {
+      if (
+        !b.hostDelayAlertSent &&
+        now - b.createdAt >= twoHours &&
+        now - b.createdAt < oneDay
+      ) {
+        const apt = await ctx.db.get(b.apartmentId);
+        if (apt?.ownerId) {
+          const owner = await ctx.db.get(apt.ownerId);
+          const ownerProf = await ctx.db
+            .query("userProfiles")
+            .withIndex("by_user", (q) => q.eq("userId", apt.ownerId!))
+            .unique();
+          const rawPhone = ownerProf?.phone || owner?.phone;
+          delayed.push({
+            bookingId: b._id,
+            apartmentId: b.apartmentId,
+            ownerPhone: rawPhone ? normalizeSaudiPhone(rawPhone) : undefined,
+            ownerName: owner?.name || "المستضيف",
+            apartmentTitle: apt.titleAr || apt.title,
+            invoiceNumber: b.invoiceNumber || b._id.slice(-6).toUpperCase(),
+            guestName: b.guestName || "ضيف العلا",
+          });
+        }
+      }
+    }
+
+    return delayed;
+  },
+});
+
+/** تمييز الحجز بأنه تم إرسال تنبيه تأخر المالك */
+export const markHostDelayAlertSent = internalMutation({
+  args: { bookingId: v.id("bookings") },
+  handler: async (ctx, { bookingId }) => {
+    await ctx.db.patch(bookingId, { hostDelayAlertSent: true });
+  },
+});
+
+/** جلب الحجوزات المعلقة التي تجاوزت 24 ساعة دون رد لإلغائها تلقائياً */
+export const getExpiredUnansweredBookings = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const oneDay = 24 * 60 * 60 * 1000;
+
+    const pending = await ctx.db
+      .query("bookings")
+      .withIndex("by_status", (q) => q.eq("status", "pending"))
+      .collect();
+
+    const expired: Array<{
+      bookingId: any;
+      apartmentId: any;
+      guestPhone?: string;
+      guestName: string;
+      apartmentTitle: string;
+      invoiceNumber: string;
+    }> = [];
+
+    for (const b of pending) {
+      if (b.paymentStatus === "unpaid" && now - b.createdAt >= oneDay) {
+        const apt = await ctx.db.get(b.apartmentId);
+        expired.push({
+          bookingId: b._id,
+          apartmentId: b.apartmentId,
+          guestPhone: b.guestPhone ? normalizeSaudiPhone(b.guestPhone) : undefined,
+          guestName: b.guestName || "ضيف العلا",
+          apartmentTitle: apt?.titleAr || apt?.title || "شقة في العلا",
+          invoiceNumber: b.invoiceNumber || b._id.slice(-6).toUpperCase(),
+        });
+      }
+    }
+
+    return expired;
+  },
+});
+
+/** إلغاء الحجز منتهي الصلاحية */
+export const autoCancelExpiredBooking = internalMutation({
+  args: { bookingId: v.id("bookings") },
+  handler: async (ctx, { bookingId }) => {
+    await ctx.db.patch(bookingId, { status: "cancelled" });
+  },
+});

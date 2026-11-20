@@ -216,6 +216,7 @@ const schema = defineSchema(
       checkInGuideSent: v.optional(v.boolean()),
       reviewPromptSent: v.optional(v.boolean()),
       abandonedReminderSent: v.optional(v.boolean()),
+      hostDelayAlertSent: v.optional(v.boolean()),
       createdAt: v.number(),
     })
       .index("by_apartment", ["apartmentId"])

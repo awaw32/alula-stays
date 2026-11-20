@@ -48,4 +48,13 @@ crons.cron(
   internal.cronHelpers.sendReviewPrompts,
 );
 
+/**
+ * 6. مراقبة تأخر الملاك في الرد على الحجوزات: تذكير بعد ساعتين وإلغاء تلقائي بعد 24 ساعة.
+ */
+crons.cron(
+  "check pending bookings timeout",
+  "0 * * * *",
+  internal.cronHelpers.checkPendingBookingsTimeout,
+);
+
 export default crons;

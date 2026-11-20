@@ -85,6 +85,40 @@ async function notifyOwnerStatusChange(
     read: false,
     createdAt: Date.now(),
   });
+
+  // إرسال رسالة واتساب مباشرة للمالك عند الموافقة أو الرفض أو طلب التعديلات
+  if (status !== "pending") {
+    try {
+      const owner = await ctx.db.get(ownerId);
+      const ownerProf = await ctx.db
+        .query("userProfiles")
+        .withIndex("by_user", (q) => q.eq("userId", ownerId))
+        .unique();
+      const rawPhone = ownerProf?.phone || owner?.phone;
+      if (rawPhone) {
+        const normPhone = normalizeSaudiPhone(rawPhone);
+        if (normPhone) {
+          const waText =
+            `📢 *تحديث حالة عقارك في شقق العلا*\n\n` +
+            `الوحدة: *${apartmentTitle}*\n` +
+            `الحالة: *${title}*\n\n` +
+            `${message}\n\n` +
+            `يمكنك متابعة وتعديل عقارك عبر الرابط:\n` +
+            `🔗 https://alulahome.com/owner`;
+
+          await ctx.db.insert("whatsappQueue", {
+            ownerId,
+            apartmentId,
+            ownerPhone: normPhone,
+            message: waText,
+            type: "general",
+            status: "pending",
+            createdAt: Date.now(),
+          });
+        }
+      }
+    } catch {}
+  }
 }
 
 // ─── Owner Functions ───
@@ -181,6 +215,27 @@ export const createApartment = mutation({
         createdAt: Date.now(),
       });
     }
+
+    // إشعار واتساب فوري لرقم الإدارة المعتمد (966506709265)
+    try {
+      const adminWaMsg =
+        `🏠 *عقار جديد قيد المراجعة في منصة شقق العلا*\n\n` +
+        `الوحدة: *${args.titleAr || args.title}*\n` +
+        `الموقع: *${args.locationAr || args.location}*\n` +
+        `السعر: *${args.price} ر.س / ليلة*\n` +
+        `المضيف: *${user.name || "مالك"}*\n\n` +
+        `لمراجعة العقار واتخاذ القرار (قبول / رفض):\n` +
+        `🔗 https://alulahome.com/admin`;
+
+      await ctx.db.insert("whatsappQueue", {
+        apartmentId,
+        ownerPhone: "966506709265",
+        message: adminWaMsg,
+        type: "general",
+        status: "pending",
+        createdAt: Date.now(),
+      });
+    } catch {}
 
     return apartmentId;
   },

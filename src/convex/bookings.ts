@@ -459,6 +459,29 @@ export const create = mutation({
         }
       }
 
+      // إشعار واتساب فوري لرقم الإدارة المعتمد (966506709265)
+      try {
+        const aptTitle = apartment.titleAr || apartment.title;
+        const guestDisplay = user.name || "ضيف العلا";
+        const adminWaMsg =
+          `🛎️ *حجز جديد في منصة شقق العلا*\n\n` +
+          `🏠 *الشقة:* ${aptTitle}\n` +
+          `👤 *الضيف:* ${guestDisplay}\n` +
+          `💰 *المبلغ:* ${totalPrice.toLocaleString()} ر.س (عمولة المنصة: ${platformFee.toLocaleString()} ر.س)\n` +
+          `🧾 *الفاتورة:* #${invoiceNumber}\n` +
+          `🔗 https://alulahome.com/admin`;
+
+        await ctx.db.insert("whatsappQueue", {
+          bookingId,
+          apartmentId: args.apartmentId,
+          ownerPhone: "966506709265",
+          message: adminWaMsg,
+          type: "general",
+          status: "pending",
+          createdAt: Date.now(),
+        });
+      } catch {}
+
       return { bookingId, totalPrice, platformFee, totalNights };
     } catch (error) {
       if (error instanceof ConvexError) {
@@ -705,6 +728,113 @@ export const cancel = mutation({
         status: "cancelled",
         paymentStatus,
       });
+
+      const now = Date.now();
+      const apartment = await ctx.db.get(booking.apartmentId);
+      const invoiceNum = booking.invoiceNumber || `INV-${booking._id.slice(-6).toUpperCase()}`;
+      const aptTitle = apartment?.titleAr || apartment?.title || "شقة في العلا";
+
+      // 1. إشعار فوري لمالك الشقة (داخلي + واتساب)
+      if (apartment?.ownerId) {
+        await ctx.db.insert("notifications", {
+          userId: apartment.ownerId,
+          type: "booking_cancelled",
+          title: "إلغاء حجز ⚠️",
+          message: `تم إلغاء الحجز رقم (#${invoiceNum}) لشقة "${aptTitle}". تم إتاحة التواريخ للحجز مجدداً.`,
+          relatedBookingId: args.bookingId,
+          relatedApartmentId: booking.apartmentId,
+          actionUrl: "/owner",
+          read: false,
+          createdAt: now,
+        });
+
+        // رسالة واتساب للمالك
+        try {
+          const ownerDoc = await ctx.db.get(apartment.ownerId);
+          const ownerProf = await ctx.db
+            .query("userProfiles")
+            .withIndex("by_user", (q) => q.eq("userId", apartment.ownerId!))
+            .unique();
+          const rawOwnerPhone = ownerProf?.phone || ownerDoc?.phone;
+          if (rawOwnerPhone) {
+            const normOwner = normalizeSaudiPhone(rawOwnerPhone);
+            if (normOwner) {
+              const ownerMsg =
+                `⚠️ *تنبيه من منصة شقق العلا: تم إلغاء حجز*\n\n` +
+                `🏠 *الوحدة:* ${aptTitle}\n` +
+                `🧾 *رقم الفاتورة:* #${invoiceNum}\n` +
+                `📅 *التواريخ:* من ${new Date(booking.checkIn).toLocaleDateString("ar-SA")} إلى ${new Date(booking.checkOut).toLocaleDateString("ar-SA")}\n\n` +
+                `أصبحت تواريخ الشقة متاحة الآن لاستقبال حجوزات جديدة 🌴.`;
+
+              await ctx.db.insert("whatsappQueue", {
+                bookingId: args.bookingId,
+                apartmentId: booking.apartmentId,
+                ownerPhone: normOwner,
+                message: ownerMsg,
+                type: "booking_update",
+                status: "pending",
+                createdAt: now,
+              });
+            }
+          }
+        } catch {}
+      }
+
+      // 2. إشعار واتساب للضيف بنتيجة الإلغاء والاسترداد
+      try {
+        const guestPhone =
+          booking.guestPhone ||
+          (booking.userId ? (await ctx.db.get(booking.userId))?.phone : undefined);
+        if (guestPhone) {
+          const normGuest = normalizeSaudiPhone(guestPhone);
+          if (normGuest) {
+            const refundMsgText =
+              refundPercentage === 100
+                ? `تم استرداد كامل المبلغ (${booking.totalPrice.toLocaleString()} ر.س) لحسابك ✅`
+                : refundPercentage === 50
+                  ? `تم استرداد 50% من المبلغ (${refundAmount.toLocaleString()} ر.س) لحسابك ✅`
+                  : `الإلغاء قبل أقل من 24 ساعة بدون استرداد وفق سياسة الإلغاء ℹ️`;
+
+            const guestMsg =
+              `🌿 *تأكيد إلغاء الحجز - شقق العلا*\n\n` +
+              `تم إلغاء حجزك بنجاح لشقة: *${aptTitle}*\n` +
+              `🧾 *رقم الفاتورة:* #${invoiceNum}\n` +
+              `💳 *حالة الاسترداد:* ${refundMsgText}\n\n` +
+              `يسعدنا دائماً خدمتك واستضافتك في رحلاتك القادمة إلى العلا ✨\n` +
+              `🔗 https://alulahome.com/apartments`;
+
+            await ctx.db.insert("whatsappQueue", {
+              bookingId: args.bookingId,
+              apartmentId: booking.apartmentId,
+              ownerPhone: normGuest,
+              message: guestMsg,
+              type: "booking_update",
+              status: "pending",
+              createdAt: now,
+            });
+          }
+        }
+      } catch {}
+
+      // 3. إشعار واتساب للأدمن (966506709265)
+      try {
+        const adminCancelMsg =
+          `⚠️ *تم إلغاء حجز في المنصة*\n\n` +
+          `🏠 *الشقة:* ${aptTitle}\n` +
+          `🧾 *الفاتورة:* #${invoiceNum}\n` +
+          `💰 *المبلغ:* ${booking.totalPrice.toLocaleString()} ر.س (استرداد: ${refundPercentage}%)\n` +
+          `🔗 https://alulahome.com/admin`;
+
+        await ctx.db.insert("whatsappQueue", {
+          bookingId: args.bookingId,
+          apartmentId: booking.apartmentId,
+          ownerPhone: "966506709265",
+          message: adminCancelMsg,
+          type: "general",
+          status: "pending",
+          createdAt: now,
+        });
+      } catch {}
 
       // رسالة نتيجة واضحة
       const getMessage = () => {

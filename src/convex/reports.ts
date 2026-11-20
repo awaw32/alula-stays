@@ -123,6 +123,52 @@ export const create = mutation({
       createdAt: Date.now(),
     });
 
+    // إشعار فوري لمديري المنصة (Admins) في لوحة التحكم وعبر الواتساب
+    try {
+      const reasonLabels: Record<string, string> = {
+        inaccurate: "معلومات غير دقيقة",
+        inappropriate_images: "صور غير لائقة",
+        misleading: "مضلل أو مخادع",
+        scam: "اشتباه احتيال",
+        other: "أخرى",
+      };
+
+      const admins = await ctx.db
+        .query("users")
+        .filter((q) => q.eq(q.field("role"), "admin"))
+        .collect();
+
+      for (const admin of admins) {
+        await ctx.db.insert("notifications", {
+          userId: admin._id,
+          type: "new_report",
+          title: "🚨 بلاغ جديد في المنصة",
+          message: `بلاغ عن ${args.targetType === "apartment" ? "شقة" : args.targetType} بسبب "${reasonLabels[args.reason] || args.reason}"`,
+          actionUrl: "/admin",
+          read: false,
+          createdAt: Date.now(),
+        });
+      }
+
+      // رسالة واتساب فورية لرقم الإدارة المعتمد (966506709265)
+      const adminWaMsg =
+        `🚨 *تنبيه بلاغ جديد في منصة شقق العلا*\n\n` +
+        `النوع: *${args.targetType === "apartment" ? "شقة" : args.targetType}*\n` +
+        `السبب: *${reasonLabels[args.reason] || args.reason}*\n` +
+        `التفاصيل: *${args.details?.trim() || "لا توجد تفاصيل إضافية"}*\n` +
+        `المُبلّغ: *${user.name || "مستخدم"}*\n\n` +
+        `لمراجعة البلاغ ومعالجته:\n` +
+        `🔗 https://alulahome.com/admin`;
+
+      await ctx.db.insert("whatsappQueue", {
+        ownerPhone: "966506709265",
+        message: adminWaMsg,
+        type: "general",
+        status: "pending",
+        createdAt: Date.now(),
+      });
+    } catch {}
+
     return { reportId, message: "تم إرسال البلاغ — سيُراجع من الإدارة" };
   },
 });
