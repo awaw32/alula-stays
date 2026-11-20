@@ -46,7 +46,42 @@ async function sendViaInfobipWhatsApp(
       : "447860099299");
   sender = sender.replace(/[^\d]/g, "");
 
-  // المحاولة الأولى: إرسال رسالة نصية مباشرة عبر WhatsApp
+  // المحاولة الأولى: محاولة إرسال عبر القالب المعتمد (Template) أولاً
+  try {
+    const templateName = process.env.INFOBIP_WHATSAPP_TEMPLATE || "test_whatsapp_template_en";
+    const lang = templateName.endsWith("_en") ? "en" : (process.env.INFOBIP_WHATSAPP_LANG || "en");
+    const res = await fetch(`${baseUrl}/whatsapp/1/message/template`, {
+      method: "POST",
+      headers: {
+        Authorization: `App ${apiKey}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        messages: [
+          {
+            from: sender,
+            to: phoneDigits,
+            content: {
+              templateName,
+              templateData: { body: { placeholders: [token] } },
+              language: lang,
+            },
+          },
+        ],
+      }),
+    });
+    const data: any = await res.json().catch(() => ({}));
+    if (res.ok && data?.messages?.[0]?.status?.groupName !== "REJECTED") {
+      console.log(`[Infobip WhatsApp] Template (${templateName}) message sent successfully to ${phoneDigits}`);
+      return true;
+    }
+    console.warn(`[Infobip WhatsApp] Template attempt response (${res.status}):`, data);
+  } catch (tErr: any) {
+    console.warn(`[Infobip WhatsApp] Template error:`, tErr?.message);
+  }
+
+  // المحاولة الثانية: إرسال رسالة نصية مباشرة عبر WhatsApp
   try {
     const res = await fetch(`${baseUrl}/whatsapp/1/message/text`, {
       method: "POST",
@@ -95,40 +130,6 @@ async function sendViaInfobipWhatsApp(
     }
   } catch (err: any) {
     console.warn(`[Infobip WhatsApp] Dispatch error:`, err?.message);
-  }
-
-  // المحاولة الثانية: محاولة إرسال عبر القالب (Template) إن وجد
-  try {
-    const templateName = process.env.INFOBIP_WHATSAPP_TEMPLATE || "otp";
-    const res = await fetch(`${baseUrl}/whatsapp/1/message/template`, {
-      method: "POST",
-      headers: {
-        Authorization: `App ${apiKey}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({
-        messages: [
-          {
-            from: sender,
-            to: phoneDigits,
-            content: {
-              templateName,
-              templateData: { body: { placeholders: [token] } },
-              language: "ar",
-            },
-          },
-        ],
-      }),
-    });
-    const data: any = await res.json().catch(() => ({}));
-    if (res.ok && data?.messages?.[0]?.status?.groupName !== "REJECTED") {
-      console.log(`[Infobip WhatsApp] Template message sent successfully to ${phoneDigits}`);
-      return true;
-    }
-    console.warn(`[Infobip WhatsApp] Template attempt response:`, data);
-  } catch (tErr: any) {
-    console.warn(`[Infobip WhatsApp] Template error:`, tErr?.message);
   }
 
   return false;
