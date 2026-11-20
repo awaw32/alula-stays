@@ -46,8 +46,8 @@ interface FormState {
 const EMPTY: FormState = {
   brandName: "",
   contactEmail: "alulahome2026@gmail.com",
-  contactPhone: "0590051074",
-  whatsapp: "0590051074",
+  contactPhone: "0535080498",
+  whatsapp: "0535080498",
   instagram: "",
   twitter: "",
   paymentProvider: "",
@@ -582,11 +582,11 @@ function SettingsForm({
             </div>
             <div>
               <label htmlFor="st-phone" className={labelCls}>رقم التواصل</label>
-              <input id="st-phone" type="tel" dir="ltr" value={form.contactPhone} onChange={(e) => set("contactPhone", e.target.value)} placeholder="0590051074" className={inputCls} />
+              <input id="st-phone" type="tel" dir="ltr" value={form.contactPhone} onChange={(e) => set("contactPhone", e.target.value)} placeholder="0535080498" className={inputCls} />
             </div>
             <div>
               <label htmlFor="st-whatsapp" className={labelCls}>واتساب</label>
-              <input id="st-whatsapp" type="tel" dir="ltr" value={form.whatsapp} onChange={(e) => set("whatsapp", e.target.value)} placeholder="0590051074" className={inputCls} />
+              <input id="st-whatsapp" type="tel" dir="ltr" value={form.whatsapp} onChange={(e) => set("whatsapp", e.target.value)} placeholder="0535080498" className={inputCls} />
             </div>
             <div>
               <label htmlFor="st-instagram" className={labelCls}>إنستغرام (رابط)</label>

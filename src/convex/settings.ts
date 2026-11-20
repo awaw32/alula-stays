@@ -38,11 +38,23 @@ export const get = query({
         whatsapp: DEFAULT_CONTACT.whatsapp,
       };
     }
+    const rawPhone = settings.contactPhone;
+    const cleanPhone =
+      !rawPhone || rawPhone.includes("590051074") || rawPhone.endsWith("74")
+        ? DEFAULT_CONTACT.phone
+        : rawPhone;
+
+    const rawWa = settings.whatsapp;
+    const cleanWa =
+      !rawWa || rawWa.includes("590051074") || rawWa.endsWith("74")
+        ? DEFAULT_CONTACT.whatsapp
+        : rawWa;
+
     return {
       ...settings,
       contactEmail: settings.contactEmail || DEFAULT_CONTACT.email,
-      contactPhone: settings.contactPhone || DEFAULT_CONTACT.phone,
-      whatsapp: settings.whatsapp || DEFAULT_CONTACT.whatsapp,
+      contactPhone: cleanPhone,
+      whatsapp: cleanWa,
     };
   },
 });

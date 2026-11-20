@@ -877,11 +877,15 @@ export default function Landing() {
                   <span>📧</span>
                 </a>
                 <a
-                  href={`tel:${siteSettings?.contactPhone || "0535080498"}`}
+                  href={`tel:${siteSettings?.contactPhone && !siteSettings.contactPhone.endsWith("74") ? siteSettings.contactPhone : "0535080498"}`}
                   className="flex items-center gap-2 hover:text-[#542382] dark:hover:text-purple-400 transition-colors"
                   dir="ltr"
                 >
-                  <span className="text-right flex-1">{siteSettings?.contactPhone || "0535080498"}</span>
+                  <span className="text-right flex-1">
+                    {siteSettings?.contactPhone && !siteSettings.contactPhone.endsWith("74")
+                      ? siteSettings.contactPhone
+                      : "0535080498"}
+                  </span>
                   <span>📱</span>
                 </a>
                 <a
