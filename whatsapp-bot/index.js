@@ -24,6 +24,7 @@ const convex = new ConvexHttpClient(CONVEX_URL);
 
 /** رقم الإدارة المعتمد للأوامر والتنبيهات والتقارير */
 const ADMIN_PHONE = "966506709265";
+const ADMIN_LID = "255220479201491";
 const ADMIN_JID = `${ADMIN_PHONE}@s.whatsapp.net`;
 
 /** تتبع Cooldown للتنبيهات والقوائم */
@@ -248,7 +249,9 @@ async function startBot() {
       if (msg.key.fromMe) continue;
 
       const from = msg.key.remoteJid;
-      if (!from || !from.endsWith("@s.whatsapp.net")) continue;
+      if (!from) continue;
+      // السماح بالحسابات الفردية ورسائل الـ LID
+      if (!from.endsWith("@s.whatsapp.net") && !from.endsWith("@lid")) continue;
 
       const text = (
         msg.message.conversation ||
@@ -258,13 +261,25 @@ async function startBot() {
 
       if (!text) continue;
 
-      const cleanPhone = from.replace("@s.whatsapp.net", "").replace(/\D/g, "");
+      // فحص المرسل وهل هو الإدارة (سواء جاء عبر رقم 966506709265 أو LID 255220479201491 أو participant)
+      const senderJid = from;
+      const participantJid = msg.key.participant || "";
+      const remoteJidAlt = msg.key.remoteJidAlt || "";
+      const allSenders = [senderJid, participantJid, remoteJidAlt].join(" ");
 
-      // 1. أوامر الإدارة (من رقم الإدارة 966506709265 وتبدأ بـ /)
-      if (cleanPhone === ADMIN_PHONE && text.startsWith("/")) {
+      const isAdmin =
+        allSenders.includes(ADMIN_PHONE) ||
+        allSenders.includes(ADMIN_LID);
+
+      console.log(`📩 رسالة جديدة من [${from}] (أدمن: ${isAdmin ? "نعم" : "لا"}): "${text}"`);
+
+      // 1. أوامر الإدارة (تبدأ بـ / وترسل الرد لنفس remoteJid الذي أرسل منه الأدمن)
+      if (isAdmin && text.startsWith("/")) {
         await handleAdminCommand(sock, from, text);
         continue;
       }
+
+      const cleanPhone = from.replace(/@(s\.whatsapp\.net|lid)/g, "").replace(/\D/g, "");
 
       // 2. إذا كانت الرسالة رقماً (1 إلى 5)
       const num = Number(text);
