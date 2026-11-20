@@ -329,10 +329,26 @@ export const create = mutation({
         paymentStatus: "unpaid",
         invoiceNumber,
         guestName: user.name || "ضيف العلا",
-        guestPhone: userProfile?.phone || "",
+        guestPhone: userProfile?.phone || user.phone || "",
         guestEmail: user.email || "",
         createdAt: Date.now(),
       });
+
+      // تسجيل بدء عملية الدفع في التحليلات
+      try {
+        await ctx.db.insert("siteAnalytics", {
+          type: "checkout_started",
+          path: `/apartment/${args.apartmentId}`,
+          visitorId: `usr_${user._id}`,
+          userId: user._id,
+          apartmentId: args.apartmentId,
+          bookingId,
+          phone: userProfile?.phone || user.phone || undefined,
+          completed: false,
+          reminderSent: false,
+          createdAt: Date.now(),
+        });
+      } catch {}
 
       // إشعار فوري لمالك الشقة
       if (apartment.ownerId) {
@@ -846,6 +862,17 @@ export const markPaid = internalMutation({
       paymentSessionId: args.sessionId,
       paidAt: now,
     });
+
+    // تحديث حالة إكمال الدفع في التحليلات
+    try {
+      const analyticsRecords = await ctx.db
+        .query("siteAnalytics")
+        .withIndex("by_booking", (q) => q.eq("bookingId", args.bookingId))
+        .collect();
+      for (const rec of analyticsRecords) {
+        await ctx.db.patch(rec._id, { completed: true });
+      }
+    } catch {}
 
     const updatedBooking = await ctx.db.get(args.bookingId);
     if (updatedBooking) {

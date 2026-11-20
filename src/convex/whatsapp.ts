@@ -100,6 +100,11 @@ export const enqueueMessage = internalMutation({
         v.literal("daily_check"),
         v.literal("test"),
         v.literal("general"),
+        v.literal("review_request"),
+        v.literal("checkin_guide"),
+        v.literal("abandoned_checkout"),
+        v.literal("daily_report"),
+        v.literal("admin_alert"),
       ),
     ),
   },
@@ -312,7 +317,7 @@ export const verifyOtp = mutation({
 export const recordReplyByPhone = mutation({
   args: {
     ownerPhone: v.string(),
-    reply: v.union(v.literal(1), v.literal(2)),
+    reply: v.number(),
   },
   handler: async (ctx, { ownerPhone, reply }) => {
     const normalizedPhone = normalizeSaudiPhone(ownerPhone);
@@ -334,6 +339,65 @@ export const recordReplyByPhone = mutation({
 
     const now = Date.now();
     let ownerMessage = "";
+
+    // 0. إذا كان الرد على طلب تقييم الإقامة (review_request) بالدرجة 1 إلى 5
+    if (latest.type === "review_request") {
+      const rating = Math.min(5, Math.max(1, Math.round(reply)));
+      if (latest.apartmentId) {
+        let booking: any = null;
+        if (latest.bookingId) {
+          booking = await ctx.db.get(latest.bookingId);
+        }
+
+        const allUsers = await ctx.db.query("users").collect();
+        const guestUser = allUsers.find((u) => {
+          if (!u.phone) return false;
+          const uNorm = normalizeSaudiPhone(u.phone);
+          return uNorm === normalizedPhone || u.phone.endsWith(normalizedPhone.slice(-9));
+        });
+
+        // حفظ التقييم في جدول reviews
+        await ctx.db.insert("reviews", {
+          apartmentId: latest.apartmentId,
+          userId: booking?.userId || guestUser?._id || (allUsers[0]?._id as any),
+          userName: booking?.guestName || guestUser?.name || "ضيف العلا",
+          rating,
+          comment: `تقييم الضيف عبر الواتساب (${rating} من 5 نجوم ⭐)`,
+          createdAt: now,
+        });
+
+        // تحديث إحصاءات الشقة
+        const existingReviews = await ctx.db
+          .query("reviews")
+          .withIndex("by_apartment", (q) => q.eq("apartmentId", latest.apartmentId!))
+          .collect();
+        const totalRating = existingReviews.reduce((sum, r) => sum + r.rating, 0);
+        const avgRating = totalRating / (existingReviews.length || 1);
+        await ctx.db.patch(latest.apartmentId, {
+          rating: Math.round(avgRating * 10) / 10,
+          reviewCount: existingReviews.length,
+        });
+
+        ownerMessage = `⭐ شكراً جزيلاً لتقييمك (${rating} نجوم)! يسعدنا دائماً استضافتك في العلا ونرجو أن نراك قريباً 🌿✨`;
+
+        await ctx.db.patch(latest._id, {
+          status: "replied" as const,
+          reply: rating,
+          repliedAt: now,
+        });
+
+        return {
+          success: true,
+          ownerMessage,
+          action: "review_recorded",
+          reply: rating,
+        };
+      }
+    }
+
+    if (reply !== 1 && reply !== 2) {
+      throw new Error("يرجى الرد بـ 1 أو 2 فقط لتحديد حالة الحجز أو توفر الشقة.");
+    }
 
     // 1. إذا كان الرد على طلب حجز جديد (booking_request)
     if (latest.bookingId) {

@@ -146,6 +146,11 @@ const schema = defineSchema(
           v.literal("daily_check"),
           v.literal("test"),
           v.literal("general"),
+          v.literal("review_request"),
+          v.literal("checkin_guide"),
+          v.literal("abandoned_checkout"),
+          v.literal("daily_report"),
+          v.literal("admin_alert"),
         ),
       ),
       ownerId: v.optional(v.id("users")),
@@ -158,7 +163,7 @@ const schema = defineSchema(
         v.literal("expired"),
         v.literal("failed"),
       ),
-      reply: v.optional(v.union(v.literal(1), v.literal(2))),
+      reply: v.optional(v.number()),
       retryCount: v.optional(v.number()),
       error: v.optional(v.string()),
       sentAt: v.optional(v.number()),
@@ -208,6 +213,9 @@ const schema = defineSchema(
       guestEmail: v.optional(v.string()),
       bookingReference: v.optional(v.string()),
       paidAt: v.optional(v.number()),
+      checkInGuideSent: v.optional(v.boolean()),
+      reviewPromptSent: v.optional(v.boolean()),
+      abandonedReminderSent: v.optional(v.boolean()),
       createdAt: v.number(),
     })
       .index("by_apartment", ["apartmentId"])
@@ -534,6 +542,23 @@ const schema = defineSchema(
     })
       .index("by_created", ["createdAt"])
       .index("by_visitor", ["visitorId"]),
+
+    // تحليلات وتتبع الزيارات وبدء الدفع
+    siteAnalytics: defineTable({
+      type: v.union(v.literal("page_view"), v.literal("checkout_started")),
+      path: v.optional(v.string()),
+      visitorId: v.string(),
+      userId: v.optional(v.id("users")),
+      apartmentId: v.optional(v.id("apartments")),
+      bookingId: v.optional(v.id("bookings")),
+      phone: v.optional(v.string()),
+      completed: v.optional(v.boolean()),
+      reminderSent: v.optional(v.boolean()),
+      createdAt: v.number(),
+    })
+      .index("by_type_created", ["type", "createdAt"])
+      .index("by_visitor", ["visitorId"])
+      .index("by_booking", ["bookingId"]),
   },
   {
     schemaValidation: false,

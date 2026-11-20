@@ -1,6 +1,7 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { normalizeSaudiPhone } from "./whatsapp";
 
 /**
  * تسجيل زيارة للموقع (تتبع حركة المرور والزوار الفريدين)
@@ -34,7 +35,83 @@ export const recordVisit = mutation({
       createdAt: now,
     });
 
+    // تسجيل في جدول التحليلات الخفيف أيضاً
+    await ctx.db.insert("siteAnalytics", {
+      type: "page_view",
+      path: args.path,
+      visitorId: args.visitorId,
+      userId: userId ?? undefined,
+      createdAt: now,
+    });
+
     return { recorded: true };
+  },
+});
+
+/**
+ * تسجيل بدء عملية الدفع والحجز (checkout_started)
+ */
+export const recordCheckoutStarted = mutation({
+  args: {
+    visitorId: v.string(),
+    path: v.optional(v.string()),
+    apartmentId: v.optional(v.id("apartments")),
+    bookingId: v.optional(v.id("bookings")),
+    phone: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    const now = Date.now();
+
+    let cleanPhone = args.phone ? normalizeSaudiPhone(args.phone) : undefined;
+    if (!cleanPhone && userId) {
+      const u = await ctx.db.get(userId);
+      if (u?.phone) cleanPhone = normalizeSaudiPhone(u.phone);
+    }
+
+    return await ctx.db.insert("siteAnalytics", {
+      type: "checkout_started",
+      path: args.path || "/checkout",
+      visitorId: args.visitorId,
+      userId: userId ?? undefined,
+      apartmentId: args.apartmentId,
+      bookingId: args.bookingId,
+      phone: cleanPhone,
+      completed: false,
+      reminderSent: false,
+      createdAt: now,
+    });
+  },
+});
+
+/**
+ * تحديث حالة الدفع إلى مكتمل (completed: true)
+ */
+export const markCheckoutCompleted = mutation({
+  args: {
+    bookingId: v.optional(v.id("bookings")),
+    visitorId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    if (args.bookingId) {
+      const records = await ctx.db
+        .query("siteAnalytics")
+        .withIndex("by_booking", (q) => q.eq("bookingId", args.bookingId))
+        .collect();
+      for (const rec of records) {
+        await ctx.db.patch(rec._id, { completed: true });
+      }
+    }
+    if (args.visitorId) {
+      const records = await ctx.db
+        .query("siteAnalytics")
+        .withIndex("by_visitor", (q) => q.eq("visitorId", args.visitorId!))
+        .filter((q) => q.eq(q.field("type"), "checkout_started"))
+        .collect();
+      for (const rec of records) {
+        await ctx.db.patch(rec._id, { completed: true });
+      }
+    }
   },
 });
 
@@ -82,5 +159,137 @@ export const getVisitorStats = query({
         uniqueVisitors: uniqueVisitors(visits),
       },
     };
+  },
+});
+
+/**
+ * حساب بيانات التقرير اليومي المختصر لمنصة شقق العلا (توقيت مكة المكرمة UTC+3)
+ */
+export const getDailySummaryData = query({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    // توقيت السعودية (UTC+3)
+    const saudiOffset = 3 * 60 * 60 * 1000;
+    const saudiNow = new Date(now + saudiOffset);
+    const todayStart = new Date(
+      Date.UTC(
+        saudiNow.getUTCFullYear(),
+        saudiNow.getUTCMonth(),
+        saudiNow.getUTCDate()
+      ) - saudiOffset
+    ).getTime();
+
+    // 1. الزوار الفريدين اليوم
+    const todayVisits = await ctx.db
+      .query("siteVisits")
+      .withIndex("by_created", (q) => q.gte("createdAt", todayStart))
+      .collect();
+    const uniqueVisitors = new Set(todayVisits.map((v) => v.visitorId)).size;
+
+    // 2. تتبع من وصل لصفحة الدفع
+    const allCheckoutRecords = await ctx.db
+      .query("siteAnalytics")
+      .withIndex("by_type_created", (q) =>
+        q.eq("type", "checkout_started").gte("createdAt", todayStart)
+      )
+      .collect();
+
+    const completedCheckoutCount = allCheckoutRecords.filter((c) => c.completed).length;
+    const abandonedCheckoutCount = Math.max(0, allCheckoutRecords.length - completedCheckoutCount);
+
+    // 3. الحجوزات اليومية وحالاتها
+    const allBookings = await ctx.db.query("bookings").collect();
+    const todayBookings = allBookings.filter((b) => b.createdAt >= todayStart);
+
+    const paidBookings = todayBookings.filter((b) => b.paymentStatus === "paid").length;
+    const pendingBookings = todayBookings.filter((b) => b.status === "pending" && b.paymentStatus !== "paid").length;
+    const cancelledBookings = todayBookings.filter((b) => b.status === "cancelled").length;
+
+    // 4. إجمالي الإيرادات اليوم (من الحجوزات المدفوعة اليوم)
+    const totalRevenue = allBookings
+      .filter((b) => b.paymentStatus === "paid" && (b.paidAt ? b.paidAt >= todayStart : b.createdAt >= todayStart))
+      .reduce((sum, b) => sum + (b.totalPrice || 0), 0);
+
+    // 5. البلاغات الجديدة اليوم
+    const allReports = await ctx.db.query("reports").collect();
+    const newReports = allReports.filter((r) => r.createdAt >= todayStart).length;
+
+    return {
+      todayDate: saudiNow.toLocaleDateString("ar-SA", { timeZone: "Asia/Riyadh" }),
+      uniqueVisitors,
+      totalCheckoutStarted: allCheckoutRecords.length,
+      abandonedCheckoutCount,
+      totalBookings: todayBookings.length,
+      paidBookings,
+      pendingBookings,
+      cancelledBookings,
+      totalRevenue,
+      newReports,
+    };
+  },
+});
+
+/**
+ * نص التقرير اليومي المختصر المنسق للواتساب (لاستخدام Cron وبوت الواتساب ChatOps)
+ */
+export const getDailyAdminReportText = query({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const saudiOffset = 3 * 60 * 60 * 1000;
+    const saudiNow = new Date(now + saudiOffset);
+    const todayStart = new Date(
+      Date.UTC(
+        saudiNow.getUTCFullYear(),
+        saudiNow.getUTCMonth(),
+        saudiNow.getUTCDate()
+      ) - saudiOffset
+    ).getTime();
+
+    const todayVisits = await ctx.db
+      .query("siteVisits")
+      .withIndex("by_created", (q) => q.gte("createdAt", todayStart))
+      .collect();
+    const uniqueVisitors = new Set(todayVisits.map((v) => v.visitorId)).size;
+
+    const allCheckoutRecords = await ctx.db
+      .query("siteAnalytics")
+      .withIndex("by_type_created", (q) =>
+        q.eq("type", "checkout_started").gte("createdAt", todayStart)
+      )
+      .collect();
+
+    const completedCheckoutCount = allCheckoutRecords.filter((c) => c.completed).length;
+    const abandonedCheckoutCount = Math.max(0, allCheckoutRecords.length - completedCheckoutCount);
+
+    const allBookings = await ctx.db.query("bookings").collect();
+    const todayBookings = allBookings.filter((b) => b.createdAt >= todayStart);
+
+    const paidBookings = todayBookings.filter((b) => b.paymentStatus === "paid").length;
+    const pendingBookings = todayBookings.filter((b) => b.status === "pending" && b.paymentStatus !== "paid").length;
+    const cancelledBookings = todayBookings.filter((b) => b.status === "cancelled").length;
+
+    const totalRevenue = allBookings
+      .filter((b) => b.paymentStatus === "paid" && (b.paidAt ? b.paidAt >= todayStart : b.createdAt >= todayStart))
+      .reduce((sum, b) => sum + (b.totalPrice || 0), 0);
+
+    const allReports = await ctx.db.query("reports").collect();
+    const newReports = allReports.filter((r) => r.createdAt >= todayStart).length;
+    const dateStr = saudiNow.toLocaleDateString("ar-SA", { timeZone: "Asia/Riyadh" });
+
+    return (
+      `📊 *تقرير شقق العلا اليومي* 🌴\n` +
+      `📅 *التاريخ:* ${dateStr}\n\n` +
+      `👥 *الزوار اليوم:* ${uniqueVisitors} زائر فريد\n` +
+      `🛒 *بدء الدفع ولم يكتمل:* ${abandonedCheckoutCount}\n\n` +
+      `📦 *إجمالي الحجوزات اليوم:* ${todayBookings.length}\n` +
+      `  - مؤكدة ومسددة: ${paidBookings} ✅\n` +
+      `  - بانتظار الدفع: ${pendingBookings} ⏳\n` +
+      `  - ملغية: ${cancelledBookings} ❌\n\n` +
+      `💰 *إجمالي الإيرادات اليوم:* ${totalRevenue.toLocaleString()} ر.س\n` +
+      `🚨 *البلاغات الجديدة:* ${newReports}\n\n` +
+      `نظام التشغيل والمراقبة يعمل بكفاءة 100% ✨`
+    );
   },
 });

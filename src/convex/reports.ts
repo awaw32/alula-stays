@@ -180,3 +180,49 @@ export const adminPendingCount = query({
     return all.length;
   },
 });
+
+/** جلب أحدث البلاغات المفتوحة (لاستخدام بوت الواتساب والإدارة عبر ChatOps) */
+export const getLatestOpenReports = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const max = args.limit || 5;
+    const pendingReports = await ctx.db
+      .query("reports")
+      .withIndex("by_status", (q) => q.eq("status", "pending"))
+      .collect();
+
+    // فرز بالأحدث أولاً
+    const sorted = pendingReports.sort((a, b) => b.createdAt - a.createdAt).slice(0, max);
+
+    return Promise.all(
+      sorted.map(async (rep) => {
+        let targetTitle = rep.targetType === "apartment" ? "شقة" : rep.targetType;
+        if (rep.targetType === "apartment") {
+          try {
+            const apt: any = await ctx.db.get(rep.targetId as never);
+            if (apt) {
+              targetTitle = apt.titleAr || apt.title;
+            }
+          } catch {}
+        }
+
+        const reasonLabels: Record<string, string> = {
+          inaccurate: "معلومات غير دقيقة",
+          inappropriate_images: "صور غير لائقة",
+          misleading: "مضلل أو مخادع",
+          scam: "اشتباه احتيال",
+          other: "أخرى",
+        };
+
+        return {
+          id: rep._id,
+          targetType: rep.targetType,
+          targetTitle,
+          reason: reasonLabels[rep.reason] || rep.reason,
+          details: rep.details || "بدون تفاصيل إضافية",
+          createdAt: rep.createdAt,
+        };
+      }),
+    );
+  },
+});
