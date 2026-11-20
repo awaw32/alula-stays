@@ -149,7 +149,7 @@ export function AdminInvoices() {
                       {(inv.totalPrice + inv.platformFee).toLocaleString()} ر.س
                     </div>
                     <div className="text-[11px] text-emerald-600 font-medium">
-                      عمولة المنصة: +{inv.platformFee.toLocaleString()} ر.س
+                      رسوم المنصة (على الضيف): +{inv.platformFee.toLocaleString()} ر.س
                     </div>
                     <div className="text-[10px] text-[var(--muted-foreground)]">
                       مستحق المالك: {inv.ownerNet.toLocaleString()} ر.س

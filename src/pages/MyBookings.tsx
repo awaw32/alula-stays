@@ -10,6 +10,7 @@ import { motion } from "framer-motion";
 import { Calendar, MapPin, Clock, CheckCircle, XCircle, Loader2, AlertCircle, Search, FileText, Phone, MessageCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
+import { useSeo } from "@/lib/seo";
 import { toast } from "sonner";
 import { InvoiceModal, type InvoiceData } from "@/components/InvoiceModal";
 
@@ -34,6 +35,13 @@ export default function MyBookings() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const liveBookings = useQuery(api.bookings.list, DEMO_MODE ? "skip" : {});
+
+  useSeo({
+    title: "حجوزاتي",
+    description: "تابع حجوزاتك وحالات الدفع والفواتير في منصة شقق العلا.",
+    path: "/my-bookings",
+    noIndex: true,
+  });
   const bookings = DEMO_MODE ? [] : liveBookings;
   const cancelBooking = useMutation(api.bookings.cancel);
   const cancelAndRefund = useAction(api.payments.cancelAndRefund);

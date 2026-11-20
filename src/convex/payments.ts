@@ -20,6 +20,7 @@ import {
   calculateRefund,
 } from "./lib/money";
 import { checkRateLimit, RATE_LIMIT_POLICIES } from "./lib/rateLimiting";
+import { isDevelopmentDeployment } from "./lib/env";
 
 /**
  * الحصول على Stripe مع التحقق من المفاتيح
@@ -326,7 +327,19 @@ export const createCheckoutSession = action({
         return { url: session.url, sessionId: session.id };
       }
 
-      // وضع الفحص والاختبار السريع (Sandbox Payment Mode) في حال عدم إدخال مفاتيح البوابات بعد
+      // ─────────────────────────────────────────────────────────────
+      // وضع الفحص والاختبار السريع (Sandbox Payment Mode)
+      // ⚠️ محمي: يعمل فقط إذا لم تُضبط مفاتيح البوابات
+      //    AND we're on a development deployment (ALLOW_DEV_TOOLS=true).
+      //    In production with no keys configured we now fail loudly
+      //    instead of silently marking bookings as paid for free.
+      // ─────────────────────────────────────────────────────────────
+      if (!isDevelopmentDeployment()) {
+        throw new PaymentError(
+          "بوابة الدفع غير مهيأة. يرجى المحاولة لاحقاً أو التواصل مع الدعم.",
+        );
+      }
+
       const mockSessionId = `test_sess_${Date.now()}`;
       await ctx.runMutation(internal.bookings.attachPaymentSession, {
         bookingId: args.bookingId,
@@ -527,6 +540,7 @@ export const cancelAndRefund = action({
       const totalRefundToCustomer = refundAmount + feeRefund;
 
       // إذا كان الحجز مدفوعاً وهناك استرجاع مالي
+      let gatewayRefundSucceeded = true;
       if (booking.paymentStatus === "paid" && totalRefundToCustomer > 0 && booking.paymentSessionId) {
         if (booking.paymentSessionId.startsWith("chg_")) {
           try {
@@ -537,8 +551,10 @@ export const cancelAndRefund = action({
               reason: "requested_by_customer",
             });
           } catch (refundError) {
+            gatewayRefundSucceeded = false;
             console.error("Tap Refund error:", refundError);
-            // نسجل الخطأ ولا نمنع تسجيل الإلغاء
+            // نسجّل الخطأ ولا نمنع تسجيل الإلغاء، لكننا لا ندّعي
+            // استرجاع المال — سيتولى فريق الدعم متابعته يدوياً.
           }
         }
       }
@@ -546,7 +562,7 @@ export const cancelAndRefund = action({
       const finalPaymentStatus =
         booking.paymentStatus !== "paid"
           ? "unpaid"
-          : refundPercentage === 100
+          : refundPercentage === 100 && gatewayRefundSucceeded
             ? "refunded"
             : "paid";
 
@@ -557,12 +573,15 @@ export const cancelAndRefund = action({
 
       let message = "تم إلغاء الحجز بنجاح";
       if (booking.paymentStatus === "paid") {
-        if (refundPercentage === 100) {
+        if (!gatewayRefundSucceeded) {
+          message =
+            "تم إلغاء الحجز بنجاح. تعذّر إتمام الاسترجاع الإلكتروني تلقائياً وسيتواصل فريق الدعم معك لإتمامه.";
+        } else if (refundPercentage === 100) {
           message = `تم إلغاء الحجز واسترداد المبلغ بالكامل (${totalRefundToCustomer} ر.س) إلى وسيلة الدفع الخاصة بك`;
         } else if (refundPercentage === 50) {
           message = `تم إلغاء الحجز واسترداد 50% من المبلغ (${totalRefundToCustomer} ر.س) إلى وسيلة الدفع الخاصة بك`;
         } else {
-          message = "تم إلغاء الحجز بدون استرداد (أقل من 24 ساعة وفقاً لسياسة الإلغاء)";
+          message = "تم إلغاء الحجز بدون استرجاع (أقل من 24 ساعة وفقاً لسياسة الإلغاء)";
         }
       }
 

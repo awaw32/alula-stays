@@ -11,6 +11,7 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { ERROR_MESSAGES, ValidationError } from "./lib/errors";
 import { logActivity } from "./lib/activityLog";
+import { ownerPayoutFor } from "./lib/money_model";
 
 /** فحص صلاحيات الأدمن — يعمل في query وmutation */
 async function requireAdmin(ctx: QueryCtx | MutationCtx) {
@@ -139,7 +140,12 @@ export const myEarnings = query({
 
     const grossRevenue = paidBookings.reduce((s, b) => s + b.totalPrice, 0);
     const platformFees = paidBookings.reduce((s, b) => s + b.platformFee, 0);
-    const netEarnings = grossRevenue - platformFees;
+    // رسوم المنصة تُقتطع من الضيف ولا تُخصم من مستحقات المالك.
+    // (انظر lib/money-model.ts — الخصم المزدوج يجعل المنصة تحتفظ بضعف الرسوم)
+    const netEarnings = paidBookings.reduce(
+      (s, b) => s + ownerPayoutFor(b.totalPrice),
+      0,
+    );
 
     // تحويلات المالك
     const payouts = await ctx.db
@@ -256,9 +262,10 @@ export const adminRecordPayout = mutation({
         apartmentIds.has(b.apartmentId),
     );
 
-    const netEarnings =
-      paidBookings.reduce((s, b) => s + b.totalPrice, 0) -
-      paidBookings.reduce((s, b) => s + b.platformFee, 0);
+    const netEarnings = paidBookings.reduce(
+      (s, b) => s + ownerPayoutFor(b.totalPrice),
+      0,
+    );
 
     const existingPayouts = await ctx.db
       .query("payouts")

@@ -6,6 +6,7 @@ import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { DEMO_MODE, DEMO_APARTMENTS } from "@/lib/demo-data";
 import { Link, useNavigate } from "react-router";
+import { useSeo } from "@/lib/seo";
 import type { ApartmentRecord } from "@/types/apartment";
 import { cn } from "@/lib/utils";
 import {
@@ -97,8 +98,7 @@ export default function Landing() {
   const liveApartments = useQuery(
     api.apartments.list,
     DEMO_MODE ? "skip" : {},
-  );
-  const liveLocations = useQuery(
+  );  const liveLocations = useQuery(
     api.apartments.locations,
     DEMO_MODE ? "skip" : undefined,
   );
@@ -108,6 +108,27 @@ export default function Landing() {
 
   const siteSettings = useQuery(api.settings.get, {});
   const navigate = useNavigate();
+
+  useSeo({
+    title: "شقق العلا | AlUla Apartments",
+    description:
+      "منصة شقق العلا لحجز الشقق والإقامات الفاخرة في العلا — واحة العرب، مدائن صالح، دادان، وقرية العلا التراثية. حجز مباشر وآمن مع أفضل الأسعار.",
+    path: "/",
+    jsonLd: {
+      "@type": "TravelAgency",
+      name: "شقق العلا",
+      url: "https://alulahome.com",
+      image: "https://alulahome.com/logo-icon.png",
+      areaServed: "العلا، المملكة العربية السعودية",
+      address: {
+        "@type": "PostalAddress",
+        addressLocality: "العلا",
+        addressCountry: "SA",
+      },
+      telephone: "+966590051074",
+      sameAs: [],
+    },
+  });
 
   // Hero background slideshow timer
   const [currentBgIndex, setCurrentBgIndex] = useState(0);
@@ -721,7 +742,7 @@ export default function Landing() {
 
             <div className="shrink-0 flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
               <Link
-                to="/add-apartment"
+                to="/owner/add"
                 className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-[var(--clay-accent)] to-[var(--clay-gold)] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-xl hover:scale-102 transition-all"
               >
                 <Building2 className="w-4 h-4" />
@@ -823,7 +844,7 @@ export default function Landing() {
               <div className="flex flex-col gap-2">
                 {[
                   { href: "/apartments", label: "تصفح جميع الشقق" },
-                  { href: "/add-apartment", label: "أضف عقارك كشريك" },
+                  { href: "/owner/add", label: "أضف عقارك كشريك" },
                   { href: "/owner", label: "بوابة المضيفين" },
                   { href: "/auth", label: "تسجيل الدخول / إنشاء حساب" },
                 ].map((link) => (

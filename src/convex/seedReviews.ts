@@ -1,6 +1,9 @@
-import { mutation } from "./_generated/server";
+import { internalMutation } from "./_generated/server";
 
-export const seed = mutation({
+// ⚠️ محمي: internalMutation بدل mutation — لا يمكن استدعاؤه عبر HTTP
+//    من أي زائر. البيانات وتاريخ تشغيلها لم يتغيّرا.
+//    التشغيل: npx convex run --type internal seedReviews:seed
+export const seed = internalMutation({
   handler: async (ctx) => {
     // Check if reviews already exist
     const existing = await ctx.db.query("reviews").first();

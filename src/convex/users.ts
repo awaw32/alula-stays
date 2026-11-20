@@ -1,6 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { mutation, query, internalMutation, internalQuery, QueryCtx } from "./_generated/server";
+import { isDevelopmentDeployment } from "./lib/env";
 
 /**
  * Get the current signed in user. Returns null if the user is not signed in.
@@ -143,10 +144,19 @@ export const hasAdmin = query({
 
 /**
  * تعيين أول مدير للمنصة — مسموح فقط إذا لم يكن هناك أي مدير مسجل بعد.
+ * ⚠️ محمي: مقيّدة ببيئة التطوير لمنع أي مستخدم مجهول من الاستيلاء على المنصة.
+ *    لتفعيلها: npx convex env set ALLOW_DEV_TOOLS true
+ *    في الإنتاج استخدم instead: npx convex run users:setAdminByEmail '{"email":"..."}'
  */
 export const claimFirstAdmin = mutation({
   args: {},
   handler: async (ctx) => {
+    if (!isDevelopmentDeployment()) {
+      throw new Error(
+        "هذه الميزة مفعّلة في بيئة التطوير فقط. في الإنتاج استخدم أمر سطر الأوامر المخصص لمنح الصلاحية.",
+      );
+    }
+
     const userId = await getAuthUserId(ctx);
     if (!userId) {
       throw new Error("يجب تسجيل الدخول أولاً");
@@ -245,11 +255,17 @@ export const recordLatestOtp = internalMutation({
 });
 
 /**
- * جلب رمز التحقق الأخير لرقم الجوال (صالح لمدة 10 دقائق)
+ * جلب رمز التحقق الأخير لرقم الجوال (للاختبار أثناء التطوير فقط)
+ * ────────────────────────────────────────────────────────────
+ * ⚠️ محمي: هذه الدالة تكشف رمز SMS الحقيقي، لذلك تُقيَّد ببيئة التطوير.
+ *    في الإنتاج تُعيد null دائماً. لتفعيلها: npx convex env set ALLOW_DEV_TOOLS true
+ *    الدالة نفسها ورمز الإرسال لم يُحذفا — الفحص فقط هو ما تغيّر.
  */
 export const getLatestOtpForPhone = query({
   args: { phone: v.string() },
   handler: async (ctx, args) => {
+    if (!isDevelopmentDeployment()) return null;
+
     const raw = normalizePhoneKey(args.phone);
     if (!raw) return null;
     const item = await ctx.db

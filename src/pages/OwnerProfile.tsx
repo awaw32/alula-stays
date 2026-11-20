@@ -12,6 +12,7 @@ import { BadgeCheck, Loader2, MapPin, Phone, UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router";
 import { toast } from "sonner";
+import { useSeo } from "@/lib/seo";
 
 export default function OwnerProfile() {
   const { role } = useAuth();
@@ -19,6 +20,13 @@ export default function OwnerProfile() {
   const profile = useQuery(api.users.myProfile, DEMO_MODE ? "skip" : undefined);
   const myUpdateProfile = useMutation(api.users.updateProfile);
   const becomeOwner = useMutation(api.users.becomeOwner);
+
+  useSeo({
+    title: "الملف الشخصي",
+    description: "إدارة بياناتك الشخصية في منصة شقق العلا.",
+    path: "/owner/profile",
+    noIndex: true,
+  });
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");

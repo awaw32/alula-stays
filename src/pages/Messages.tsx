@@ -1,9 +1,17 @@
 import { Navigation } from "@/components/Navigation";
 import { MessagesPage } from "@/components/messages/Messages";
 import { useParams } from "react-router";
+import { useSeo } from "@/lib/seo";
 
 export default function Messages() {
   const { conversationId } = useParams<{ conversationId: string }>();
+
+  useSeo({
+    title: "الرسائل",
+    description: "محادثاتك مع المضيفين والضيوف في منصة شقق العلا.",
+    path: conversationId ? `/messages/${conversationId}` : "/messages",
+    noIndex: true,
+  });
 
   return (
     <div className="min-h-screen bg-[var(--background)] pb-24 md:pb-0">

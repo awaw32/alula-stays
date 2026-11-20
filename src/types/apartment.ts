@@ -44,6 +44,8 @@ export interface ApartmentRecord {
   cancellationPolicy?: CancellationPolicy;
   icalImportUrl?: string;
   icalExportToken?: string;
+  stay22Url?: string;
+  bookingUrl?: string;
 }
 
 export interface ApartmentFormValues {

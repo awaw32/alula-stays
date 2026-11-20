@@ -9,6 +9,7 @@ import { calculateStayPrice } from "@/lib/pricing";
 import { getErrorMessage } from "@/lib/error-message";
 import { toast } from "sonner";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router";
+import { useSeo } from "@/lib/seo";
 import {
   Star,
   MapPin,
@@ -185,6 +186,52 @@ export default function ApartmentDetail() {
   const [showDatesModal, setShowDatesModal] = useState(false);
   const [showGuaranteeModal, setShowGuaranteeModal] = useState(false);
 
+  // ── SEO: عنوان ووصف وبيانات منظّمة لكل شقة ──────────────────────
+  const seoTitle = apartment?.titleAr || apartment?.title || "تفاصيل الإقامة";
+  const seoDescription =
+    apartment?.descriptionAr ||
+    apartment?.description ||
+    `اكتشف ${apartment?.titleAr || apartment?.title || "إقامة"} في ${apartment?.locationAr || "العلا"} — تفاصيل الغرف والمرافق والسعر والتقييمات.`;
+
+  useSeo({
+    title: seoTitle,
+    description: seoDescription?.slice(0, 300),
+    path: apartmentId ? `/apartment/${apartmentId}` : undefined,
+    image: apartment?.images?.[0],
+    type: "product",
+    jsonLd: apartment
+      ? {
+          "@type": "Product",
+          name: apartment.titleAr || apartment.title,
+          description: seoDescription,
+          image: apartment.images || [],
+          category: "إقامة سياحية",
+          offers: {
+            "@type": "Offer",
+            price: apartment.price,
+            priceCurrency: "SAR",
+            availability:
+              apartment.available === false
+                ? "https://schema.org/SoldOut"
+                : "https://schema.org/InStock",
+            url: `https://alulahome.com/apartment/${apartmentId}`,
+            seller: { "@type": "Organization", name: "شقق العلا" },
+          },
+          ...(apartment.reviewCount > 0
+            ? {
+                aggregateRating: {
+                  "@type": "AggregateRating",
+                  ratingValue: apartment.rating,
+                  reviewCount: apartment.reviewCount,
+                  bestRating: 5,
+                  worstRating: 1,
+                },
+              }
+            : {}),
+        }
+      : undefined,
+  });
+
   // Amenities accordions state (first 2 open by default)
   const [expandedAccordions, setExpandedAccordions] = useState<Record<string, boolean>>({
     general: true,
@@ -273,7 +320,11 @@ export default function ApartmentDetail() {
   const totalNights = stayBreakdown?.totalNights ?? 1;
   const totalPrice = stayBreakdown?.totalPrice ?? (apartment?.price || 0);
   const minNights = (apartment as { minNights?: number } | null)?.minNights ?? 1;
-  const nightsBelowMin = totalNights > 0 && totalNights < minNights;
+  // مدة غير صالحة (نفس اليوم أو تاريخ مغادرة قبل الوصول) أو أقل من الحد الأدنى.
+  // ملاحظة: كان الشرط `totalNights > 0 &&` يتخطى الفحص عند 0 ليالٍ،
+  // فتُعرض فاتورة ليلة كاملة ويُسمح بالمتابعة حتى رفض الخادم الطلب.
+  const invalidRange = checkIn && checkOut && checkOut.getTime() <= checkIn.getTime();
+  const nightsBelowMin = !invalidRange && totalNights < minNights;
 
   const handleBooking = async () => {
     if (DEMO_MODE) { toast.error("الوضع التجريبي: اربط Convex لتفعيل الحجز."); return; }
@@ -295,6 +346,11 @@ export default function ApartmentDetail() {
 
     if (!checkIn || !checkOut) {
       toast.error("يرجى تحديد تواريخ الوصول والمغادرة أولاً");
+      return;
+    }
+
+    if (invalidRange) {
+      toast.error("تاريخ المغادرة يجب أن يكون بعد تاريخ الوصول");
       return;
     }
 
@@ -975,18 +1031,26 @@ export default function ApartmentDetail() {
 
             {/* Price breakdown */}
             <div className="space-y-2 pt-2 text-xs text-neutral-600 dark:text-neutral-400">
-              <div className="flex justify-between">
-                <span>{apartment.price.toLocaleString("ar-SA")} ر.س × {totalNights} ليالٍ</span>
-                <span>{totalPrice.toLocaleString("ar-SA")} ر.س</span>
-              </div>
-              <div className="flex justify-between">
-                <span>رسوم الخدمة وضريبة القيمة المضافة</span>
-                <span className="text-emerald-600 font-semibold">مشمولة</span>
-              </div>
-              <div className="flex justify-between font-bold text-sm text-neutral-900 dark:text-neutral-100 pt-2 border-t border-neutral-100 dark:border-neutral-800">
-                <span>المبلغ الإجمالي</span>
-                <span className="text-[#5E2590] dark:text-[#C596F0] font-black">{totalPrice.toLocaleString("ar-SA")} ر.س</span>
-              </div>
+              {invalidRange ? (
+                <p className="text-red-600 dark:text-red-400 font-medium">
+                  يرجى اختيار تاريخ مغادرة بعد تاريخ الوصول لعرض تفاصيل السعر.
+                </p>
+              ) : (
+                <>
+                  <div className="flex justify-between">
+                    <span>{apartment.price.toLocaleString("ar-SA")} ر.س × {totalNights} ليالٍ</span>
+                    <span>{totalPrice.toLocaleString("ar-SA")} ر.س</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>رسوم الخدمة وضريبة القيمة المضافة</span>
+                    <span className="text-emerald-600 font-semibold">مشمولة</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-sm text-neutral-900 dark:text-neutral-100 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+                    <span>المبلغ الإجمالي</span>
+                    <span className="text-[#5E2590] dark:text-[#C596F0] font-black">{totalPrice.toLocaleString("ar-SA")} ر.س</span>
+                  </div>
+                </>
+              )}
             </div>
 
             {bookingError && (

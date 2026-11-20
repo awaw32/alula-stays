@@ -31,6 +31,7 @@ import { AdminVerifications } from "@/components/admin/AdminVerifications";
 import { AdminReports } from "@/components/admin/AdminReports";
 import { AdminInvoices } from "@/components/admin/AdminInvoices";
 import { FileText, CreditCard, Search as SearchIcon, ArrowUpRight, Phone, Mail } from "lucide-react";
+import { useSeo } from "@/lib/seo";
 
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   pending: { label: "بانتظار المراجعة", className: "bg-amber-100 text-amber-700" },
@@ -66,6 +67,13 @@ export default function AdminDashboard() {
   const featureApartment = useMutation(api.admin.adminFeatureApartment);
   const updateRole = useMutation(api.admin.adminUpdateUserRole);
   const setUserDisabled = useMutation(api.admin.adminSetUserDisabled);
+
+  useSeo({
+    title: "لوحة الإدارة",
+    description: "لوحة إدارة منصة شقق العلا.",
+    path: "/admin",
+    noIndex: true,
+  });
 
   const handleToggleDisable = async (id: string, disabled: boolean, name: string) => {
     try {

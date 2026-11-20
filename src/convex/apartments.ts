@@ -51,7 +51,11 @@ export const list = query({
       apartments = apartments.filter((a) => a.price <= args.maxPrice!);
     }
     if (args.bedrooms !== undefined && args.bedrooms > 0) {
-      apartments = apartments.filter((a) => a.bedrooms === args.bedrooms);
+      // القيمة 4 تعني "4 غرف فأكثر" كما هو معروض في واجهة Apartments
+      apartments =
+        args.bedrooms === 4
+          ? apartments.filter((a) => a.bedrooms >= 4)
+          : apartments.filter((a) => a.bedrooms === args.bedrooms);
     }
 
     switch (args.sortBy) {

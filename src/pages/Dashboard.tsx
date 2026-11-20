@@ -17,11 +17,19 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router";
+import { useSeo } from "@/lib/seo";
 
 export default function Dashboard() {
   const { user, role, signOut } = useAuth();
   const navigate = useNavigate();
   const ownerStatus = useQuery(api.owners.myOwnerStatus, DEMO_MODE ? "skip" : undefined);
+
+  useSeo({
+    title: "لوحة التحكم",
+    description: "لوحة تحكم الضيف في منصة شقق العلا.",
+    path: "/dashboard",
+    noIndex: true,
+  });
 
   const isAdmin = isAuthorizedAdmin(role, user?.email);
 

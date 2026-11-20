@@ -2,6 +2,7 @@ import { Navigation } from "@/components/Navigation";
 import { useParams, Link } from "react-router";
 import { ArrowRight } from "lucide-react";
 import { useEffect } from "react";
+import { useSeo } from "@/lib/seo";
 
 const BRAND = "شقق العلا";
 const CONTACT_EMAIL = "alulahome2026@gmail.com";
@@ -268,6 +269,12 @@ const NAV = [
 export default function Legal() {
   const { section } = useParams<{ section: string }>();
   const page = PAGES[section ?? ""] ?? PAGES.about;
+
+  useSeo({
+    title: page.title,
+    description: `${page.title} — منصة شقق العلا للإقامات الفاخرة في العلا.`,
+    path: `/legal/${section ?? "about"}`,
+  });
 
   useEffect(() => {
     window.scrollTo(0, 0);

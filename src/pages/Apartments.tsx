@@ -6,6 +6,7 @@ import { api } from "../convex/_generated/api";
 import { DEMO_MODE, DEMO_APARTMENTS } from "@/lib/demo-data";
 import { useState, useMemo } from "react";
 import { useSearchParams } from "react-router";
+import { useSeo } from "@/lib/seo";
 import type { ApartmentRecord } from "@/types/apartment";
 import {
   Search,
@@ -16,6 +17,7 @@ import {
   X,
   LayoutGrid,
   Map as MapIcon,
+  Building2,
 } from "lucide-react";
 
 const fadeUp = {
@@ -55,10 +57,27 @@ const bedroomOptions = [
   { value: 4, label: "4+" },
 ];
 
+// أنواع العقارات — تتطابق مع قيم propertyType في قاعدة البيانات
+// (انظر schema.ts) ومع روابط التنقل في Navigation.tsx (?type=...)
+const propertyTypeOptions = [
+  { value: "all", label: "كل الأنواع" },
+  { value: "apartment", label: "شقة" },
+  { value: "villa", label: "فيلا" },
+  { value: "chalet", label: "شاليه" },
+  { value: "camp", label: "مخيم / كرفان" },
+];
+
 export default function Apartments() {
   const [searchParams] = useSearchParams();
   const urlLocation = searchParams.get("location");
   const urlType = searchParams.get("type");
+
+  useSeo({
+    title: "تصفح الشقق والإقامات في العلا",
+    description:
+      "تصفح جميع الشقق والفلل والشاليهات والمخيمات المتاحة للإيجار في العلا. قارن الأسعار والموقع والمراجعات واحجز مباشرة بأمان.",
+    path: "/apartments",
+  });
 
   const [search, setSearch] = useState("");
   const [selectedLocation, setSelectedLocation] = useState(urlLocation || "all");
@@ -106,6 +125,12 @@ export default function Apartments() {
         return true;
       });
     }
+    // فلتر "4+" يعني 4 غرف فأكثر وليس 4 بالضبط
+    if (bedrooms > 0) {
+      list = list.filter((a) =>
+        bedrooms === 4 ? a.bedrooms >= 4 : a.bedrooms === bedrooms,
+      );
+    }
     if (!search.trim()) return list;
     const q = search.toLocaleLowerCase("ar-SA");
     return list.filter((apartment) =>
@@ -113,16 +138,19 @@ export default function Apartments() {
         .filter(Boolean)
         .some((value) => value!.toLocaleLowerCase("ar-SA").includes(q)),
     );
-  }, [apartments, search, selectedType]);
+  }, [apartments, search, selectedType, bedrooms]);
 
   const activeFilters =
     (selectedLocation !== "all" ? 1 : 0) +
+    (selectedType !== "all" ? 1 : 0) +
     (bedrooms > 0 ? 1 : 0) +
     (minPrice !== "" ? 1 : 0) +
-    (maxPrice !== "" ? 1 : 0);
+    (maxPrice !== "" ? 1 : 0) +
+    (search.trim() ? 1 : 0);
 
   const clearFilters = () => {
     setSelectedLocation("all");
+    setSelectedType("all");
     setBedrooms(0);
     setMinPrice("");
     setMaxPrice("");
@@ -231,17 +259,42 @@ export default function Apartments() {
                 className="mt-4 pt-4 border-t border-[var(--border)]"
               >
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Property Type */}
+                  <div>
+                    <label
+                      htmlFor="property-type-filter"
+                      className="text-sm font-medium text-[var(--foreground)] mb-2 block"
+                    >
+                      <Building2 className="w-4 h-4 inline ml-1" />
+                      نوع العقار
+                    </label>
+                    <select
+                      id="property-type-filter"
+                      value={selectedType}
+                      onChange={(e) => setSelectedType(e.target.value)}
+                      className="clay-input text-sm w-full cursor-pointer"
+                    >
+                      {propertyTypeOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   {/* Bedrooms */}
                   <div>
-                    <label className="text-sm font-medium text-[var(--foreground)] mb-2 block">
+                    <span className="text-sm font-medium text-[var(--foreground)] mb-2 block">
                       <Bed className="w-4 h-4 inline ml-1" />
                       عدد الغرف
-                    </label>
+                    </span>
                     <div className="flex gap-2">
                       {bedroomOptions.map((opt) => (
                         <button
                           key={opt.value}
+                          type="button"
                           onClick={() => setBedrooms(opt.value)}
+                          aria-pressed={bedrooms === opt.value}
                           className={`clay-sm px-4 py-2 text-sm font-medium transition-all ${
                             bedrooms === opt.value
                               ? "!bg-[var(--clay-accent)] !text-white"

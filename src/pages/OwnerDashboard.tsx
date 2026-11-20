@@ -30,6 +30,7 @@ import { InvoiceModal, type InvoiceData } from "@/components/InvoiceModal";
 import { OwnerApplicationForm } from "@/components/owner/OwnerApplicationForm";
 import { OwnerPendingView } from "@/components/owner/OwnerPendingView";
 import { AlertCircle, RefreshCw } from "lucide-react";
+import { useSeo } from "@/lib/seo";
 
 const OWNER_STATUS_LABELS: Record<string, { label: string; className: string }> = {
   pending: { label: "بانتظار مراجعة الإدارة", className: "bg-amber-100 text-amber-700" },
@@ -68,6 +69,13 @@ export default function OwnerDashboard() {
     DEMO_MODE || ownerStatus?.status !== "approved" ? "skip" : undefined
   );
   const deleteApartment = useMutation(api.admin.deleteApartment);
+
+  useSeo({
+    title: "بوابة المضيفين",
+    description: "أدر عقاراتك وحجوزاتك ومستحقاتك المالية من بوابة المضيفين في شقق العلا.",
+    path: "/owner",
+    noIndex: true,
+  });
   const [activeTab, setActiveTab] = useState<"apartments" | "bookings" | "calendar" | "finance">("apartments");
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -316,9 +324,10 @@ export default function OwnerDashboard() {
                             <span>{booking.guests} ضيوف</span>
                           </div>
                           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-xs">
-                            <span className="text-[var(--muted-foreground)]">إجمالي الحجز: <span className="font-medium">{booking.totalPrice.toLocaleString()} ر.س</span></span>
-                            <span className="text-[var(--muted-foreground)]">عمولة المنصة: <span className="font-medium text-red-600">−{booking.platformFee.toLocaleString()} ر.س</span></span>
-                            <span className="text-emerald-700 font-semibold">صافي مستحقك: {(booking.totalPrice - booking.platformFee).toLocaleString()} ر.س</span>
+                            <span className="text-[var(--muted-foreground)]">سعر الإقامة: <span className="font-medium">{booking.totalPrice.toLocaleString()} ر.س</span></span>
+                            <span className="text-[var(--muted-foreground)]">رسوم خدمة المنصة (على الضيف): <span className="font-medium text-red-600">+{booking.platformFee.toLocaleString()} ر.س</span></span>
+                            <span className="text-[var(--muted-foreground)]">إجمالي مدفوع: <span className="font-medium">{(booking.totalPrice + booking.platformFee).toLocaleString()} ر.س</span></span>
+                            <span className="text-emerald-700 font-semibold">صافي مستحقك: {booking.totalPrice.toLocaleString()} ر.س</span>
                           </div>
                         </div>
 

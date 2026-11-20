@@ -9,6 +9,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { Loader2 } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
+import { useSeo } from "@/lib/seo";
 
 function toFormValues(apartment: ApartmentRecord): ApartmentFormValues {
   return {
@@ -55,6 +56,13 @@ export default function EditApartment() {
   const apartments = DEMO_MODE ? [] : liveApartments;
   const updateApartment = useMutation(api.admin.updateApartment);
   const apartment = apartments?.find((item) => item._id === id);
+
+  useSeo({
+    title: "تعديل الشقة",
+    description: "تعديل بيانات شقتك في منصة شقق العلا.",
+    path: id ? `/owner/edit/${id}` : undefined,
+    noIndex: true,
+  });
 
   if (apartments === undefined) {
     return <div className="flex min-h-screen items-center justify-center bg-[var(--background)]"><Loader2 className="h-6 w-6 animate-spin text-[var(--clay-accent)]" aria-label="جاري تحميل الشقة" /></div>;

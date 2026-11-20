@@ -41,6 +41,7 @@ import {
   normalizePhone,
 } from "@/lib/phone";
 import { toast } from "sonner";
+import { useSeo } from "@/lib/seo";
 
 interface AuthProps {
   redirectAfterAuth?: string;
@@ -72,6 +73,13 @@ export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
 
   const [method, setMethod] = useState<"phone" | "email">("phone");
   const [step, setStep] = useState<"input" | "otp">("input");
+
+  useSeo({
+    title: "تسجيل الدخول",
+    description: "سجّل الدخول إلى منصة شقق العلا عبر رقم الجوال أو البريد الإلكتروني.",
+    path: "/auth",
+    noIndex: true,
+  });
 
   const [phoneInput, setPhoneInput] = useState("");
   const [emailInput, setEmailInput] = useState("");

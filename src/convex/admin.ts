@@ -573,7 +573,12 @@ export const adminDashboardStats = query({
         (sum, b) => sum + b.platformFee,
         0,
       );
-      const ownerPayouts = revenue - platformProfit;
+      // رسوم المنصة تُقتطع من الضيف فقط ولا تُخصم مرة أخرى من مستحقات المالك.
+      // (انظر lib/money_model.ts)
+      const ownerPayouts = paidList.reduce(
+        (sum, b) => sum + b.totalPrice,
+        0,
+      );
 
       const vList = visits.filter((v) => v.createdAt >= since);
       const uniqueVisitors = new Set(vList.map((v) => v.visitorId)).size;
@@ -713,7 +718,7 @@ export const adminInvoicesList = query({
         pricePerNight: b.pricePerNight,
         totalPrice: b.totalPrice,
         platformFee: b.platformFee,
-        ownerNet: b.totalPrice - b.platformFee,
+        ownerNet: b.totalPrice,
         paymentSessionId: b.paymentSessionId || "",
         paidAt: b.paidAt,
         createdAt: b.createdAt,

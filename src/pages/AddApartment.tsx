@@ -9,6 +9,7 @@ import { KeyRound, ShieldCheck } from "lucide-react";
 import { Navigate, useNavigate } from "react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { useSeo } from "@/lib/seo";
 
 const initialValues: ApartmentFormValues = {
   title: "",
@@ -50,6 +51,14 @@ export default function AddApartment() {
   const { role } = useAuth();
   const myProfile = useQuery(api.users.myProfile, DEMO_MODE ? "skip" : undefined);
   const createApartment = useMutation(api.admin.createApartment);
+
+  useSeo({
+    title: "أضف عقارك",
+    description: "أضف عقارك إلى منصة شقق العلا وابدأ باستقبال الحجوزات.",
+    path: "/owner/add",
+    noIndex: true,
+  });
+
   // إذا لم يكن المستخدم مالكاً معتمداً أو مديراً، يتم توجيهه إلى لوحة المالك لتقديم أو متابعة الطلب
   useEffect(() => {
     if (role !== undefined && role !== "owner" && role !== "admin") {

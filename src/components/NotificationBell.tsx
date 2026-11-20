@@ -12,6 +12,8 @@ interface NotificationBellProps {
 
 export function NotificationBell({ className }: NotificationBellProps) {
   const [isOpen, setIsOpen] = useState(false);
+  // وقت مرجعي ثابت يُحدّث عند فتح القائمة — تجنّب استدعاء Date.now() أثناء الرسم
+  const [now, setNow] = useState(() => Date.now());
   const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
@@ -75,7 +77,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
   };
 
   const formatRelativeTime = (timestamp: number) => {
-    const diff = Date.now() - timestamp;
+    const diff = now - timestamp;
     const minutes = Math.floor(diff / (1000 * 60));
     if (minutes < 1) return "الآن";
     if (minutes < 60) return `منذ ${minutes} دقيقة`;
@@ -90,10 +92,14 @@ export function NotificationBell({ className }: NotificationBellProps) {
       {/* Bell Button */}
       <button
         type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={() => {
+          if (!isOpen) setNow(Date.now());
+          setIsOpen((prev) => !prev);
+        }}
         className="relative flex items-center justify-center w-9 h-9 rounded-xl bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-200 transition-colors focus:outline-hidden"
         aria-label="الإشعارات"
         aria-expanded={isOpen}
+        aria-haspopup="true"
       >
         <Bell className="w-4 h-4" />
         {unreadCount > 0 && (

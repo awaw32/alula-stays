@@ -1,7 +1,10 @@
-import { mutation } from "./_generated/server";
+import { internalMutation } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 
-export const seed = mutation({
+// ⚠️ محمي: internalMutation بدل mutation — لا يمكن استدعاؤه عبر HTTP
+//    من أي زائر. البيانات وتاريخ تشغيلها لم يتغيّرا.
+//    التشغيل: npx convex run --type internal seed:seed
+export const seed = internalMutation({
   handler: async (ctx) => {
     // Check if already seeded
     const existing = await ctx.db.query("apartments").first();

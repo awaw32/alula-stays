@@ -1,6 +1,13 @@
 import { motion } from "framer-motion";
+import { useSeo } from "@/lib/seo";
 
 export default function NotFound() {
+  useSeo({
+    title: "الصفحة غير موجودة",
+    description: "عذرًا، الصفحة التي تبحث عنها غير موجودة في منصة شقق العلا.",
+    noIndex: true,
+  });
+
   return (
     <motion.div
       initial={{ opacity: 0 }}

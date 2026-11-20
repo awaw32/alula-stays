@@ -96,6 +96,8 @@ const schema = defineSchema(
       ), // سياسة الإلغاء: مرنة | متوسطة | صارمة
       icalImportUrl: v.optional(v.string()), // رابط مزامنة التقويم الخارجي (Airbnb / Booking)
       icalExportToken: v.optional(v.string()), // رمز تصدير التقويم الخارجي
+      stay22Url: v.optional(v.string()), // رابط الشريك المعتمد Stay22
+      bookingUrl: v.optional(v.string()), // رابط الحجز الأصلي
 
       // دورة حياة الشقة: بانتظار المراجعة → مقبولة/مرفوضة/تحتاج تعديلات → موقوفة
       status: v.optional(

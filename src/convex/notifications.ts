@@ -13,6 +13,8 @@ const NOTIFICATION_TYPES = {
 
 /**
  * إنشاء إشعار جديد
+ * ⚠️ محمي: يتطلب تسجيل الدخول. الإشعارات الداخلية (تأكيد الحجز، الرسالة
+ *    الجديدة، إلخ) تُكتب مباشرة عبر ctx.db.insert داخل الخادم ولا تمر هنا.
  */
 export const create = mutation({
   args: {
@@ -26,6 +28,11 @@ export const create = mutation({
     read: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    const actorId = await getAuthUserId(ctx);
+    if (!actorId) {
+      throw new Error("يجب تسجيل الدخول أولاً");
+    }
+
     const notificationId = await ctx.db.insert("notifications", {
       userId: args.userId,
       type: args.type,

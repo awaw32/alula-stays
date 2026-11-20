@@ -9,10 +9,17 @@
   <link rel="manifest" href="%BASE_URL%manifest.webmanifest" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>شقق العلا | AlUla Apartments</title>
-  <link rel="canonical" href="https://alulahome.com/" />
+  <meta
+    name="description"
+    content="منصة شقق العلا لحجز الشقق والإقامات الفاخرة في العلا — واحة العرب، مدائن صالح، دادان، وقرية العلا التراثية. حجز مباشر وآمن مع أفضل الأسعار."
+  />
+  <!-- canonical و og:url يُداران ديناميكياً لكل مسار عبر src/lib/seo.ts
+       لأن هذا تطبيق صفحة واحدة (SPA) وكل مسار يحتاج عنواناً ووصفاً خاصين به. -->
   <meta property="og:url" content="https://alulahome.com/" />
   <meta property="og:site_name" content="شقق العلا" />
   <meta property="og:type" content="website" />
+  <meta property="og:locale" content="ar_SA" />
+  <meta name="twitter:card" content="summary_large_image" />
   <!-- Google Fonts: Almarai & Readex Pro for luxury Arabic typography -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -29,6 +36,18 @@
         script.src = 'https://emrldtp.com/NTc4OTk1.js?t=578995';
         document.head.appendChild(script);
     })();
+  </script>
+  <!-- Stay22 LetMeAllez Script -->
+  <script>
+    (function (s, t, a, y, twenty, two) {
+      s.Stay22 = s.Stay22 || {};
+      s.Stay22.params = { lmaID: '6aba8af6fddcb338e2ee906b' };
+      twenty = t.createElement(a);
+      two = t.getElementsByTagName(a)[0];
+      twenty.async = 1;
+      twenty.src = y;
+      two.parentNode.insertBefore(twenty, two);
+    })(window, document, 'script', 'https://scripts.stay22.com/letmeallez.js');
   </script>
 </head>
 

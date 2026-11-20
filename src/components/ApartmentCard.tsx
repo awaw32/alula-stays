@@ -64,9 +64,18 @@ export function ApartmentCard({
 
   return (
     <div
+      role="link"
+      tabIndex={0}
+      aria-label={`عرض تفاصيل ${getApartmentTitle(apartment)}`}
       onClick={() => navigate(`/apartment/${apartment._id}`)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          navigate(`/apartment/${apartment._id}`);
+        }
+      }}
       className={cn(
-        "group cursor-pointer flex flex-col bg-white dark:bg-neutral-900 rounded-2xl overflow-hidden border border-neutral-100 dark:border-neutral-800 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 select-none",
+        "group cursor-pointer flex flex-col bg-white dark:bg-neutral-900 rounded-2xl overflow-hidden border border-neutral-100 dark:border-neutral-800 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--clay-accent)] focus-visible:ring-offset-2",
         className,
       )}
     >
@@ -92,7 +101,8 @@ export function ApartmentCard({
         <button
           type="button"
           onClick={handleFav}
-          aria-label="إضافة للمفضلة"
+          aria-label={fav ? "إزالة من المفضلة" : "إضافة للمفضلة"}
+          aria-pressed={fav}
           className="absolute top-3 left-3 w-8 h-8 rounded-full bg-white/80 dark:bg-neutral-900/80 backdrop-blur-md flex items-center justify-center shadow-md transition-transform hover:scale-110 active:scale-90 z-10"
         >
           <Heart

@@ -1,4 +1,4 @@
-import { mutation } from "./_generated/server";
+import { internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 
@@ -12,7 +12,9 @@ import type { Id } from "./_generated/dataModel";
  * ✅ Favorites (البيانات المفضلة)
  * ✅ Payments (معلومات الدفع)
  *
- * الاستخدام: bun convex run seed.complete:seedAll
+ * ⚠️ محمي: internalMutation بدل mutation — لا يمكن استدعاؤه عبر HTTP
+ *    من أي زائر. البيانات وتاريخ تشغيلها لم يتغيّرا.
+ *    التشغيل: npx convex run --type internal seed.complete:seedAll
  */
 
 // ==================== USERS DATA ====================
@@ -219,7 +221,7 @@ const favoritesData = [
 ];
 
 // ==================== SEED FUNCTION ====================
-export const seedAll = mutation({
+export const seedAll = internalMutation({
   handler: async (ctx) => {
     console.log("🚀 بدء عملية ملء البيانات التجريبية...\n");
 

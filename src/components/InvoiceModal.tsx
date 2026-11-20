@@ -170,7 +170,7 @@ export function InvoiceModal({ open, onOpenChange, invoice }: InvoiceModalProps)
                 </tr>
                 <tr>
                   <td className="py-2.5 text-zinc-500 text-xs">
-                    رسوم خدمة المنصة والضريبة المضافة
+                    رسوم خدمة المنصة والضريبة المضافة (١٠٪)
                   </td>
                   <td className="text-center py-2.5 text-zinc-400 text-xs">شاملة</td>
                   <td className="text-left py-2.5 text-zinc-500 text-xs">{invoice.platformFee.toLocaleString()} ر.س</td>

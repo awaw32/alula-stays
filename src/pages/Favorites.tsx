@@ -5,6 +5,7 @@ import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { DEMO_MODE } from "@/lib/demo-data";
 import { Link } from "react-router";
+import { useSeo } from "@/lib/seo";
 import type { ApartmentRecord } from "@/types/apartment";
 import { Heart, Search } from "lucide-react";
 
@@ -20,6 +21,13 @@ const fadeUp = {
 export default function Favorites() {
   const liveFavorites = useQuery(api.favorites.list, DEMO_MODE ? "skip" : undefined);
   const favorites = DEMO_MODE ? [] : liveFavorites;
+
+  useSeo({
+    title: "المفضلة",
+    description: "الشقق والإقامات التي أضفتها إلى قائمتك المفضلة في منصة شقق العلا.",
+    path: "/favorites",
+    noIndex: true,
+  });
 
   return (
     <div className="min-h-screen bg-[var(--background)] pb-24 md:pb-0">

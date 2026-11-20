@@ -23,6 +23,159 @@ function formatPhoneDigits(phone: string): string {
 }
 
 /**
+ * إرسال رسالة واتساب عبر بوابة Infobip
+ */
+async function sendViaInfobipWhatsApp(
+  phoneDigits: string,
+  text: string,
+  token: string,
+): Promise<boolean> {
+  const apiKey = process.env.INFOBIP_API_KEY;
+  if (!apiKey) {
+    console.warn("[Infobip WhatsApp] INFOBIP_API_KEY not configured.");
+    return false;
+  }
+  const rawBaseUrl = process.env.INFOBIP_BASE_URL || "https://55nw9j.api.infobip.com";
+  const baseUrl = rawBaseUrl.startsWith("http") ? rawBaseUrl : `https://${rawBaseUrl}`;
+
+  // رقم مرسل الواتساب: إما رقم مخصص من البيئة أو رقم Sandbox الافتراضي لـ Infobip
+  let sender =
+    process.env.INFOBIP_WHATSAPP_SENDER ||
+    (process.env.INFOBIP_SENDER && /^\+?\d+$/.test(process.env.INFOBIP_SENDER)
+      ? process.env.INFOBIP_SENDER
+      : "447860099299");
+  sender = sender.replace(/[^\d]/g, "");
+
+  // المحاولة الأولى: إرسال رسالة نصية مباشرة عبر WhatsApp
+  try {
+    const res = await fetch(`${baseUrl}/whatsapp/1/message/text`, {
+      method: "POST",
+      headers: {
+        Authorization: `App ${apiKey}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        from: sender,
+        to: phoneDigits,
+        content: { text },
+      }),
+    });
+
+    const data: any = await res.json().catch(() => ({}));
+    if (res.ok && data?.status?.groupName !== "REJECTED") {
+      console.log(`[Infobip WhatsApp] Text message sent successfully to ${phoneDigits}`);
+      return true;
+    }
+
+    console.warn(`[Infobip WhatsApp] Text attempt response (${res.status}):`, data);
+
+    // إذا فشل بسبب Invalid Source Address، أعد المحاولة برقم Sandbox الافتراضي 447860099299
+    if (sender !== "447860099299" && data?.status?.name === "REJECTED_SOURCE") {
+      console.log(`[Infobip WhatsApp] Retrying with sandbox sender 447860099299...`);
+      const retryRes = await fetch(`${baseUrl}/whatsapp/1/message/text`, {
+        method: "POST",
+        headers: {
+          Authorization: `App ${apiKey}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          from: "447860099299",
+          to: phoneDigits,
+          content: { text },
+        }),
+      });
+      const retryData: any = await retryRes.json().catch(() => ({}));
+      if (retryRes.ok && retryData?.status?.groupName !== "REJECTED") {
+        console.log(`[Infobip WhatsApp] Sandbox retry sent successfully to ${phoneDigits}`);
+        return true;
+      }
+      console.warn(`[Infobip WhatsApp] Sandbox retry response:`, retryData);
+    }
+  } catch (err: any) {
+    console.warn(`[Infobip WhatsApp] Dispatch error:`, err?.message);
+  }
+
+  // المحاولة الثانية: محاولة إرسال عبر القالب (Template) إن وجد
+  try {
+    const templateName = process.env.INFOBIP_WHATSAPP_TEMPLATE || "otp";
+    const res = await fetch(`${baseUrl}/whatsapp/1/message/template`, {
+      method: "POST",
+      headers: {
+        Authorization: `App ${apiKey}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        messages: [
+          {
+            from: sender,
+            to: phoneDigits,
+            content: {
+              templateName,
+              templateData: { body: { placeholders: [token] } },
+              language: "ar",
+            },
+          },
+        ],
+      }),
+    });
+    const data: any = await res.json().catch(() => ({}));
+    if (res.ok && data?.messages?.[0]?.status?.groupName !== "REJECTED") {
+      console.log(`[Infobip WhatsApp] Template message sent successfully to ${phoneDigits}`);
+      return true;
+    }
+    console.warn(`[Infobip WhatsApp] Template attempt response:`, data);
+  } catch (tErr: any) {
+    console.warn(`[Infobip WhatsApp] Template error:`, tErr?.message);
+  }
+
+  return false;
+}
+
+/**
+ * إرسال SMS عبر بوابة Infobip
+ */
+async function sendViaInfobipSms(phoneDigits: string, text: string): Promise<boolean> {
+  const apiKey = process.env.INFOBIP_API_KEY;
+  if (!apiKey) return false;
+  const rawBaseUrl = process.env.INFOBIP_BASE_URL || "https://55nw9j.api.infobip.com";
+  const baseUrl = rawBaseUrl.startsWith("http") ? rawBaseUrl : `https://${rawBaseUrl}`;
+  const sender = process.env.INFOBIP_SENDER || "AlulaStays";
+
+  try {
+    const res = await fetch(`${baseUrl}/sms/2/text/advanced`, {
+      method: "POST",
+      headers: {
+        Authorization: `App ${apiKey}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        messages: [
+          {
+            destinations: [{ to: phoneDigits }],
+            from: sender,
+            text,
+          },
+        ],
+      }),
+    });
+    if (res.ok) {
+      const data: any = await res.json().catch(() => ({}));
+      console.log(`[Infobip SMS] Status:`, data?.messages?.[0]?.status?.name || "SENT");
+      return true;
+    }
+    const errText = await res.text();
+    console.warn(`[Infobip SMS] HTTP ${res.status}: ${errText}`);
+  } catch (err: any) {
+    console.warn(`[Infobip SMS] Dispatch error:`, err?.message);
+  }
+  return false;
+}
+
+/**
  * إرسال SMS عبر بوابة تقنيات (Taqnyat) السعودية
  */
 async function sendViaTaqnyat(phoneDigits: string, text: string): Promise<boolean> {
@@ -51,48 +204,6 @@ async function sendViaTaqnyat(phoneDigits: string, text: string): Promise<boolea
     console.warn(`[Taqnyat] HTTP ${res.status}: ${errText}`);
   } catch (err: any) {
     console.warn(`[Taqnyat] Dispatch error:`, err?.message);
-  }
-  return false;
-}
-
-/**
- * إرسال SMS عبر بوابة Infobip
- */
-async function sendViaInfobip(phoneDigits: string, text: string): Promise<boolean> {
-  const apiKey =
-    process.env.INFOBIP_API_KEY ||
-    "e7923b67d7307866885e643173c76eaf-08b56421-648d-44a2-955a-9fe6d95e27e8";
-  const rawBaseUrl = process.env.INFOBIP_BASE_URL || "https://55nw9j.api.infobip.com";
-  const baseUrl = rawBaseUrl.startsWith("http") ? rawBaseUrl : `https://${rawBaseUrl}`;
-  const sender = process.env.INFOBIP_SENDER || "AlulaStays";
-
-  try {
-    const res = await fetch(`${baseUrl}/sms/2/text/advanced`, {
-      method: "POST",
-      headers: {
-        Authorization: `App ${apiKey}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({
-        messages: [
-          {
-            destinations: [{ to: phoneDigits }],
-            from: sender,
-            text,
-          },
-        ],
-      }),
-    });
-    if (res.ok) {
-      const data: any = await res.json();
-      console.log(`[Infobip] SMS Status:`, data?.messages?.[0]?.status?.name || "SENT");
-      return true;
-    }
-    const errText = await res.text();
-    console.warn(`[Infobip] HTTP ${res.status}: ${errText}`);
-  } catch (err: any) {
-    console.warn(`[Infobip] Dispatch error:`, err?.message);
   }
   return false;
 }
@@ -137,71 +248,36 @@ export const phoneOtp = {
         });
       }
     } catch (saveErr) {
-      console.warn("[phoneOtp] Error recording OTP token:", saveErr);
+      console.warn("[phoneOtp] Error recording OTP token in devOtpLogs:", saveErr);
     }
 
-    // 2. محاولة الإرسال المباشر عبر بوابة Infobip باستخدام المتغيرات البيئية
+    // 2. إرسال عبر واتساب Infobip أولاً (حسب طلب المستخدم وإعدادات الخادم)
+    let dispatched = false;
     try {
-      const apiKey = process.env.INFOBIP_API_KEY;
-      const baseUrl = process.env.INFOBIP_BASE_URL || "https://55nw9j.api.infobip.com";
-      const sender = process.env.INFOBIP_SENDER || "AlulaStays";
-
-      if (!apiKey) {
-        console.error(
-          "[phoneOtp] CRITICAL: INFOBIP_API_KEY environment variable is not defined. SMS will not be sent.",
-        );
-        throw new Error(
-          "Missing INFOBIP_API_KEY environment variable. Configure it in Convex Dashboard.",
-        );
-      }
-
-      console.log(`[phoneOtp] Attempting to send SMS via Infobip to ${destination}`);
-
-      const res = await fetch(`${baseUrl}/sms/2/text/advanced`, {
-        method: "POST",
-        headers: {
-          Authorization: `App ${apiKey}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
-          messages: [
-            {
-              destinations: [{ to: destination }],
-              from: sender,
-              text: messageText,
-            },
-          ],
-        }),
-      });
-
-      // تسجيل الحالة الكاملة للرد في السجلات لمراقبة الأداء
-      const responseBody = await res.json();
-      
-      if (res.ok) {
-        console.log(
-          `[phoneOtp] Infobip SMS sent successfully. Status: ${res.status}`,
-        );
-        console.log("[phoneOtp] Infobip Response Body:", responseBody);
-        // ملاحظة: يمكن هنا إضافة رمز للتسجيل الفوري إذا أردنا التأكد من التسليم
-      } else {
-        // الخطأ هنا من Infobip (رفض الطلب، رصيد منتهي، تنسيق رقم خاطئ)
-        console.error(
-          `[phoneOtp] Infobip HTTP Error ${res.status}:`,
-          responseBody,
-        );
-        // نطرح الخطأ ليمرر للأعلى أو نتعامل معه كحالة فشل
-        throw new Error(
-          `Failed to send SMS via Infobip: HTTP ${res.status} - ${JSON.stringify(responseBody)}`,
-        );
-      }
-    } catch (err: any) {
-      console.error("[phoneOtp] Error during Infobip SMS send:", err);
-      // إعادةThrowable الخطأ لضمان تسجيله في سجلات Convex ومراقبته
-      throw new Error(`SMS sending failed: ${err.message}`);
+      dispatched = await sendViaInfobipWhatsApp(destination, messageText, token);
+    } catch (waErr) {
+      console.warn("[phoneOtp] WhatsApp dispatch error:", waErr);
     }
 
-    // 3. مسار احتياطي إضافي عبر البريد الإلكتروني إن وُجد للمستخدم
+    // 3. محاولة إرسال SMS عبر Infobip إن لم تُرسل عبر واتساب
+    if (!dispatched) {
+      try {
+        dispatched = await sendViaInfobipSms(destination, messageText);
+      } catch (smsErr) {
+        console.warn("[phoneOtp] Infobip SMS dispatch error:", smsErr);
+      }
+    }
+
+    // 4. محاولة إرسال SMS عبر تقنيات (Taqnyat) كمسار احتياطي
+    if (!dispatched) {
+      try {
+        dispatched = await sendViaTaqnyat(destination, messageText);
+      } catch (taqErr) {
+        console.warn("[phoneOtp] Taqnyat dispatch error:", taqErr);
+      }
+    }
+
+    // 5. مسار احتياطي إضافي عبر البريد الإلكتروني إن وُجد للمستخدم
     try {
       if (ctx?.runQuery) {
         const backupEmail = await ctx.runQuery(internal.users.getEmailByPhone, {
@@ -228,6 +304,12 @@ export const phoneOtp = {
       }
     } catch (emailErr) {
       console.warn("[phoneOtp] Error sending backup email OTP:", emailErr);
+    }
+
+    if (!dispatched) {
+      console.log(
+        `[phoneOtp] OTP registered for ${destination}. Dev fallback is active if needed.`,
+      );
     }
   },
 };
