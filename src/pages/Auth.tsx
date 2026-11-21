@@ -59,9 +59,9 @@ export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
     ownerMode && !returnTo
       ? "/owner"
       : resolveRedirectAfterAuth(
-          returnTo,
-          redirectAfterAuth,
-        );
+        returnTo,
+        redirectAfterAuth,
+      );
 
   const [method, setMethod] = useState<"phone" | "email">("phone");
   const [step, setStep] = useState<"input" | "otp">("input");
@@ -258,11 +258,10 @@ export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
                     setMethod("phone");
                     setError(null);
                   }}
-                  className={`relative z-10 flex-1 py-2 text-xs font-bold rounded-[14px] transition-colors ${
-                    method === "phone"
+                  className={`relative z-10 flex-1 py-2 text-xs font-bold rounded-[14px] transition-colors ${method === "phone"
                       ? "text-[var(--clay-accent)]"
                       : "text-neutral-500 hover:text-neutral-700"
-                  }`}
+                    }`}
                 >
                   رقم الجوال
                 </button>
@@ -272,11 +271,10 @@ export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
                     setMethod("email");
                     setError(null);
                   }}
-                  className={`relative z-10 flex-1 py-2 text-xs font-bold rounded-[14px] transition-colors ${
-                    method === "email"
+                  className={`relative z-10 flex-1 py-2 text-xs font-bold rounded-[14px] transition-colors ${method === "email"
                       ? "text-[var(--clay-accent)]"
                       : "text-neutral-500 hover:text-neutral-700"
-                  }`}
+                    }`}
                 >
                   البريد الإلكتروني
                 </button>
