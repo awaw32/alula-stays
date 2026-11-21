@@ -24,11 +24,23 @@ import {
   Instagram,
   Twitter,
   Youtube,
+  LogOut,
+  Settings,
+  LayoutDashboard,
+  ShieldAlert,
 } from "lucide-react";
 import { useState } from "react";
-import { Link, useLocation, useSearchParams } from "react-router";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { NotificationBell } from "./NotificationBell";
 import { SearchFilterSheet } from "./SearchFilterSheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const navLinks = [
   { href: "/", label: "الرئيسية", icon: Home, requiresAuth: false },
@@ -77,8 +89,9 @@ function isActivePath(pathname: string, href: string) {
 
 export function Navigation() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { isAuthenticated, role, user } = useAuth();
+  const { isAuthenticated, role, user, signOut } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchSheetOpen, setSearchSheetOpen] = useState(false);
   const unreadCount = useQuery(
@@ -196,21 +209,96 @@ export function Navigation() {
             {/* Notification Bell */}
             {isAuthenticated && <NotificationBell />}
 
-            {/* User Account Button (Desktop) */}
-            <Link
-              to={isAuthenticated ? accountPath : "/auth"}
-              className={cn(
-                "hidden sm:flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all",
-                isAuthenticated
-                  ? "bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-200"
-                  : "bg-[var(--clay-accent)] text-white shadow-md hover:opacity-90",
-              )}
-            >
-              <div className="w-5 h-5 rounded-full bg-[var(--clay-gold)] flex items-center justify-center text-[10px] text-white font-bold">
-                {isAuthenticated && user?.name ? user.name.charAt(0) : <User className="w-3 h-3" />}
-              </div>
-              <span>{isAuthenticated ? accountLabel : "تسجيل الدخول"}</span>
-            </Link>
+            {/* User Account / Dropdown Menu (Desktop) */}
+            {isAuthenticated ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="hidden sm:flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-200 dark:hover:bg-neutral-700 cursor-pointer shadow-xs border border-neutral-200/60 dark:border-neutral-700"
+                    aria-label="قائمة حسابي"
+                  >
+                    <div className="w-6 h-6 rounded-full bg-[var(--clay-gold)] flex items-center justify-center text-[10px] text-white font-bold shadow-xs">
+                      {user?.name ? user.name.charAt(0) : <User className="w-3.5 h-3.5" strokeWidth={1.75} />}
+                    </div>
+                    <span>{user?.name || accountLabel}</span>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 p-2 rounded-2xl shadow-xl border border-neutral-200/80 dark:border-neutral-800 bg-white/95 dark:bg-[#1C1510]/95 backdrop-blur-xl">
+                  <DropdownMenuLabel className="font-bold text-xs text-neutral-500 dark:text-neutral-400 px-3 py-1.5 text-right">
+                    {user?.phone ? `الهاتف: ${user.phone}` : user?.email || "حساب شقق العلا"}
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
+                  
+                  <DropdownMenuItem
+                    onClick={() => navigate(accountPath)}
+                    className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-neutral-800 dark:text-neutral-200 cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                  >
+                    <span className="flex items-center gap-2">
+                      <LayoutDashboard className="w-4 h-4 text-[var(--clay-accent)]" strokeWidth={1.75} />
+                      {accountLabel}
+                    </span>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem
+                    onClick={() => navigate("/my-bookings")}
+                    className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-neutral-800 dark:text-neutral-200 cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-emerald-600" strokeWidth={1.75} />
+                      حجوزاتي
+                    </span>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem
+                    onClick={() => navigate("/favorites")}
+                    className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-neutral-800 dark:text-neutral-200 cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Heart className="w-4 h-4 text-rose-500" strokeWidth={1.75} />
+                      المفضلة
+                    </span>
+                  </DropdownMenuItem>
+
+                  {isAdmin && (
+                    <DropdownMenuItem
+                      onClick={() => navigate("/admin")}
+                      className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-purple-700 dark:text-purple-300 cursor-pointer hover:bg-purple-50 dark:hover:bg-purple-950/40"
+                    >
+                      <span className="flex items-center gap-2">
+                        <ShieldAlert className="w-4 h-4 text-purple-600" strokeWidth={1.75} />
+                        لوحة تحكم الإدارة
+                      </span>
+                    </DropdownMenuItem>
+                  )}
+
+                  <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
+
+                  <DropdownMenuItem
+                    onClick={async () => {
+                      await signOut();
+                      navigate("/");
+                    }}
+                    className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-red-600 dark:text-red-400 cursor-pointer hover:bg-red-50 dark:hover:bg-red-950/30"
+                  >
+                    <span className="flex items-center gap-2">
+                      <LogOut className="w-4 h-4" strokeWidth={1.75} />
+                      تسجيل الخروج
+                    </span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Link
+                to="/auth"
+                className="hidden sm:flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all bg-[var(--clay-accent)] text-white shadow-md hover:opacity-90"
+              >
+                <div className="w-5 h-5 rounded-full bg-[var(--clay-gold)] flex items-center justify-center text-[10px] text-white font-bold">
+                  <User className="w-3 h-3" strokeWidth={1.75} />
+                </div>
+                <span>تسجيل الدخول</span>
+              </Link>
+            )}
 
             {/* ─── Mobile: Search Icon + Hamburger ─── */}
             <div className="flex items-center gap-1.5 md:hidden">

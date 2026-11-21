@@ -26,20 +26,29 @@ import {
 
 const HERO_IMAGES = [
   {
+    // جبل الفيل (Elephant Rock) في العلا
     url: "https://images.unsplash.com/photo-1682687220063-4742bd7fd538?w=1800&q=85&auto=format&fit=crop",
     title: "جبل الفيل وتكوينات العلا الصخرية الساحرة",
   },
   {
-    url: "https://images.unsplash.com/photo-1578895101408-1a36b834405b?w=1800&q=85&auto=format&fit=crop",
-    title: "آثار الحِجر ومدائن صالح التاريخية",
-  },
-  {
+    // واحة نخيل العلا الخضراء بين الجبال
     url: "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=1800&q=85&auto=format&fit=crop",
-    title: "واحات ونخيل العلا الغنّاء بين الجبال",
+    title: "واحات ونخيل العلا الغنّاء بين الجبال التراثية",
   },
   {
+    // سماء وصحراء العلا الذهبية عند الغروب
     url: "https://images.unsplash.com/photo-1544644181-1484b3fdfc62?w=1800&q=85&auto=format&fit=crop",
     title: "جبال وسهول العلا الخلابة في لحظات الغروب",
+  },
+  {
+    // قصر الفريد ومدائن صالح (الحجر) الموقع الأثري العالمي في العلا
+    url: "https://images.unsplash.com/photo-1518684079-3c830dcef090?w=1800&q=85&auto=format&fit=crop",
+    title: "آثار الحِجر ومدائن صالح التاريخية في العلا",
+  },
+  {
+    // سماء العلا ورصد النجوم في صحراء الغراميل
+    url: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1800&q=85&auto=format&fit=crop",
+    title: "سماء العلا ورصد النجوم فوق التكوينات الصخرية",
   },
 ];
 

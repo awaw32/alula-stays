@@ -212,24 +212,37 @@ export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
           {/* Close 'X' Button — quiet top-left corner */}
           <button
             type="button"
-            onClick={() => navigate(returnTo || "/")}
-            aria-label="إغلاق"
-            className="absolute top-4 left-4 w-8 h-8 rounded-full bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 flex items-center justify-center text-neutral-500 dark:text-neutral-400 transition-colors z-20"
+            onClick={() => {
+              if (window.history.length > 1) {
+                navigate(-1);
+              } else {
+                navigate(returnTo || "/");
+              }
+            }}
+            aria-label="إغلاق والعودة"
+            className="absolute top-4 left-4 w-8 h-8 rounded-full bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 flex items-center justify-center text-neutral-500 dark:text-neutral-400 transition-colors z-20 cursor-pointer"
           >
             <X className="w-4 h-4" strokeWidth={1.75} />
           </button>
 
           <CardHeader className="flex flex-col items-center pb-2 pt-7 px-6 text-center">
-            {/* Centered Brand Mark */}
-            <div className="mb-3 flex items-center gap-2">
-              <img
-                src="/logo-icon.png"
-                alt="شقق العلا"
-                className="h-10 w-auto object-contain"
-              />
-              <span className="font-bold text-xl tracking-tight text-neutral-900 dark:text-neutral-100">
-                شقق العلا
-              </span>
+            {/* Centered Brand Mark with Luxury Emblem */}
+            <div className="mb-3.5 flex items-center justify-center gap-3">
+              <div className="relative w-12 h-12 rounded-2xl p-1 bg-gradient-to-tr from-[#C25E2E] via-[#D4A574] to-[#F59E0B] shadow-md shadow-[#C25E2E]/20 flex items-center justify-center">
+                <img
+                  src="/logo-icon.png"
+                  alt="شقق العلا"
+                  className="w-10 h-10 object-contain drop-shadow"
+                />
+              </div>
+              <div className="text-right">
+                <span className="block font-black text-2xl tracking-tight bg-gradient-to-l from-[#3D2B1F] via-[#732F12] to-[#C25E2E] dark:from-white dark:via-[#F5E6D8] dark:to-[#D4A574] bg-clip-text text-transparent">
+                  شقق العلا
+                </span>
+                <span className="block text-[10px] font-extrabold tracking-widest text-[#D4A574] dark:text-[#E8956F] -mt-1">
+                  ALULA LUXURY STAYS
+                </span>
+              </div>
             </div>
 
             {/* Single subtitle — no "أهلاً بك" */}
