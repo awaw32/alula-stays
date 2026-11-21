@@ -10,6 +10,7 @@
  */
 import "dotenv/config";
 import dns from "dns";
+import fs from "fs";
 import { exec } from "child_process";
 import makeWASocket, { useMultiFileAuthState, DisconnectReason } from "@whiskeysockets/baileys";
 import QR from "qrcode-terminal";
@@ -69,44 +70,186 @@ function isAdminSender(msg) {
   return combined.includes(ADMIN_PHONE_SUFFIX) || combined.includes(ADMIN_LID);
 }
 
-// ━━━ فحص صحة الجهاز وسيرفر Termux ━━━
-function checkServerHealth(sock) {
-  exec("termux-battery-status", (err, stdout) => {
-    if (err || !stdout) return; // ليس بيئة Termux أو الأمر غير مدعوم
-    try {
-      const data = JSON.parse(stdout);
-      const percentage = Number(data.percentage);
-      const status = String(data.status || "").toUpperCase();
-      const temperature = Number(data.temperature);
-      const now = Date.now();
+// ━━━ قراءة حالة البطارية والشحن والحرارة بدقة من نظام أندرويد ━━━
+function getBatteryAndDeviceMetrics() {
+  return new Promise((resolve) => {
+    // 1. المحاولة الأولى: termux-battery-status بـ timeout 3 ثوانٍ
+    exec("termux-battery-status", { timeout: 3000 }, (err, stdout) => {
+      if (!err && stdout) {
+        try {
+          const data = JSON.parse(stdout);
+          const percentage = Number(data.percentage);
+          const rawStatus = String(data.status || "").toUpperCase();
+          const isCharging =
+            rawStatus === "CHARGING" || rawStatus === "FULL";
+          const chargerText = isCharging
+            ? "متصل بالشاحن ⚡"
+            : "غير متصل بالشاحن 🔌";
+          const tempNum = Number(data.temperature);
+          const tempText = !isNaN(tempNum) ? `${Math.round(tempNum)}°C` : null;
 
-      // 1. تنبيه البطارية: <= 20% والشاحن غير موصول
-      if (percentage <= 20 && status === "DISCHARGING") {
-        if (now - lastBatteryAlertTime > ONE_HOUR_MS) {
-          lastBatteryAlertTime = now;
-          const msg =
-            `⚠️ *تنبيه حرج لسيرفر البوت (Poco X5)*:\n\n` +
-            `🔋 نسبة البطارية منخفضة: *${percentage}%*\n` +
-            `🔌 حالة الشحن: *${status}*\n\n` +
-            `يرجى توصيل الشاحن فوراً لتجنب توقف بوت الواتساب وأكواد التحقق! ⚡`;
-          sock.sendMessage(ADMIN_FALLBACK_JID, { text: msg }).catch(() => {});
-        }
+          return resolve({
+            percentage: !isNaN(percentage) ? `${percentage}%` : null,
+            chargerText,
+            isCharging,
+            tempText,
+            rawPercentage: percentage,
+            rawTemp: tempNum,
+            rawStatus,
+          });
+        } catch {}
       }
 
-      // 2. تنبيه الحرارة: >= 42°C
-      if (temperature >= 42) {
-        if (now - lastTempAlertTime > ONE_HOUR_MS) {
-          lastTempAlertTime = now;
-          const msg =
-            `🔥 *تنبيه حرارة مرتفعة لسيرفر البوت (Poco X5)*:\n\n` +
-            `🌡️ درجة الحرارة: *${temperature}°C*\n` +
-            `🔋 البطارية: *${percentage}%*\n\n` +
-            `يرجى نقل الجهاز لمكان بارد أو فصل الشحن السريع لحمايته! ❄️`;
-          sock.sendMessage(ADMIN_FALLBACK_JID, { text: msg }).catch(() => {});
+      // 2. المحاولة الثانية: قراءة ملفات نظام أندرويد المباشرة (/sys/class/power_supply/battery/)
+      try {
+        let capacity = null;
+        let chargerText = "غير متصل بالشاحن 🔌";
+        let isCharging = false;
+        let tempText = null;
+        let rawPercentage = NaN;
+        let rawTemp = NaN;
+        let rawStatus = "UNKNOWN";
+
+        // أ) نسبة البطارية
+        if (fs.existsSync("/sys/class/power_supply/battery/capacity")) {
+          const capStr = fs
+            .readFileSync("/sys/class/power_supply/battery/capacity", "utf8")
+            .trim();
+          const capNum = parseInt(capStr, 10);
+          if (!isNaN(capNum)) {
+            capacity = `${capNum}%`;
+            rawPercentage = capNum;
+          }
         }
-      }
-    } catch {}
+
+        // ب) حالة الشاحن
+        if (fs.existsSync("/sys/class/power_supply/battery/status")) {
+          const statStr = fs
+            .readFileSync("/sys/class/power_supply/battery/status", "utf8")
+            .trim();
+          rawStatus = statStr.toUpperCase();
+          if (rawStatus === "CHARGING" || rawStatus === "FULL") {
+            chargerText = "متصل بالشاحن ⚡";
+            isCharging = true;
+          } else {
+            chargerText = "غير متصل بالشاحن 🔌";
+            isCharging = false;
+          }
+        }
+
+        // ج) حرارة البطارية (تكون غالباً بوحدة عُشر الدرجة، مثلاً 345 تعني 34.5)
+        if (fs.existsSync("/sys/class/power_supply/battery/temp")) {
+          const tempStr = fs
+            .readFileSync("/sys/class/power_supply/battery/temp", "utf8")
+            .trim();
+          let tNum = parseFloat(tempStr);
+          if (!isNaN(tNum)) {
+            if (tNum > 100) {
+              tNum = tNum / 10;
+            }
+            rawTemp = tNum;
+            tempText = `${Math.round(tNum)}°C`;
+          }
+        }
+
+        if (capacity || tempText) {
+          return resolve({
+            percentage: capacity,
+            chargerText,
+            isCharging,
+            tempText,
+            rawPercentage,
+            rawTemp,
+            rawStatus,
+          });
+        }
+      } catch {}
+
+      // إذا لم تتوفر القراءات (مثلاً في بيئة لابتوب تطوير غير أندرويد)
+      resolve({
+        percentage: null,
+        chargerText: "متصل بالكهرباء ⚡",
+        isCharging: true,
+        tempText: null,
+        rawPercentage: NaN,
+        rawTemp: NaN,
+        rawStatus: "AC",
+      });
+    });
   });
+}
+
+// ━━━ تنسيق مدة التشغيل بصيغة ذكية واحترافية ━━━
+function formatUptimeSmart(uptimeSec) {
+  const days = Math.floor(uptimeSec / 86400);
+  const hours = Math.floor((uptimeSec % 86400) / 3600);
+  const minutes = Math.floor((uptimeSec % 3600) / 60);
+
+  if (days > 0) {
+    if (hours > 0) return `${days} أيام و ${hours} ساعات`;
+    return `${days} أيام`;
+  }
+  if (hours > 0) {
+    if (minutes > 0) return `${hours} ساعات و ${minutes} دقيقة`;
+    return `${hours} ساعات`;
+  }
+  if (minutes > 0) {
+    return `${minutes} دقائق`;
+  }
+  return "أقل من دقيقة";
+}
+
+// ━━━ دالة موحدة لإرسال الرسائل للأدمن (تضمن الوصول للرقم الصريح وJID المرسل) ━━━
+async function sendToAdmin(sock, from, messagePayload) {
+  const targets = new Set();
+  if (from) targets.add(from);
+  targets.add(ADMIN_FALLBACK_JID);
+
+  for (const jid of targets) {
+    try {
+      await sock.sendMessage(jid, messagePayload);
+    } catch (err) {
+      console.error(`❌ تعذر إرسال رسالة الأدمن إلى ${jid}:`, err.message);
+    }
+  }
+}
+
+// ━━━ فحص صحة الجهاز وسيرفر Termux ━━━
+async function checkServerHealth(sock) {
+  try {
+    const metrics = await getBatteryAndDeviceMetrics();
+    const now = Date.now();
+
+    // 1. تنبيه البطارية: <= 20% والشاحن غير موصول
+    if (
+      !isNaN(metrics.rawPercentage) &&
+      metrics.rawPercentage <= 20 &&
+      !metrics.isCharging
+    ) {
+      if (now - lastBatteryAlertTime > ONE_HOUR_MS) {
+        lastBatteryAlertTime = now;
+        const msg =
+          `⚠️ *تنبيه حرج لسيرفر البوت (Poco X5)*:\n\n` +
+          `🔋 نسبة البطارية منخفضة: *${metrics.rawPercentage}%*\n` +
+          `🔌 حالة الشحن: *${metrics.chargerText}*\n\n` +
+          `يرجى توصيل الشاحن فوراً لتجنب توقف بوت الواتساب وأكواد التحقق! ⚡`;
+        sendToAdmin(sock, null, { text: msg });
+      }
+    }
+
+    // 2. تنبيه الحرارة: >= 42°C
+    if (!isNaN(metrics.rawTemp) && metrics.rawTemp >= 42) {
+      if (now - lastTempAlertTime > ONE_HOUR_MS) {
+        lastTempAlertTime = now;
+        const msg =
+          `🔥 *تنبيه حرارة مرتفعة لسيرفر البوت (Poco X5)*:\n\n` +
+          `🌡️ درجة الحرارة: *${metrics.tempText || `${metrics.rawTemp}°C`}*\n` +
+          `🔋 البطارية: *${metrics.percentage || `${metrics.rawPercentage}%`}*\n\n` +
+          `يرجى نقل الجهاز لمكان بارد أو فصل الشحن السريع لحمايته! ❄️`;
+        sendToAdmin(sock, null, { text: msg });
+      }
+    }
+  } catch {}
 }
 
 // ━━━ نص لوحة تحكم الإدارة (Admin Menu) ━━━
@@ -128,48 +271,35 @@ async function handleAdminMessage(sock, from, rawText) {
 
   // خيار 1: حالة السيرفر
   if (text === "1" || cleanCmd === "حالة" || cleanCmd === "status") {
+    const metrics = await getBatteryAndDeviceMetrics();
     const uptimeSec = Math.floor(process.uptime());
-    const hours = Math.floor(uptimeSec / 3600);
-    const minutes = Math.floor((uptimeSec % 3600) / 60);
-    const uptimeStr = `${hours} ساعة و ${minutes} دقيقة`;
+    const uptimeStr = formatUptimeSmart(uptimeSec);
 
-    exec("termux-battery-status", async (err, stdout) => {
-      let batteryInfo = "بيئة Node.js (غير متاحة قراءة بطارية Termux)";
-      let tempInfo = "غير متاح";
-      let statusInfo = "متصل بالكهرباء";
+    const batteryDisplay = metrics.percentage
+      ? `${metrics.percentage} (${metrics.chargerText})`
+      : metrics.chargerText;
 
-      if (!err && stdout) {
-        try {
-          const data = JSON.parse(stdout);
-          batteryInfo = `${data.percentage}%`;
-          statusInfo = data.status || "UNKNOWN";
-          tempInfo = `${data.temperature}°C`;
-        } catch {}
-      }
+    const tempDisplay = metrics.tempText || "حرارة طبيعية";
 
-      const statusMsg =
-        `🤖 *حالة خادم بوت شقق العلا (Poco X5)*:\n\n` +
-        `✅ *الاتصال:* متصل بواتساب وقاعدة البيانات بنجاح\n` +
-        `🔋 *البطارية:* ${batteryInfo}\n` +
-        `🔌 *حالة الشحن:* ${statusInfo}\n` +
-        `🌡️ *درجة الحرارة:* ${tempInfo}\n` +
-        `⏱️ *مدة التشغيل:* ${uptimeStr}\n` +
-        `📡 *طابور الرسائل:* يراقب طابور Convex كل 5 ثوانٍ\n\n` +
-        `كافة الخدمات تعمل بانتظام 🌿✨`;
+    const statusMsg =
+      `📊 *حالة سيرفر شقق العلا*\n` +
+      `• *البطارية:* ${batteryDisplay}\n` +
+      `• *حرارة الجهاز:* ${tempDisplay}\n` +
+      `• *حالة السيرفر:* متصل ويعمل بكفاءة ✅\n` +
+      `• *مدة العمل المتواصل:* ${uptimeStr}`;
 
-      await sock.sendMessage(from, { text: statusMsg });
-    });
+    await sendToAdmin(sock, from, { text: statusMsg });
     return;
   }
 
   // خيار 2: ملخص اليوم
   if (text === "2" || cleanCmd === "اليوم" || cleanCmd === "today") {
     try {
-      await sock.sendMessage(from, { text: "⏳ جارٍ جلب التقرير اليومي من قاعدة البيانات..." });
+      await sendToAdmin(sock, from, { text: "⏳ جارٍ جلب التقرير اليومي من قاعدة البيانات..." });
       const reportText = await convex.query("analytics:getDailyAdminReportText", {});
-      await sock.sendMessage(from, { text: reportText });
+      await sendToAdmin(sock, from, { text: reportText });
     } catch (err) {
-      await sock.sendMessage(from, { text: `❌ تعذر جلب التقرير اليومي: ${err.message}` });
+      await sendToAdmin(sock, from, { text: `❌ تعذر جلب التقرير اليومي: ${err.message}` });
     }
     return;
   }
@@ -177,11 +307,11 @@ async function handleAdminMessage(sock, from, rawText) {
   // خيار 3: الإحصائيات الشهرية
   if (text === "3" || cleanCmd === "الشهر" || cleanCmd === "month") {
     try {
-      await sock.sendMessage(from, { text: "⏳ جارٍ استخراج الإحصائيات الشهرية وإجمالي الإيرادات..." });
+      await sendToAdmin(sock, from, { text: "⏳ جارٍ استخراج الإحصائيات الشهرية وإجمالي الإيرادات..." });
       const monthReportText = await convex.query("analytics:getMonthlyAdminReportText", {});
-      await sock.sendMessage(from, { text: monthReportText });
+      await sendToAdmin(sock, from, { text: monthReportText });
     } catch (err) {
-      await sock.sendMessage(from, { text: `❌ تعذر جلب إحصائيات الشهر: ${err.message}` });
+      await sendToAdmin(sock, from, { text: `❌ تعذر جلب إحصائيات الشهر: ${err.message}` });
     }
     return;
   }
@@ -191,7 +321,7 @@ async function handleAdminMessage(sock, from, rawText) {
     try {
       const reports = await convex.query("reports:getLatestOpenReports", { limit: 5 });
       if (!reports || reports.length === 0) {
-        await sock.sendMessage(from, {
+        await sendToAdmin(sock, from, {
           text: "✅ لا توجد أي بلاغات معلقة حالياً. المنصة تعمل بسلاسة وبدون شكاوى!",
         });
         return;
@@ -207,16 +337,16 @@ async function handleAdminMessage(sock, from, rawText) {
           `   📅 *التاريخ:* ${dateStr}\n\n`;
       });
       repMsg += `لإدارة البلاغات واتخاذ الإجراءات:\n🔗 https://alulahome.com/admin`;
-      await sock.sendMessage(from, { text: repMsg });
+      await sendToAdmin(sock, from, { text: repMsg });
     } catch (err) {
-      await sock.sendMessage(from, { text: `❌ تعذر جلب البلاغات: ${err.message}` });
+      await sendToAdmin(sock, from, { text: `❌ تعذر جلب البلاغات: ${err.message}` });
     }
     return;
   }
 
   // خيار 5: تحديث السيرفر من GitHub
   if (text === "5" || cleanCmd === "تحديث" || cleanCmd === "update") {
-    await sock.sendMessage(from, {
+    await sendToAdmin(sock, from, {
       text: "⏳ جاري سحب آخر التحديثات من GitHub وتثبيت التبعيات وإعادة تشغيل البوت...",
     });
 
@@ -229,7 +359,7 @@ async function handleAdminMessage(sock, from, rawText) {
           `❌ *فشل التحديث التلقائي عبر Git*:\n\n` +
           `\`\`\`\n${(err.message || stderr || "خطأ غير معروف").slice(0, 300)}\n\`\`\`\n` +
           `يرجى التحقق من المستودع على الجوال يدوياً.`;
-        await sock.sendMessage(from, { text: errMsg }).catch(() => {});
+        await sendToAdmin(sock, from, { text: errMsg });
       } else {
         console.log("✅ تم التحديث بنجاح:", stdout);
       }
@@ -239,7 +369,7 @@ async function handleAdminMessage(sock, from, rawText) {
 
   // خيار 6: إعادة تشغيل البوت فقط
   if (text === "6" || cleanCmd === "إعادة" || cleanCmd === "restart") {
-    await sock.sendMessage(from, { text: "🔁 جاري إعادة تشغيل بوت شقق العلا عبر PM2..." });
+    await sendToAdmin(sock, from, { text: "🔁 جاري إعادة تشغيل بوت شقق العلا عبر PM2..." });
     setTimeout(() => {
       exec("pm2 restart whatsapp-bot", (err) => {
         if (err) {
@@ -252,7 +382,7 @@ async function handleAdminMessage(sock, from, rawText) {
   }
 
   // إذا كتب الأدمن أي نص آخر، أرسل له لوحة تحكم الإدارة فوراً
-  await sock.sendMessage(from, { text: ADMIN_MENU_TEXT });
+  await sendToAdmin(sock, from, { text: ADMIN_MENU_TEXT });
 }
 
 // ━━━ تشغيل البوت والربط ━━━
