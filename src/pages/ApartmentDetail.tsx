@@ -161,7 +161,6 @@ export default function ApartmentDetail() {
   const isOwnerOfApartment = !!(currentUser && apartment && (apartment as { ownerId?: string }).ownerId === currentUser._id);
   const toggleFavorite = useMutation(api.favorites.toggle);
   const createReport = useMutation(api.reports.create);
-  const getOrCreateConversation = useMutation(api.messages.getOrCreate);
   const createBooking = useMutation(api.bookings.create);
   const createReview = useMutation(api.reviews.create);
   const createCheckoutSession = useAction(api.payments.createCheckoutSession);
@@ -451,20 +450,20 @@ export default function ApartmentDetail() {
     }
   };
 
-  const scrollToSection = (sectionId: "specs" | "reviews" | "map" | "rules") => {
+  const handleTabChange = (sectionId: "specs" | "reviews" | "map" | "rules") => {
     setActiveTab(sectionId);
-    const element = document.getElementById(sectionId);
-    if (element) {
-      const offset = 120;
+    const navEl = document.getElementById("details-tabs-nav");
+    if (navEl) {
+      const offset = 80;
       const bodyRect = document.body.getBoundingClientRect().top;
-      const elementRect = element.getBoundingClientRect().top;
-      const elementPosition = elementRect - bodyRect;
-      const offsetPosition = elementPosition - offset;
-
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: "smooth",
-      });
+      const navRect = navEl.getBoundingClientRect().top;
+      const offsetPosition = navRect - bodyRect - offset;
+      if (window.scrollY > offsetPosition) {
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: "smooth",
+        });
+      }
     }
   };
 
@@ -640,12 +639,12 @@ export default function ApartmentDetail() {
         {/* ========================================================================= */}
         {/* 2. STICKY TABS BAR (المواصفات | التقييمات | الخريطة | الشروط) */}
         {/* ========================================================================= */}
-        <nav aria-label="أقسام تفاصيل الإقامة" className="sticky top-14 sm:top-16 z-30 bg-[#FDFBF7]/95 dark:bg-[#15100C]/95 backdrop-blur-md border-b border-[var(--border)] px-4 mt-2">
+        <nav id="details-tabs-nav" aria-label="أقسام تفاصيل الإقامة" className="sticky top-14 sm:top-16 z-30 bg-[#FDFBF7]/95 dark:bg-[#15100C]/95 backdrop-blur-md border-b border-[var(--border)] px-4 mt-2">
           <div className="flex items-center justify-around gap-2 text-sm font-medium">
             <button
               type="button"
-              onClick={() => scrollToSection("specs")}
-              className={`py-3.5 px-3 border-b-2 transition-all relative whitespace-nowrap ${
+              onClick={() => handleTabChange("specs")}
+              className={`py-3.5 px-3 border-b-2 transition-all relative whitespace-nowrap cursor-pointer ${
                 activeTab === "specs"
                   ? "border-[#5E2590] dark:border-[#9D5BD2] text-[#5E2590] dark:text-[#B47AE0] font-bold"
                   : "border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
@@ -656,8 +655,8 @@ export default function ApartmentDetail() {
 
             <button
               type="button"
-              onClick={() => scrollToSection("reviews")}
-              className={`py-3.5 px-3 border-b-2 transition-all relative whitespace-nowrap ${
+              onClick={() => handleTabChange("reviews")}
+              className={`py-3.5 px-3 border-b-2 transition-all relative whitespace-nowrap cursor-pointer ${
                 activeTab === "reviews"
                   ? "border-[#5E2590] dark:border-[#9D5BD2] text-[#5E2590] dark:text-[#B47AE0] font-bold"
                   : "border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
@@ -668,8 +667,8 @@ export default function ApartmentDetail() {
 
             <button
               type="button"
-              onClick={() => scrollToSection("map")}
-              className={`py-3.5 px-3 border-b-2 transition-all relative whitespace-nowrap ${
+              onClick={() => handleTabChange("map")}
+              className={`py-3.5 px-3 border-b-2 transition-all relative whitespace-nowrap cursor-pointer ${
                 activeTab === "map"
                   ? "border-[#5E2590] dark:border-[#9D5BD2] text-[#5E2590] dark:text-[#B47AE0] font-bold"
                   : "border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
@@ -680,8 +679,8 @@ export default function ApartmentDetail() {
 
             <button
               type="button"
-              onClick={() => scrollToSection("rules")}
-              className={`py-3.5 px-3 border-b-2 transition-all relative whitespace-nowrap ${
+              onClick={() => handleTabChange("rules")}
+              className={`py-3.5 px-3 border-b-2 transition-all relative whitespace-nowrap cursor-pointer ${
                 activeTab === "rules"
                   ? "border-[#5E2590] dark:border-[#9D5BD2] text-[#5E2590] dark:text-[#B47AE0] font-bold"
                   : "border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
@@ -694,607 +693,668 @@ export default function ApartmentDetail() {
 
         <div className="px-4 sm:px-0 py-5 space-y-5">
           {/* ========================================================================= */}
-          {/* 3. ضمان شقق العلا (Matching Gathern Guarantee Banner) */}
+          {/* تبويب 1: المواصفات (كل ما يخص تفاصيل الشقة، السعر، الوصف، المرافق، والحجز) */}
           {/* ========================================================================= */}
-          <section aria-labelledby="guarantee-heading" className="rounded-2xl p-4 bg-[#F5EFFB] dark:bg-[#281636] border border-[#E4D1F5] dark:border-[#4B2968] flex items-center justify-between shadow-xs transition-all hover:shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-xl bg-[#5E2590] dark:bg-[#7E37BD] flex items-center justify-center text-white shrink-0 shadow-sm">
-                <ShieldCheck className="w-6 h-6" />
-              </div>
-              <div>
-                <h2 id="guarantee-heading" className="font-bold text-sm text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
-                  <span>ضمان شقق العلا</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#5E2590]/10 dark:bg-[#7E37BD]/30 text-[#5E2590] dark:text-[#C596F0] font-semibold">موثق</span>
-                </h2>
-                <p className="text-xs text-neutral-600 dark:text-neutral-300 mt-0.5">
-                  نضمن لك صحة المعلومات ونظافة واكتمال المكان 100%
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setShowGuaranteeModal(true)}
-              className="text-xs font-bold text-[#5E2590] dark:text-[#C596F0] hover:underline flex items-center gap-0.5 shrink-0 pr-2"
+          {activeTab === "specs" && (
+            <motion.div
+              key="specs-tab"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              className="space-y-5"
             >
-              <span>اعرف أكثر</span>
-              <ChevronLeft className="w-3.5 h-3.5" />
-            </button>
-          </section>
+              {/* 3. ضمان شقق العلا (Matching Gathern Guarantee Banner) */}
+              <section aria-labelledby="guarantee-heading" className="rounded-2xl p-4 bg-[#F5EFFB] dark:bg-[#281636] border border-[#E4D1F5] dark:border-[#4B2968] flex items-center justify-between shadow-xs transition-all hover:shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-[#5E2590] dark:bg-[#7E37BD] flex items-center justify-center text-white shrink-0 shadow-sm">
+                    <ShieldCheck className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 id="guarantee-heading" className="font-bold text-sm text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
+                      <span>ضمان شقق العلا</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#5E2590]/10 dark:bg-[#7E37BD]/30 text-[#5E2590] dark:text-[#C596F0] font-semibold">موثق</span>
+                    </h2>
+                    <p className="text-xs text-neutral-600 dark:text-neutral-300 mt-0.5">
+                      نضمن لك صحة المعلومات ونظافة واكتمال المكان 100%
+                    </p>
+                  </div>
+                </div>
 
-          {/* ========================================================================= */}
-          {/* 4. TITLE & KEY METADATA (Matching Gathern First Block) */}
-          {/* ========================================================================= */}
-          <section id="specs" aria-labelledby="specs-heading" className="bg-white dark:bg-[#1E1712] rounded-2xl p-5 border border-[var(--border)] shadow-xs space-y-3.5">
-            {/* Title with Unit Number */}
-            <div>
-              <h1 id="specs-heading" className="text-xl sm:text-2xl font-black text-neutral-900 dark:text-neutral-100 leading-snug">
-                {getApartmentTitle(apartment)}{" "}
-                <span className="text-sm font-normal text-neutral-400 dark:text-neutral-500">
-                  ({String(apartment._id).slice(-6)})
-                </span>
-              </h1>
-            </div>
+                <button
+                  type="button"
+                  onClick={() => setShowGuaranteeModal(true)}
+                  className="text-xs font-bold text-[#5E2590] dark:text-[#C596F0] hover:underline flex items-center gap-0.5 shrink-0 pr-2"
+                >
+                  <span>اعرف أكثر</span>
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+              </section>
 
-            {/* Rating row: ★ 10.0 (38) تقييم */}
-            <div className="flex items-center gap-2 text-sm">
-              <div className="flex items-center gap-1 text-amber-500 font-bold">
-                <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                <span>10.0</span>
-              </div>
-              <span className="text-neutral-400">•</span>
-              <button
-                type="button"
-                onClick={() => scrollToSection("reviews")}
-                className="text-neutral-600 dark:text-neutral-300 hover:text-[#5E2590] hover:underline"
-              >
-                ({apartment.reviewCount || 38}) تقييم
-              </button>
-              {apartment.tourismLicenseNumber && (
-                <>
+              {/* 4. TITLE & KEY METADATA */}
+              <section id="specs" aria-labelledby="specs-heading" className="bg-white dark:bg-[#1E1712] rounded-2xl p-5 border border-[var(--border)] shadow-xs space-y-3.5">
+                <div>
+                  <h1 id="specs-heading" className="text-xl sm:text-2xl font-black text-neutral-900 dark:text-neutral-100 leading-snug">
+                    {getApartmentTitle(apartment)}{" "}
+                    <span className="text-sm font-normal text-neutral-400 dark:text-neutral-500">
+                      ({String(apartment._id).slice(-6)})
+                    </span>
+                  </h1>
+                </div>
+
+                {/* Rating row: ★ 10.0 (38) تقييم */}
+                <div className="flex items-center gap-2 text-sm">
+                  <div className="flex items-center gap-1 text-amber-500 font-bold">
+                    <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                    <span>10.0</span>
+                  </div>
                   <span className="text-neutral-400">•</span>
-                  <span className="text-emerald-700 dark:text-emerald-400 font-semibold text-xs flex items-center gap-1">
-                    <CheckCircle className="w-3.5 h-3.5" />
-                    مرخص سياحياً
-                  </span>
-                </>
-              )}
-            </div>
-
-            {/* Attribute List */}
-            <div className="space-y-2 pt-1 text-sm text-neutral-700 dark:text-neutral-300">
-              <div className="flex items-center gap-2.5">
-                <MapPin className="w-4 h-4 text-neutral-400 shrink-0" />
-                <span>العلا - {getApartmentLocation(apartment)}</span>
-              </div>
-
-              <div className="flex items-center gap-2.5">
-                <Maximize className="w-4 h-4 text-neutral-400 shrink-0" />
-                <span>مساحة الوحدة {apartment.area} م²</span>
-              </div>
-
-              <div className="flex items-center gap-2.5">
-                <Users className="w-4 h-4 text-neutral-400 shrink-0" />
-                <span>مخصص لـ عوائل وعزاب (يتسع حتى {apartment.maxGuests} ضيوف)</span>
-              </div>
-
-              <div className="flex items-center gap-2.5">
-                <ShieldCheck className="w-4 h-4 text-neutral-400 shrink-0" />
-                <span>لا يتطلب تأمين عند الوصول (أو تأمين مسترد بالكامل)</span>
-              </div>
-            </div>
-
-            {/* ========================================================================= */}
-            {/* 5. TABBY & TAMARA BANNER (قسمها على 4) */}
-            {/* ========================================================================= */}
-            <div className="mt-4 pt-4 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900/60">
-              <div className="flex items-center gap-2">
-                <span className="text-xs sm:text-sm font-semibold text-neutral-800 dark:text-neutral-200">
-                  قسمها على 4، بدون رسوم تأخير
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-md bg-[#00D5A0] text-black font-black text-xs tracking-tight">
-                  tabby
-                </span>
-                <span className="px-2 py-0.5 rounded-md bg-[#FFAE9E] text-black font-bold text-xs tracking-tight">
-                  tamara
-                </span>
-              </div>
-            </div>
-          </section>
-
-          {/* ========================================================================= */}
-          {/* 6. IN-PAGE PRICE & SELECTION PILL (Matching Gathern Button Row) */}
-          {/* ========================================================================= */}
-          <section aria-labelledby="pricing-summary-heading" className="bg-white dark:bg-[#1E1712] rounded-2xl p-4 border border-[var(--border)] shadow-xs flex items-center justify-between">
-            <div>
-              <h2 id="pricing-summary-heading" className="sr-only">ملخص السعر</h2>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl font-black text-[#5E2590] dark:text-[#C596F0]">
-                  {apartment.price.toLocaleString("ar-SA")} ر.س
-                </span>
-                <span className="text-xs text-neutral-500 dark:text-neutral-400">/ ليلة</span>
-              </div>
-              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 underline">
-                إجمالي ({totalNights} {totalNights === 1 ? "ليلة واحدة" : "ليالٍ"}) {totalPrice.toLocaleString("ar-SA")} ر.س شامل الضريبة
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                const bookingCard = document.getElementById("booking-card");
-                if (bookingCard) {
-                  bookingCard.scrollIntoView({ behavior: "smooth" });
-                } else {
-                  void handleBooking();
-                }
-              }}
-              className="px-8 py-3 rounded-xl bg-[#5E2590] hover:bg-[#4E1E78] active:scale-95 text-white font-bold text-base shadow-md transition-all cursor-pointer"
-            >
-              اختر
-            </button>
-          </section>
-
-          {/* ========================================================================= */}
-          {/* 7. DESCRIPTION (الوصف مع تصريح وزارة السياحة) */}
-          {/* ========================================================================= */}
-          <section aria-labelledby="desc-heading" className="bg-white dark:bg-[#1E1712] rounded-2xl p-5 border border-[var(--border)] shadow-xs space-y-3">
-            <h2 id="desc-heading" className="text-base font-black text-neutral-900 dark:text-neutral-100">الوصف</h2>
-
-            <div className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 pb-1">
-              رقم تصريح وزارة السياحة:{" "}
-              <span className="font-mono text-neutral-800 dark:text-neutral-200">
-                {apartment.tourismLicenseNumber || "50040461"}
-              </span>
-            </div>
-
-            <div className="relative text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed">
-              <p className={isDescExpanded ? "" : "line-clamp-3 whitespace-pre-line"}>
-                {getApartmentDescription(apartment)}
-              </p>
-              <button
-                type="button"
-                onClick={() => setIsDescExpanded(!isDescExpanded)}
-                className="mt-2 text-xs font-bold text-[#5E2590] dark:text-[#C596F0] hover:underline block"
-              >
-                {isDescExpanded ? "عرض أقل ▲" : "المزيد ... ▼"}
-              </button>
-            </div>
-          </section>
-
-          {/* ========================================================================= */}
-          {/* 8. ABOUT HOST (عن المضيف) */}
-          {/* ========================================================================= */}
-          <section aria-labelledby="host-heading" className="bg-white dark:bg-[#1E1712] rounded-2xl p-5 border border-[var(--border)] shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 id="host-heading" className="text-base font-black text-neutral-900 dark:text-neutral-100">عن المضيف</h2>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!apartmentId) return;
-                  getOrCreateConversation({ apartmentId })
-                    .then((cid) => navigate(`/messages/${cid}`))
-                    .catch((err) => toast.error(getErrorMessage(err, "تعذر بدء المحادثة مع المضيف")));
-                }}
-                className="text-xs font-bold text-[#5E2590] dark:text-[#C596F0] flex items-center gap-0.5 hover:underline"
-              >
-                <span>مراسلة المضيف</span>
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            <div className="flex items-center gap-3.5">
-              <div className="w-14 h-14 rounded-full bg-[#5E2590] text-white flex items-center justify-center text-xl font-bold shrink-0 shadow-sm">
-                س
-              </div>
-              <div className="space-y-0.5">
-                <h3 className="font-bold text-neutral-900 dark:text-neutral-100 text-base">سلطان العلا</h3>
-                <div className="flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400">
-                  <span className="flex items-center gap-1 text-amber-500 font-bold">
-                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                    <span>10.0 (90 تقييم)</span>
-                  </span>
-                  <span>•</span>
-                  <span>يستضيف وحدات معتمدة على المنصة</span>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* ========================================================================= */}
-          {/* 9. AMENITIES ACCORDIONS (المرافق والتجهيزات) */}
-          {/* ========================================================================= */}
-          <section aria-labelledby="amenities-heading" className="bg-white dark:bg-[#1E1712] rounded-2xl p-5 border border-[var(--border)] shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 id="amenities-heading" className="text-base font-black text-neutral-900 dark:text-neutral-100">المرافق</h2>
-              <button
-                type="button"
-                onClick={expandAllAccordions}
-                className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-200 transition-colors"
-              >
-                إظهار الكل
-              </button>
-            </div>
-
-            <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
-              {amenityCategories.map((cat) => {
-                const isOpen = expandedAccordions[cat.id] ?? false;
-                const CatIcon = cat.icon;
-                return (
-                  <div key={cat.id} className="py-3">
-                    <button
-                      type="button"
-                      onClick={() => toggleAccordion(cat.id)}
-                      className="w-full flex items-center justify-between text-right font-medium text-sm text-neutral-800 dark:text-neutral-200 hover:text-[#5E2590] transition-colors py-1"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <CatIcon className="w-4 h-4 text-neutral-400 shrink-0" />
-                        <span>{cat.title}</span>
-                      </div>
-                      {isOpen ? (
-                        <ChevronUp className="w-4 h-4 text-neutral-400" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4 text-neutral-400" />
-                      )}
-                    </button>
-
-                    {isOpen && (
-                      <div className="mt-3 pr-6 space-y-2 text-xs text-neutral-600 dark:text-neutral-400 animate-in fade-in duration-200">
-                        {cat.items.map((item) => (
-                          <div key={item.key} className="flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#5E2590]/60 shrink-0" />
-                            <span>{item.label}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* ========================================================================= */}
-          {/* 10. BOOKING DETAILS & DATES BOX (تفاصيل الحجز) */}
-          {/* ========================================================================= */}
-          <section id="booking-card" aria-labelledby="booking-card-heading" className="bg-white dark:bg-[#1E1712] rounded-2xl p-5 border border-[var(--border)] shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 id="booking-card-heading" className="text-base font-black text-neutral-900 dark:text-neutral-100">
-                تفاصيل الحجز ({totalNights} {totalNights === 1 ? "ليلة" : "ليالٍ"})
-              </h2>
-              <button
-                type="button"
-                onClick={() => setShowDatesModal(true)}
-                className="text-xs font-bold text-[#5E2590] dark:text-[#C596F0] flex items-center gap-1 hover:underline cursor-pointer"
-              >
-                <span>غيّر التاريخ</span>
-                <Clock className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            {/* 2x2 Grid for Dates and Times */}
-            <div className="grid grid-cols-2 gap-3 p-4 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 text-xs">
-              <div className="space-y-1">
-                <span className="text-neutral-400 font-medium block">تاريخ الوصول</span>
-                <span className="font-bold text-neutral-800 dark:text-neutral-200 block">
-                  {formatDayAndDate(checkIn)}
-                </span>
-              </div>
-
-              <div className="space-y-1">
-                <span className="text-neutral-400 font-medium block">تاريخ المغادرة</span>
-                <span className="font-bold text-neutral-800 dark:text-neutral-200 block">
-                  {formatDayAndDate(checkOut)}
-                </span>
-              </div>
-
-              <div className="space-y-1 pt-2 border-t border-neutral-200/50 dark:border-neutral-800">
-                <span className="text-neutral-400 font-medium block">وقت الوصول</span>
-                <span className="font-bold text-neutral-800 dark:text-neutral-200 block">
-                  {(apartment as { checkInTime?: string }).checkInTime || "04:00 مساءً"}
-                </span>
-              </div>
-
-              <div className="space-y-1 pt-2 border-t border-neutral-200/50 dark:border-neutral-800">
-                <span className="text-neutral-400 font-medium block">وقت المغادرة</span>
-                <span className="font-bold text-neutral-800 dark:text-neutral-200 block">
-                  {(apartment as { checkOutTime?: string }).checkOutTime || "12:00 ظهراً"}
-                </span>
-              </div>
-            </div>
-
-            {/* Guests Selector */}
-            <div className="flex items-center justify-between p-3 rounded-xl border border-neutral-200 dark:border-neutral-800">
-              <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400">عدد الضيوف</span>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setGuests((g) => Math.max(1, g - 1))}
-                  disabled={guests <= 1}
-                  className="w-7 h-7 rounded-full border border-neutral-300 dark:border-neutral-700 flex items-center justify-center font-bold text-sm disabled:opacity-30"
-                >
-                  -
-                </button>
-                <span className="text-sm font-bold text-neutral-900 dark:text-neutral-100">{guests}</span>
-                <button
-                  type="button"
-                  onClick={() => setGuests((g) => Math.min(apartment.maxGuests, g + 1))}
-                  disabled={guests >= apartment.maxGuests}
-                  className="w-7 h-7 rounded-full border border-neutral-300 dark:border-neutral-700 flex items-center justify-center font-bold text-sm disabled:opacity-30"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-
-            {/* Price breakdown */}
-            <div className="space-y-2 pt-2 text-xs text-neutral-600 dark:text-neutral-400">
-              {invalidRange ? (
-                <p className="text-red-600 dark:text-red-400 font-medium">
-                  يرجى اختيار تاريخ مغادرة بعد تاريخ الوصول لعرض تفاصيل السعر.
-                </p>
-              ) : (
-                <>
-                  <div className="flex justify-between">
-                    <span>{apartment.price.toLocaleString("ar-SA")} ر.س × {totalNights} ليالٍ</span>
-                    <span>{totalPrice.toLocaleString("ar-SA")} ر.س</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>رسوم الخدمة وضريبة القيمة المضافة</span>
-                    <span className="text-emerald-600 font-semibold">مشمولة</span>
-                  </div>
-                  <div className="flex justify-between font-bold text-sm text-neutral-900 dark:text-neutral-100 pt-2 border-t border-neutral-100 dark:border-neutral-800">
-                    <span>المبلغ الإجمالي</span>
-                    <span className="text-[#5E2590] dark:text-[#C596F0] font-black">{totalPrice.toLocaleString("ar-SA")} ر.س</span>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {bookingError && (
-              <div className="p-3 rounded-xl bg-red-50 text-red-700 text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{bookingError}</span>
-              </div>
-            )}
-
-            {/* Direct Booking CTA Button */}
-            <button
-              type="button"
-              onClick={handleBooking}
-              disabled={bookingLoading}
-              className="w-full py-3.5 rounded-xl bg-[#5E2590] hover:bg-[#4E1E78] active:scale-98 text-white font-bold text-base shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-            >
-              {bookingLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Calendar className="w-5 h-5" />}
-              <span>{bookingLoading ? "جارٍ التجهيز للدفع..." : "احجز الآن وادفع"}</span>
-            </button>
-            <p className="text-[11px] text-center text-neutral-400">دفع إلكتروني آمن 100% عبر مدى، Apple Pay، فيزا وماستركارد</p>
-          </section>
-
-          {/* ========================================================================= */}
-          {/* 11. REVIEWS SECTION (Matching Gathern Screenshot 2: Score 10 + Highlights) */}
-          {/* ========================================================================= */}
-          <section id="reviews" aria-labelledby="reviews-heading" className="bg-white dark:bg-[#1E1712] rounded-2xl p-5 border border-[var(--border)] shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 id="reviews-heading" className="text-base font-black text-neutral-900 dark:text-neutral-100">التقييمات</h2>
-              <button
-                type="button"
-                onClick={() => setShowReviewForm(true)}
-                className="text-xs font-bold text-[#5E2590] dark:text-[#C596F0] flex items-center gap-1 hover:underline cursor-pointer"
-              >
-                <MessageSquare className="w-3.5 h-3.5" />
-                <span>أضف تقييمك</span>
-              </button>
-            </div>
-
-            {/* Top Rating Summary Card */}
-            <div className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-16 h-16 rounded-2xl bg-[#5E2590] text-white flex flex-col items-center justify-center shadow-md">
-                  <span className="text-2xl font-black leading-none">10.0</span>
-                  <span className="text-[10px] opacity-80 mt-1">ممتاز</span>
-                </div>
-                <div className="space-y-1 text-xs text-neutral-600 dark:text-neutral-400">
-                  <div className="font-bold text-neutral-900 dark:text-neutral-100">تقييم النزلاء العام</div>
-                  <div>بناءً على {apartment.reviewCount || 38} تقييماً حقيقياً وموثقاً</div>
-                </div>
-              </div>
-
-              {/* Sub categories */}
-              <div className="text-[11px] space-y-1 text-neutral-500 font-medium text-left">
-                <div>دقة البيانات: <span className="font-bold text-neutral-800 dark:text-neutral-200">10/10</span></div>
-                <div>النظافة: <span className="font-bold text-neutral-800 dark:text-neutral-200">10/10</span></div>
-                <div>القيمة: <span className="font-bold text-neutral-800 dark:text-neutral-200">9.9/10</span></div>
-                <div>الموقع: <span className="font-bold text-neutral-800 dark:text-neutral-200">10/10</span></div>
-              </div>
-            </div>
-
-            {/* Highlight Badges (Green pills matching Gathern Screenshot 2) */}
-            <div className="space-y-2">
-              <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex items-center gap-2 border border-emerald-100 dark:border-emerald-900/50">
-                <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>100% من النزلاء أكدوا أن صور ومواصفات الشقة مطابقة للواقع تماماً</span>
-              </div>
-
-              <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex items-center gap-2 border border-emerald-100 dark:border-emerald-900/50">
-                <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>98% من النزلاء أشادوا بالنظافة الفائقة والتعقيم الفندقي</span>
-              </div>
-
-              <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex items-center gap-2 border border-emerald-100 dark:border-emerald-900/50">
-                <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>موقع استراتيجي هادئ وقريب من معالم العلا والبلدة القديمة</span>
-              </div>
-
-              <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex items-center gap-2 border border-emerald-100 dark:border-emerald-900/50">
-                <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>الإنترنت فائق السرعة ومناسب للعمل عن بعد</span>
-              </div>
-            </div>
-
-            {/* Reviews List */}
-            <div className="pt-2 divide-y divide-neutral-100 dark:divide-neutral-800 space-y-4">
-              {/* Show live reviews first if any exist */}
-              {reviews && reviews.length > 0 && reviews.map((r) => (
-                <div key={r._id} className="pt-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-[#5E2590]/10 text-[#5E2590] flex items-center justify-center font-bold text-xs">
-                        {r.userName.charAt(0)}
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-neutral-900 dark:text-neutral-100">{r.userName}</div>
-                        <div className="text-[10px] text-neutral-400">{formatArabicDate(r.createdAt)}</div>
-                      </div>
-                    </div>
-                    <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-700 font-bold text-xs">
-                      ★ {r.rating * 2}.0
-                    </span>
-                  </div>
-                  <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed pr-10">{r.comment}</p>
-                </div>
-              ))}
-
-              {/* Verified sample reviews from Screenshot 2 */}
-              {sampleReviews.map((rev) => (
-                <div key={rev.id} className="pt-3 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-neutral-200 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 flex items-center justify-center font-bold text-xs">
-                        {rev.author.charAt(0)}
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-neutral-900 dark:text-neutral-100">{rev.author}</div>
-                        <div className="text-[10px] text-neutral-400">{rev.date}</div>
-                      </div>
-                    </div>
-                    <span className="px-2 py-0.5 rounded bg-[#5E2590]/10 text-[#5E2590] dark:text-[#C596F0] font-black text-xs">
-                      {rev.rating} / 10
-                    </span>
-                  </div>
-
-                  <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed pr-10">
-                    {rev.comment}
-                  </p>
-
-                  {/* Host Reply */}
-                  {rev.reply && (
-                    <div className="mr-8 p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900 text-xs text-neutral-600 dark:text-neutral-400 border-r-2 border-[#5E2590] space-y-1">
-                      <div className="font-bold text-[#5E2590] dark:text-[#C596F0] text-[11px]">رد المضيف:</div>
-                      <p>{rev.reply}</p>
-                    </div>
+                  <button
+                    type="button"
+                    onClick={() => handleTabChange("reviews")}
+                    className="text-neutral-600 dark:text-neutral-300 hover:text-[#5E2590] hover:underline"
+                  >
+                    ({apartment.reviewCount || 38}) تقييم
+                  </button>
+                  {apartment.tourismLicenseNumber && (
+                    <>
+                      <span className="text-neutral-400">•</span>
+                      <span className="text-emerald-700 dark:text-emerald-400 font-semibold text-xs flex items-center gap-1">
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        مرخص سياحياً
+                      </span>
+                    </>
                   )}
                 </div>
-              ))}
-            </div>
-          </section>
 
-          {/* ========================================================================= */}
-          {/* 12. MAP & NEARBY ATTRACTIONS (الخريطة والموقع) */}
-          {/* ========================================================================= */}
-          {(() => {
-            const lat = (apartment as { latitude?: number }).latitude ?? 26.62;
-            const lng = (apartment as { longitude?: number }).longitude ?? 37.92;
-            return (
-              <section id="map" aria-labelledby="map-heading" className="bg-white dark:bg-[#1E1712] rounded-2xl p-5 border border-[var(--border)] shadow-xs space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 id="map-heading" className="text-base font-black text-neutral-900 dark:text-neutral-100">الخريطة والموقع</h2>
-                    <p className="text-xs text-neutral-400 mt-0.5">{getApartmentLocation(apartment)} • العلا، المملكة العربية السعودية</p>
+                {/* Attribute List */}
+                <div className="space-y-2 pt-1 text-sm text-neutral-700 dark:text-neutral-300">
+                  <div className="flex items-center gap-2.5">
+                    <MapPin className="w-4 h-4 text-neutral-400 shrink-0" />
+                    <span>العلا - {getApartmentLocation(apartment)}</span>
                   </div>
-                  <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs font-bold text-[#5E2590] dark:text-[#C596F0] flex items-center gap-1 hover:underline"
-                  >
-                    <span>فتح في Google Maps</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
+
+                  <div className="flex items-center gap-2.5">
+                    <Maximize className="w-4 h-4 text-neutral-400 shrink-0" />
+                    <span>مساحة الوحدة {apartment.area} م²</span>
+                  </div>
+
+                  <div className="flex items-center gap-2.5">
+                    <Users className="w-4 h-4 text-neutral-400 shrink-0" />
+                    <span>مخصص لـ عوائل وعزاب (يتسع حتى {apartment.maxGuests} ضيوف)</span>
+                  </div>
+
+                  <div className="flex items-center gap-2.5">
+                    <ShieldCheck className="w-4 h-4 text-neutral-400 shrink-0" />
+                    <span>لا يتطلب تأمين نقدي عند الوصول (ضمان إلكتروني مسترد)</span>
+                  </div>
                 </div>
 
-                {/* Map Embed */}
-                <div className="relative aspect-[16/9] w-full rounded-2xl overflow-hidden border border-neutral-200 dark:border-neutral-800 shadow-inner">
-                  <iframe
-                    title="موقع الشقة في العلا"
-                    src={`https://www.openstreetmap.org/export/embed.html?bbox=${lng - 0.015}%2C${lat - 0.015}%2C${lng + 0.015}%2C${lat + 0.015}&layer=mapnik&marker=${lat}%2C${lng}`}
-                    className="w-full h-full border-0"
-                    loading="lazy"
-                  />
-                </div>
-
-                {/* Distances to AlUla landmarks */}
-                <div className="grid grid-cols-2 gap-2 text-xs pt-1">
-                  <div className="p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 flex items-center justify-between">
-                    <span className="text-neutral-600 dark:text-neutral-400">البلدة القديمة</span>
-                    <span className="font-bold text-neutral-800 dark:text-neutral-200">5 دقائق</span>
+                {/* 5. TABBY & TAMARA BANNER */}
+                <div className="mt-4 pt-4 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900/60">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs sm:text-sm font-semibold text-neutral-800 dark:text-neutral-200">
+                      قسمها على 4، بدون رسوم تأخير
+                    </span>
                   </div>
-                  <div className="p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 flex items-center justify-between">
-                    <span className="text-neutral-600 dark:text-neutral-400">صخرة الفيل</span>
-                    <span className="font-bold text-neutral-800 dark:text-neutral-200">10 دقائق</span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 flex items-center justify-between">
-                    <span className="text-neutral-600 dark:text-neutral-400">الحِجر (مدائن صالح)</span>
-                    <span className="font-bold text-neutral-800 dark:text-neutral-200">15 دقيقة</span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 flex items-center justify-between">
-                    <span className="text-neutral-600 dark:text-neutral-400">مسرح مرايا</span>
-                    <span className="font-bold text-neutral-800 dark:text-neutral-200">20 دقيقة</span>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-md bg-[#00D5A0] text-black font-black text-xs tracking-tight">
+                      tabby
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-[#FFAE9E] text-black font-bold text-xs tracking-tight">
+                      tamara
+                    </span>
                   </div>
                 </div>
               </section>
-            );
-          })()}
+
+              {/* 6. IN-PAGE PRICE & SELECTION PILL */}
+              <section aria-labelledby="pricing-summary-heading" className="bg-white dark:bg-[#1E1712] rounded-2xl p-4 border border-[var(--border)] shadow-xs flex items-center justify-between">
+                <div>
+                  <h2 id="pricing-summary-heading" className="sr-only">ملخص السعر</h2>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-2xl font-black text-[#5E2590] dark:text-[#C596F0]">
+                      {apartment.price.toLocaleString("ar-SA")} ر.س
+                    </span>
+                    <span className="text-xs text-neutral-500 dark:text-neutral-400">/ ليلة</span>
+                  </div>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 underline">
+                    إجمالي ({totalNights} {totalNights === 1 ? "ليلة واحدة" : "ليالٍ"}) {totalPrice.toLocaleString("ar-SA")} ر.س شامل الضريبة
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const bookingCard = document.getElementById("booking-card");
+                    if (bookingCard) {
+                      bookingCard.scrollIntoView({ behavior: "smooth" });
+                    } else {
+                      void handleBooking();
+                    }
+                  }}
+                  className="px-8 py-3 rounded-xl bg-[#5E2590] hover:bg-[#4E1E78] active:scale-95 text-white font-bold text-base shadow-md transition-all cursor-pointer"
+                >
+                  اختر
+                </button>
+              </section>
+
+              {/* 7. DESCRIPTION */}
+              <section aria-labelledby="desc-heading" className="bg-white dark:bg-[#1E1712] rounded-2xl p-5 border border-[var(--border)] shadow-xs space-y-3">
+                <h2 id="desc-heading" className="text-base font-black text-neutral-900 dark:text-neutral-100">الوصف</h2>
+
+                <div className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 pb-1">
+                  رقم تصريح وزارة السياحة:{" "}
+                  <span className="font-mono text-neutral-800 dark:text-neutral-200">
+                    {apartment.tourismLicenseNumber || "50040461"}
+                  </span>
+                </div>
+
+                <div className="relative text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed">
+                  <p className={isDescExpanded ? "" : "line-clamp-3 whitespace-pre-line"}>
+                    {getApartmentDescription(apartment)}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setIsDescExpanded(!isDescExpanded)}
+                    className="mt-2 text-xs font-bold text-[#5E2590] dark:text-[#C596F0] hover:underline block"
+                  >
+                    {isDescExpanded ? "عرض أقل ▲" : "المزيد ... ▼"}
+                  </button>
+                </div>
+              </section>
+
+              {/* 8. ABOUT HOST (عن المضيف - موثق آلياً بدون مراسلة مباشرة لحماية حقوق المنصة) */}
+              <section aria-labelledby="host-heading" className="bg-white dark:bg-[#1E1712] rounded-2xl p-5 border border-[var(--border)] shadow-xs space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 id="host-heading" className="text-base font-black text-neutral-900 dark:text-neutral-100">عن المضيف</h2>
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-xs font-bold border border-emerald-200/60 dark:border-emerald-800/40">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <span>مضيف معتمد وموثق</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3.5">
+                  <div className="w-14 h-14 rounded-full bg-[#5E2590] text-white flex items-center justify-center text-xl font-bold shrink-0 shadow-sm">
+                    {(apartment.ownerName || "س").charAt(0)}
+                  </div>
+                  <div className="space-y-0.5">
+                    <h3 className="font-bold text-neutral-900 dark:text-neutral-100 text-base">
+                      {apartment.ownerName || "سلطان العلا"}
+                    </h3>
+                    <div className="flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400">
+                      <span className="flex items-center gap-1 text-amber-500 font-bold">
+                        <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                        <span>10.0 (90 تقييم)</span>
+                      </span>
+                      <span>•</span>
+                      <span>وحدات مرخصة وموثقة رسمياً</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-100 dark:border-neutral-800/80 text-xs text-neutral-600 dark:text-neutral-300 leading-relaxed flex items-center gap-2.5">
+                  <Shield className="w-4 h-4 text-[#5E2590] dark:text-[#C596F0] shrink-0" />
+                  <span>
+                    تتم إدارة وتأكيد الحجوزات آلياً عبر نظام شقق العلا الذكي لضمان حماية الدفع والمكان لكلا الطرفين.
+                  </span>
+                </div>
+              </section>
+
+              {/* 9. AMENITIES ACCORDIONS */}
+              <section aria-labelledby="amenities-heading" className="bg-white dark:bg-[#1E1712] rounded-2xl p-5 border border-[var(--border)] shadow-xs space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 id="amenities-heading" className="text-base font-black text-neutral-900 dark:text-neutral-100">المرافق والتجهيزات</h2>
+                  <button
+                    type="button"
+                    onClick={expandAllAccordions}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-200 transition-colors"
+                  >
+                    إظهار الكل
+                  </button>
+                </div>
+
+                <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                  {amenityCategories.map((cat) => {
+                    const isOpen = expandedAccordions[cat.id] ?? false;
+                    const CatIcon = cat.icon;
+                    return (
+                      <div key={cat.id} className="py-3">
+                        <button
+                          type="button"
+                          onClick={() => toggleAccordion(cat.id)}
+                          className="w-full flex items-center justify-between text-right font-medium text-sm text-neutral-800 dark:text-neutral-200 hover:text-[#5E2590] transition-colors py-1 cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <CatIcon className="w-4 h-4 text-neutral-400 shrink-0" />
+                            <span>{cat.title}</span>
+                          </div>
+                          {isOpen ? (
+                            <ChevronUp className="w-4 h-4 text-neutral-400" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4 text-neutral-400" />
+                          )}
+                        </button>
+
+                        {isOpen && (
+                          <div className="mt-3 pr-6 space-y-2 text-xs text-neutral-600 dark:text-neutral-400 animate-in fade-in duration-200">
+                            {cat.items.map((item) => (
+                              <div key={item.key} className="flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#5E2590]/60 shrink-0" />
+                                <span>{item.label}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+
+              {/* 10. BOOKING DETAILS & DATES BOX */}
+              <section id="booking-card" aria-labelledby="booking-card-heading" className="bg-white dark:bg-[#1E1712] rounded-2xl p-5 border border-[var(--border)] shadow-xs space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 id="booking-card-heading" className="text-base font-black text-neutral-900 dark:text-neutral-100">
+                    تفاصيل الحجز ({totalNights} {totalNights === 1 ? "ليلة" : "ليالٍ"})
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setShowDatesModal(true)}
+                    className="text-xs font-bold text-[#5E2590] dark:text-[#C596F0] flex items-center gap-1 hover:underline cursor-pointer"
+                  >
+                    <span>غيّر التاريخ</span>
+                    <Clock className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* 2x2 Grid for Dates and Times */}
+                <div className="grid grid-cols-2 gap-3 p-4 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 text-xs">
+                  <div className="space-y-1">
+                    <span className="text-neutral-400 font-medium block">تاريخ الوصول</span>
+                    <span className="font-bold text-neutral-800 dark:text-neutral-200 block">
+                      {formatDayAndDate(checkIn)}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-neutral-400 font-medium block">تاريخ المغادرة</span>
+                    <span className="font-bold text-neutral-800 dark:text-neutral-200 block">
+                      {formatDayAndDate(checkOut)}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1 pt-2 border-t border-neutral-200/50 dark:border-neutral-800">
+                    <span className="text-neutral-400 font-medium block">وقت الوصول</span>
+                    <span className="font-bold text-neutral-800 dark:text-neutral-200 block">
+                      {(apartment as { checkInTime?: string }).checkInTime || "04:00 مساءً"}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1 pt-2 border-t border-neutral-200/50 dark:border-neutral-800">
+                    <span className="text-neutral-400 font-medium block">وقت المغادرة</span>
+                    <span className="font-bold text-neutral-800 dark:text-neutral-200 block">
+                      {(apartment as { checkOutTime?: string }).checkOutTime || "12:00 ظهراً"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Guests Selector */}
+                <div className="flex items-center justify-between p-3 rounded-xl border border-neutral-200 dark:border-neutral-800">
+                  <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400">عدد الضيوف</span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setGuests((g) => Math.max(1, g - 1))}
+                      disabled={guests <= 1}
+                      className="w-7 h-7 rounded-full border border-neutral-300 dark:border-neutral-700 flex items-center justify-center font-bold text-sm disabled:opacity-30"
+                    >
+                      -
+                    </button>
+                    <span className="text-sm font-bold text-neutral-900 dark:text-neutral-100">{guests}</span>
+                    <button
+                      type="button"
+                      onClick={() => setGuests((g) => Math.min(apartment.maxGuests, g + 1))}
+                      disabled={guests >= apartment.maxGuests}
+                      className="w-7 h-7 rounded-full border border-neutral-300 dark:border-neutral-700 flex items-center justify-center font-bold text-sm disabled:opacity-30"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                {/* Price breakdown */}
+                <div className="space-y-2 pt-2 text-xs text-neutral-600 dark:text-neutral-400">
+                  {invalidRange ? (
+                    <p className="text-red-600 dark:text-red-400 font-medium">
+                      يرجى اختيار تاريخ مغادرة بعد تاريخ الوصول لعرض تفاصيل السعر.
+                    </p>
+                  ) : (
+                    <>
+                      <div className="flex justify-between">
+                        <span>{apartment.price.toLocaleString("ar-SA")} ر.س × {totalNights} ليالٍ</span>
+                        <span>{totalPrice.toLocaleString("ar-SA")} ر.س</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>رسوم الخدمة وضريبة القيمة المضافة</span>
+                        <span className="text-emerald-600 font-semibold">مشمولة</span>
+                      </div>
+                      <div className="flex justify-between font-bold text-sm text-neutral-900 dark:text-neutral-100 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+                        <span>المبلغ الإجمالي</span>
+                        <span className="text-[#5E2590] dark:text-[#C596F0] font-black">{totalPrice.toLocaleString("ar-SA")} ر.س</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {bookingError && (
+                  <div className="p-3 rounded-xl bg-red-50 text-red-700 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{bookingError}</span>
+                  </div>
+                )}
+
+                {/* Direct Booking CTA Button */}
+                <button
+                  type="button"
+                  onClick={handleBooking}
+                  disabled={bookingLoading}
+                  className="w-full py-3.5 rounded-xl bg-[#5E2590] hover:bg-[#4E1E78] active:scale-98 text-white font-bold text-base shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                >
+                  {bookingLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Calendar className="w-5 h-5" />}
+                  <span>{bookingLoading ? "جارٍ التجهيز للدفع..." : "احجز الآن وادفع"}</span>
+                </button>
+                <p className="text-[11px] text-center text-neutral-400">دفع إلكتروني آمن 100% عبر مدى، Apple Pay، فيزا وماستركارد</p>
+              </section>
+            </motion.div>
+          )}
 
           {/* ========================================================================= */}
-          {/* 13. RULES & CANCELLATION (الشروط وسياسة الإلغاء) */}
+          {/* تبويب 2: التقييمات (يظهر قسم التقييمات وآراء النزلاء فقط بشكل منفصل) */}
           {/* ========================================================================= */}
-          <section id="rules" aria-labelledby="rules-heading" className="bg-white dark:bg-[#1E1712] rounded-2xl p-5 border border-[var(--border)] shadow-xs space-y-4">
-            <h2 id="rules-heading" className="text-base font-black text-neutral-900 dark:text-neutral-100">الشروط وسياسة الإلغاء</h2>
+          {activeTab === "reviews" && (
+            <motion.div
+              key="reviews-tab"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              className="space-y-5"
+            >
+              <section id="reviews" aria-labelledby="reviews-heading" className="bg-white dark:bg-[#1E1712] rounded-2xl p-5 border border-[var(--border)] shadow-xs space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 id="reviews-heading" className="text-base font-black text-neutral-900 dark:text-neutral-100">تقييمات النزلاء</h2>
+                  <button
+                    type="button"
+                    onClick={() => setShowReviewForm(true)}
+                    className="text-xs font-bold text-[#5E2590] dark:text-[#C596F0] flex items-center gap-1 hover:underline cursor-pointer"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    <span>أضف تقييمك</span>
+                  </button>
+                </div>
 
-            {/* Cancellation Pill */}
-            <div className="p-3.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/40 space-y-1">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800 dark:text-emerald-300">
-                <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                <span>إلغاء مجاني مرن</span>
-              </div>
-              <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
-                استرداد كامل 100% للمبلغ عند الإلغاء حتى قبل 24 ساعة من موعد تسجيل الوصول.
-              </p>
-            </div>
+                {/* Top Rating Summary Card */}
+                <div className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-16 h-16 rounded-2xl bg-[#5E2590] text-white flex flex-col items-center justify-center shadow-md">
+                      <span className="text-2xl font-black leading-none">10.0</span>
+                      <span className="text-[10px] opacity-80 mt-1">ممتاز</span>
+                    </div>
+                    <div className="space-y-1 text-xs text-neutral-600 dark:text-neutral-400">
+                      <div className="font-bold text-neutral-900 dark:text-neutral-100">تقييم النزلاء العام</div>
+                      <div>بناءً على {apartment.reviewCount || 38} تقييماً حقيقياً وموثقاً</div>
+                    </div>
+                  </div>
 
-            {/* Check-in / out times */}
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900/60">
-                <span className="text-neutral-400 block mb-1">وقت تسجيل الدخول</span>
-                <span className="font-bold text-neutral-800 dark:text-neutral-200 text-sm">
-                  {(apartment as { checkInTime?: string }).checkInTime || "من 04:00 مساءً"}
-                </span>
-              </div>
-              <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900/60">
-                <span className="text-neutral-400 block mb-1">وقت المغادرة</span>
-                <span className="font-bold text-neutral-800 dark:text-neutral-200 text-sm">
-                  {(apartment as { checkOutTime?: string }).checkOutTime || "حتى 12:00 ظهراً"}
-                </span>
-              </div>
-            </div>
+                  {/* Sub categories */}
+                  <div className="text-[11px] space-y-1 text-neutral-500 font-medium text-left">
+                    <div>دقة البيانات: <span className="font-bold text-neutral-800 dark:text-neutral-200">10/10</span></div>
+                    <div>النظافة: <span className="font-bold text-neutral-800 dark:text-neutral-200">10/10</span></div>
+                    <div>القيمة: <span className="font-bold text-neutral-800 dark:text-neutral-200">9.9/10</span></div>
+                    <div>الموقع: <span className="font-bold text-neutral-800 dark:text-neutral-200">10/10</span></div>
+                  </div>
+                </div>
 
-            {/* House rules */}
-            <div className="space-y-2 pt-1 text-xs text-neutral-600 dark:text-neutral-400">
-              <div className="font-bold text-neutral-800 dark:text-neutral-200">تعليمات الإقامة:</div>
-              <div className="flex items-center gap-2">
-                <span>• يُسمح بالتدخين في الشرفات والمساحات الخارجية فقط</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span>• يرجى مراعاة الهدوء وعدم إقامة الحفلات بعد الساعة 11 مساءً</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span>• المحافظة على مقتنيات ونظافة الوحدة كما تم استلامها</span>
-              </div>
-            </div>
-          </section>
+                {/* Highlight Badges */}
+                <div className="space-y-2">
+                  <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex items-center gap-2 border border-emerald-100 dark:border-emerald-900/50">
+                    <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>100% من النزلاء أكدوا أن صور ومواصفات الشقة مطابقة للواقع تماماً</span>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex items-center gap-2 border border-emerald-100 dark:border-emerald-900/50">
+                    <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>98% من النزلاء أشادوا بالنظافة الفائقة والتعقيم الفندقي</span>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex items-center gap-2 border border-emerald-100 dark:border-emerald-900/50">
+                    <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>موقع استراتيجي هادئ وقريب من معالم العلا والبلدة القديمة</span>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex items-center gap-2 border border-emerald-100 dark:border-emerald-900/50">
+                    <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>الإنترنت فائق السرعة ومناسب للعمل عن بعد</span>
+                  </div>
+                </div>
+
+                {/* Reviews List */}
+                <div className="pt-2 divide-y divide-neutral-100 dark:divide-neutral-800 space-y-4">
+                  {reviews && reviews.length > 0 && reviews.map((r) => (
+                    <div key={r._id} className="pt-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-[#5E2590]/10 text-[#5E2590] flex items-center justify-center font-bold text-xs">
+                            {r.userName.charAt(0)}
+                          </div>
+                          <div>
+                            <div className="text-xs font-bold text-neutral-900 dark:text-neutral-100">{r.userName}</div>
+                            <div className="text-[10px] text-neutral-400">{formatArabicDate(r.createdAt)}</div>
+                          </div>
+                        </div>
+                        <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-700 font-bold text-xs">
+                          ★ {r.rating * 2}.0
+                        </span>
+                      </div>
+                      <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed pr-10">{r.comment}</p>
+                    </div>
+                  ))}
+
+                  {sampleReviews.map((rev) => (
+                    <div key={rev.id} className="pt-3 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-neutral-200 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 flex items-center justify-center font-bold text-xs">
+                            {rev.author.charAt(0)}
+                          </div>
+                          <div>
+                            <div className="text-xs font-bold text-neutral-900 dark:text-neutral-100">{rev.author}</div>
+                            <div className="text-[10px] text-neutral-400">{rev.date}</div>
+                          </div>
+                        </div>
+                        <span className="px-2 py-0.5 rounded bg-[#5E2590]/10 text-[#5E2590] dark:text-[#C596F0] font-black text-xs">
+                          {rev.rating} / 10
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed pr-10">
+                        {rev.comment}
+                      </p>
+
+                      {rev.reply && (
+                        <div className="mr-8 p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900 text-xs text-neutral-600 dark:text-neutral-400 border-r-2 border-[#5E2590] space-y-1">
+                          <div className="font-bold text-[#5E2590] dark:text-[#C596F0] text-[11px]">رد المضيف:</div>
+                          <p>{rev.reply}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </motion.div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* تبويب 3: الخريطة (يظهر الخريطة وموقع الشقة ومعالم العلا فقط) */}
+          {/* ========================================================================= */}
+          {activeTab === "map" && (
+            <motion.div
+              key="map-tab"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              className="space-y-5"
+            >
+              {(() => {
+                const lat = (apartment as { latitude?: number }).latitude ?? 26.62;
+                const lng = (apartment as { longitude?: number }).longitude ?? 37.92;
+                return (
+                  <section id="map" aria-labelledby="map-heading" className="bg-white dark:bg-[#1E1712] rounded-2xl p-5 border border-[var(--border)] shadow-xs space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 id="map-heading" className="text-base font-black text-neutral-900 dark:text-neutral-100">الخريطة والموقع</h2>
+                        <p className="text-xs text-neutral-400 mt-0.5">{getApartmentLocation(apartment)} • العلا، المملكة العربية السعودية</p>
+                      </div>
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs font-bold text-[#5E2590] dark:text-[#C596F0] flex items-center gap-1 hover:underline"
+                      >
+                        <span>فتح في Google Maps</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
+
+                    {/* Map Embed */}
+                    <div className="relative aspect-[16/9] w-full rounded-2xl overflow-hidden border border-neutral-200 dark:border-neutral-800 shadow-inner">
+                      <iframe
+                        title="موقع الشقة في العلا"
+                        src={`https://www.openstreetmap.org/export/embed.html?bbox=${lng - 0.015}%2C${lat - 0.015}%2C${lng + 0.015}%2C${lat + 0.015}&layer=mapnik&marker=${lat}%2C${lng}`}
+                        className="w-full h-full border-0"
+                        loading="lazy"
+                      />
+                    </div>
+
+                    {/* Distances to AlUla landmarks */}
+                    <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                      <div className="p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 flex items-center justify-between">
+                        <span className="text-neutral-600 dark:text-neutral-400">البلدة القديمة</span>
+                        <span className="font-bold text-neutral-800 dark:text-neutral-200">5 دقائق</span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 flex items-center justify-between">
+                        <span className="text-neutral-600 dark:text-neutral-400">صخرة الفيل</span>
+                        <span className="font-bold text-neutral-800 dark:text-neutral-200">10 دقائق</span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 flex items-center justify-between">
+                        <span className="text-neutral-600 dark:text-neutral-400">الحِجر (مدائن صالح)</span>
+                        <span className="font-bold text-neutral-800 dark:text-neutral-200">15 دقيقة</span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 flex items-center justify-between">
+                        <span className="text-neutral-600 dark:text-neutral-400">مسرح مرايا</span>
+                        <span className="font-bold text-neutral-800 dark:text-neutral-200">20 دقيقة</span>
+                      </div>
+                    </div>
+                  </section>
+                );
+              })()}
+            </motion.div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* تبويب 4: الشروط (يظهر الشروط، سياسة الإلغاء، والتأمين بالتفصيل) */}
+          {/* ========================================================================= */}
+          {activeTab === "rules" && (
+            <motion.div
+              key="rules-tab"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              className="space-y-5"
+            >
+              {/* Guarantee banner on rules tab */}
+              <section aria-labelledby="guarantee-heading-rules" className="rounded-2xl p-4 bg-[#F5EFFB] dark:bg-[#281636] border border-[#E4D1F5] dark:border-[#4B2968] flex items-center justify-between shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-[#5E2590] dark:bg-[#7E37BD] flex items-center justify-center text-white shrink-0 shadow-sm">
+                    <ShieldCheck className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 id="guarantee-heading-rules" className="font-bold text-sm text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
+                      <span>ضمان حماية شقق العلا</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#5E2590]/10 dark:bg-[#7E37BD]/30 text-[#5E2590] dark:text-[#C596F0] font-semibold">موثق</span>
+                    </h2>
+                    <p className="text-xs text-neutral-600 dark:text-neutral-300 mt-0.5">
+                      حجزك محمي ومضمون بالكامل وفق الشروط المعتمدة.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowGuaranteeModal(true)}
+                  className="text-xs font-bold text-[#5E2590] dark:text-[#C596F0] hover:underline flex items-center gap-0.5 shrink-0 pr-2 cursor-pointer"
+                >
+                  <span>اعرف أكثر</span>
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+              </section>
+
+              <section id="rules" aria-labelledby="rules-heading" className="bg-white dark:bg-[#1E1712] rounded-2xl p-5 border border-[var(--border)] shadow-xs space-y-4">
+                <h2 id="rules-heading" className="text-base font-black text-neutral-900 dark:text-neutral-100">الشروط وسياسة الإلغاء والتأمين</h2>
+
+                {/* Cancellation Pill */}
+                <div className="p-3.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/40 space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    <span>إلغاء مجاني مرن</span>
+                  </div>
+                  <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                    استرداد كامل 100% للمبلغ عند الإلغاء حتى قبل 24 ساعة من موعد تسجيل الوصول.
+                  </p>
+                </div>
+
+                {/* Security Deposit Policy */}
+                <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-100 dark:border-neutral-800 space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-neutral-900 dark:text-neutral-100">
+                    <Shield className="w-4 h-4 text-[#5E2590] dark:text-[#C596F0]" />
+                    <span>سياسة التأمين المسترد</span>
+                  </div>
+                  <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                    لا يتطلب دفع أي مبالغ نقدية عند الوصول. يتم تجميد تأمين إلكتروني مسترد بالكامل تلقائياً بعد الفحص والمغادرة بدون أي استقطاع طالما تم الالتزام بسلامة المكان.
+                  </p>
+                </div>
+
+                {/* Check-in / out times */}
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900/60">
+                    <span className="text-neutral-400 block mb-1">وقت تسجيل الدخول</span>
+                    <span className="font-bold text-neutral-800 dark:text-neutral-200 text-sm">
+                      {(apartment as { checkInTime?: string }).checkInTime || "من 04:00 مساءً"}
+                    </span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900/60">
+                    <span className="text-neutral-400 block mb-1">وقت المغادرة</span>
+                    <span className="font-bold text-neutral-800 dark:text-neutral-200 text-sm">
+                      {(apartment as { checkOutTime?: string }).checkOutTime || "حتى 12:00 ظهراً"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* House rules */}
+                <div className="space-y-2 pt-1 text-xs text-neutral-600 dark:text-neutral-400">
+                  <div className="font-bold text-neutral-800 dark:text-neutral-200">تعليمات الإقامة:</div>
+                  <div className="flex items-center gap-2">
+                    <span>• يُسمح بالتدخين في الشرفات والمساحات الخارجية فقط</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span>• يرجى مراعاة الهدوء وعدم إقامة الحفلات الصاخبة بعد الساعة 11 مساءً</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span>• المحافظة على مقتنيات ونظافة الوحدة كما تم استلامها</span>
+                  </div>
+                </div>
+              </section>
+            </motion.div>
+          )}
         </div>
       </main>
 
@@ -1316,7 +1376,21 @@ export default function ApartmentDetail() {
 
         <button
           type="button"
-          onClick={handleBooking}
+          onClick={() => {
+            if (activeTab !== "specs") {
+              setActiveTab("specs");
+              setTimeout(() => {
+                const bookingCard = document.getElementById("booking-card");
+                if (bookingCard) {
+                  bookingCard.scrollIntoView({ behavior: "smooth" });
+                } else {
+                  void handleBooking();
+                }
+              }, 100);
+            } else {
+              void handleBooking();
+            }
+          }}
           disabled={bookingLoading}
           className="px-7 py-3 rounded-xl bg-[#5E2590] hover:bg-[#4E1E78] active:scale-95 text-white font-bold text-sm shadow-md transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
         >
