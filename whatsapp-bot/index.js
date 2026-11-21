@@ -9,10 +9,19 @@
  * - يعزل الإدارة تماماً عن رسائل العملاء، ويمنع إرسال قوائم العملاء للأدمن.
  */
 import "dotenv/config";
+import dns from "dns";
 import { exec } from "child_process";
 import makeWASocket, { useMultiFileAuthState, DisconnectReason } from "@whiskeysockets/baileys";
 import QR from "qrcode-terminal";
 import { ConvexHttpClient } from "convex/browser";
+
+// ━━━ معالجة الأخطاء غير الملتقطة لمنع تعليق العملية ━━━
+process.on("uncaughtException", (err) => {
+  console.error("💥 uncaughtException:", err?.message || err);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("💥 unhandledRejection:", reason);
+});
 
 // ━━━ الإعدادات والثوابت ━━━
 const CONVEX_URL = process.env.CONVEX_URL;
@@ -26,6 +35,13 @@ const convex = new ConvexHttpClient(CONVEX_URL);
 const ADMIN_PHONE_SUFFIX = "506709265";
 const ADMIN_LID = "255220479201491";
 const ADMIN_FALLBACK_JID = "966506709265@s.whatsapp.net";
+
+// ━━━ متغيرات تتبع حالة الاتصال ونظام المراقبة الذاتي (Watchdog) ━━━
+let isWaConnected = false;
+let disconnectedSince = 0;
+let wasOffline = false;
+let lastSuccessfulPoll = Date.now();
+let consecutiveDisconnects = 0;
 
 /** تتبع Cooldown للتنبيهات وقوائم العملاء */
 let lastBatteryAlertTime = 0;
@@ -258,18 +274,44 @@ async function startBot() {
 
     if (connection === "open") {
       console.log("✅ تم الاتصال بواتساب بنجاح!");
+      isWaConnected = true;
+      disconnectedSince = 0;
+      consecutiveDisconnects = 0;
       processQueue(sock);
       checkServerHealth(sock);
       setInterval(() => checkServerHealth(sock), 15 * 60 * 1000);
     }
 
     if (connection === "close") {
+      isWaConnected = false;
+      if (!disconnectedSince) {
+        disconnectedSince = Date.now();
+      }
       const reason = lastDisconnect?.error?.output?.statusCode;
       const shouldReconnect = reason !== DisconnectReason.loggedOut;
-      console.log(`⚠️ انقطع الاتصال (السبب: ${reason}). ${shouldReconnect ? "إعادة الاتصال..." : "تم تسجيل الخروج."}`);
-      if (shouldReconnect) {
-        setTimeout(startBot, 3000);
+      consecutiveDisconnects++;
+
+      console.log(
+        `⚠️ انقطع الاتصال (السبب: ${reason} | المحاولة: ${consecutiveDisconnects}). ${
+          shouldReconnect ? "إعادة الاتصال..." : "تم تسجيل الخروج."
+        }`
+      );
+
+      if (!shouldReconnect) {
+        console.error("❌ تم تسجيل الخروج من جلسة الواتساب. يلزم إعادة مسح رمز QR.");
+        return;
       }
+
+      // إذا فشلت 4 محاولات متتالية، إنهاء العملية ليتولى PM2 إعادة تشغيل نظيفة
+      if (consecutiveDisconnects >= 4) {
+        console.warn("⚠️ فشلت 4 محاولات اتصال متتالية. إعادة تشغيل العملية عبر PM2...");
+        process.exit(1);
+      }
+
+      // تأخير متدرج: 5ث، ثم 10ث، ثم 15ث
+      const delayMs = Math.min(consecutiveDisconnects * 5000, 15000);
+      console.log(`⏳ سيتم محاولة إعادة الاتصال بعد ${delayMs / 1000} ثوانٍ...`);
+      setTimeout(startBot, delayMs);
     }
   });
 
@@ -398,6 +440,7 @@ async function startBot() {
 async function processQueue(sock) {
   try {
     const pending = await convex.query("whatsapp:getPendingMessages", {});
+    lastSuccessfulPoll = Date.now();
 
     for (const item of pending) {
       try {
@@ -418,6 +461,65 @@ async function processQueue(sock) {
   setTimeout(() => processQueue(sock), 5000);
 }
 
+// ━━━ فحص وجود إنترنت فعلي عبر DNS ━━━
+function checkInternetConnectivity() {
+  return new Promise((resolve) => {
+    dns.lookup("web.whatsapp.com", (err) => {
+      resolve(!err);
+    });
+  });
+}
+
+// ━━━ حارس الشبكة والتجمّد الذاتي (Self-Healing Watchdog كل 30 ثانية) ━━━
+function startNetworkWatchdog() {
+  const TWO_MINUTES_MS = 2 * 60 * 1000;
+  const THREE_MINUTES_MS = 3 * 60 * 1000;
+
+  setInterval(async () => {
+    const isOnline = await checkInternetConnectivity();
+    const now = Date.now();
+
+    if (!isOnline) {
+      if (!wasOffline) {
+        console.warn("⚠️ تم رصد انقطاع الاتصال بالإنترنت.");
+        wasOffline = true;
+      }
+      return;
+    }
+
+    // الإنترنت متوفر الآن:
+    // 1. إذا كان الإنترنت منقطعاً سابقاً والآن عاد، وكان واتساب غير متصل أو متجمداً:
+    if (wasOffline) {
+      console.log("🌐 عادت شبكة الإنترنت بعد انقطاع!");
+      wasOffline = false;
+      if (!isWaConnected) {
+        console.warn("🔄 إعادة تشغيل البوت فوراً عبر PM2 لإنشاء اتصال نظيف بعد عودة الشبكة...");
+        process.exit(1);
+      }
+    }
+
+    // 2. إذا ظل واتساب غير متصل لأكثر من دقيقتين رغم توفر الإنترنت:
+    if (!isWaConnected && disconnectedSince > 0) {
+      const offlineDuration = now - disconnectedSince;
+      if (offlineDuration > TWO_MINUTES_MS) {
+        console.warn(
+          `⚠️ واتساب غير متصل منذ ${Math.round(offlineDuration / 1000)} ثانية رغم توفر الإنترنت. إعادة التشغيل عبر PM2...`
+        );
+        process.exit(1);
+      }
+    }
+
+    // 3. إذا لم ينجح فحص طابور Convex لأكثر من 3 دقائق رغم توفر الإنترنت (مؤشر تجمّد العملية):
+    if (now - lastSuccessfulPoll > THREE_MINUTES_MS) {
+      console.warn(
+        `⚠️ توقف فحص طابور Convex منذ ${Math.round((now - lastSuccessfulPoll) / 1000)} ثانية (تجمّد محتمل). إعادة التشغيل عبر PM2...`
+      );
+      process.exit(1);
+    }
+  }, 30 * 1000);
+}
+
 // ━━━ بدء التشغيل ━━━
 console.log("🚀 بدء تشغيل نظام بوت الواتساب والمراقبة لمنصة شقق العلا...");
+startNetworkWatchdog();
 startBot();
