@@ -184,7 +184,7 @@ export const enqueueOtpMessage = internalMutation({
 
     // إدراج الرسالة في طابور الواتساب فوراً
     const message = `رمز التحقق الخاص بك في منصة شقق العلا هو: ${code} (صالح لمدة 5 دقائق).\n\nلا تشارك هذا الرمز مع أي شخص حفاظاً على أمان حسابك 🔒.`;
-    await ctx.db.insert("whatsappQueue", {
+    const messageId = await ctx.db.insert("whatsappQueue", {
       ownerPhone: normalizedPhone,
       message,
       type: "otp",
@@ -192,7 +192,7 @@ export const enqueueOtpMessage = internalMutation({
       createdAt: now,
     });
 
-    return { success: true, phone: normalizedPhone };
+    return { success: true, phone: normalizedPhone, messageId };
   },
 });
 
@@ -243,7 +243,7 @@ export const sendOtp = mutation({
 
     // إدراج رسالة فورية في طابور الواتساب
     const message = `رمز التحقق الخاص بك في منصة شقق العلا هو: ${code} (صالح لمدة 5 دقائق).\n\nلا تشارك هذا الرمز مع أي شخص حفاظاً على أمان حسابك 🔒.`;
-    await ctx.db.insert("whatsappQueue", {
+    const messageId = await ctx.db.insert("whatsappQueue", {
       ownerPhone: normalized,
       message,
       type: "otp",
@@ -251,7 +251,89 @@ export const sendOtp = mutation({
       createdAt: now,
     });
 
-    return { success: true, phone: normalized };
+    return { success: true, phone: normalized, messageId };
+  },
+});
+
+/**
+ * استعلام حالة إرسال رسالة الواتساب في الوقت الفعلي (Real-time Status)
+ * يدعم الاستعلام بـ messageId أو برقم الجوال
+ */
+export const getMessageStatus = query({
+  args: {
+    messageId: v.optional(v.id("whatsappQueue")),
+    phone: v.optional(v.string()),
+  },
+  handler: async (ctx, { messageId, phone }) => {
+    if (messageId) {
+      const msg = await ctx.db.get(messageId);
+      if (msg) {
+        return {
+          id: msg._id,
+          status: msg.status,
+          error: msg.error,
+          sentAt: msg.sentAt,
+          createdAt: msg.createdAt,
+        };
+      }
+    }
+
+    if (phone) {
+      const normalized = normalizeSaudiPhone(phone);
+      if (normalized) {
+        // البحث عن أحدث رسالة OTP مسجلة لهذا الرقم
+        const latestMsg = await ctx.db
+          .query("whatsappQueue")
+          .withIndex("by_phone", (q) => q.eq("ownerPhone", normalized))
+          .order("desc")
+          .first();
+
+        if (latestMsg && latestMsg.type === "otp") {
+          return {
+            id: latestMsg._id,
+            status: latestMsg.status,
+            error: latestMsg.error,
+            sentAt: latestMsg.sentAt,
+            createdAt: latestMsg.createdAt,
+          };
+        }
+      }
+    }
+
+    return null;
+  },
+});
+
+/**
+ * تسجيل تنبيه صامت في Convex عند تأخر وصول كود الواتساب وتفعيل نظام Failover
+ */
+export const logOtpDelay = mutation({
+  args: {
+    phone: v.string(),
+    messageId: v.optional(v.id("whatsappQueue")),
+  },
+  handler: async (ctx, { phone }) => {
+    const normalized = normalizeSaudiPhone(phone) || phone;
+    // التحقق من عدم تكرار التنبيه لنفس الرقم خلال آخر 5 دقائق
+    const recentAlert = await ctx.db
+      .query("whatsappQueue")
+      .withIndex("by_phone", (q) => q.eq("ownerPhone", normalized))
+      .order("desc")
+      .first();
+
+    if (recentAlert && recentAlert.type === "admin_alert" && Date.now() - recentAlert.createdAt < 5 * 60 * 1000) {
+      return { logged: false, reason: "cooldown" };
+    }
+
+    await ctx.db.insert("whatsappQueue", {
+      ownerPhone: normalized,
+      message: `⚠️ [تنبيه تأخر OTP] الزائر برقم (${normalized}) لم يستلم الكود خلال 15 ثانية، وتفعلت الخطة الاحتياطية (Failover) في صفحة الدخول. يرجى فحص بوت الواتساب.`,
+      type: "admin_alert",
+      status: "sent",
+      createdAt: Date.now(),
+    });
+
+    return { logged: true };
   },
 });
 

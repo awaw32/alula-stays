@@ -13,7 +13,12 @@ import {
 } from "@/components/ui/input-otp";
 import { useAuth } from "@/hooks/use-auth";
 import { DEMO_MODE } from "@/lib/demo-data";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../convex/_generated/api";
 import {
+  CheckCircle2,
+  Clock,
+  ExternalLink,
   ChevronDown,
   Loader2,
   Mail,
@@ -83,6 +88,81 @@ export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
 
   const [activeIdentifier, setActiveIdentifier] = useState("");
 
+  // ─── 15-Second OTP Delivery & Failover State ───
+  const [countdown15, setCountdown15] = useState(15);
+  const [isFailoverActive, setIsFailoverActive] = useState(false);
+  const [hasLoggedDelay, setHasLoggedDelay] = useState(false);
+  const [fallbackEmail, setFallbackEmail] = useState("");
+  const [showFallbackEmailInput, setShowFallbackEmailInput] = useState(false);
+  const [isSendingFallbackEmail, setIsSendingFallbackEmail] = useState(false);
+
+  const logOtpDelayMutation = useMutation(api.whatsapp.logOtpDelay);
+
+  // استعلام فوري لحالة رسالة الواتساب من طابور Convex
+  const messageStatus = useQuery(
+    api.whatsapp.getMessageStatus,
+    step === "otp" && method === "phone" && activeIdentifier
+      ? { phone: activeIdentifier }
+      : "skip"
+  );
+
+  // مراقبة عداد الـ 15 ثانية لتفعيل وضع الخطة الاحتياطية (Failover)
+  useEffect(() => {
+    if (step !== "otp" || method !== "phone") {
+      setCountdown15(15);
+      setIsFailoverActive(false);
+      setHasLoggedDelay(false);
+      return;
+    }
+
+    // إذا تم تأكيد إرسال الرسالة من بوت الواتساب بنجاح
+    if (messageStatus?.status === "sent") {
+      setIsFailoverActive(false);
+      return;
+    }
+
+    if (countdown15 <= 0) {
+      setIsFailoverActive(true);
+      if (!hasLoggedDelay && activeIdentifier) {
+        setHasLoggedDelay(true);
+        void logOtpDelayMutation({ phone: activeIdentifier }).catch(() => {});
+      }
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setCountdown15((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [step, method, countdown15, messageStatus?.status, hasLoggedDelay, activeIdentifier, logOtpDelayMutation]);
+
+  const handleSendFallbackEmail = async () => {
+    const cleanEmail = fallbackEmail.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes("@")) {
+      setError("يرجى إدخال بريد إلكتروني صحيح");
+      return;
+    }
+
+    setIsSendingFallbackEmail(true);
+    setError(null);
+    try {
+      await signIn("email-otp", { email: cleanEmail });
+      setMethod("email");
+      setActiveIdentifier(cleanEmail);
+      setOtp("");
+      setResendCooldown(60);
+      setIsFailoverActive(false);
+      setShowFallbackEmailInput(false);
+      toast.success("تم إرسال رمز التحقق إلى بريدك الإلكتروني بنجاح ✉️");
+    } catch (err) {
+      console.error("[Fallback Email Error]", err);
+      setError(getErrorMessage(err, "تعذر إرسال الرمز للبريد. يرجى المحاولة مجدداً."));
+    } finally {
+      setIsSendingFallbackEmail(false);
+    }
+  };
+
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
       navigate(redirect);
@@ -124,6 +204,10 @@ export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
         setStep("otp");
         setOtp("");
         setResendCooldown(60);
+        setCountdown15(15);
+        setIsFailoverActive(false);
+        setHasLoggedDelay(false);
+        setShowFallbackEmailInput(false);
         toast.success("تم إرسال رمز التحقق عبر تطبيق واتساب 💬");
       } catch (err) {
         console.error("[Phone Auth Error]", err);
@@ -401,6 +485,23 @@ export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
                   </p>
                 </div>
 
+                {/* ─── 15-Second Delivery Indicator & Status ─── */}
+                {method === "phone" && (
+                  <div>
+                    {messageStatus?.status === "sent" ? (
+                      <div className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 text-xs font-bold border border-emerald-200/60 dark:border-emerald-800/40 animate-in fade-in">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        <span>تم إرسال الكود إلى واتسابك بنجاح ✅</span>
+                      </div>
+                    ) : !isFailoverActive ? (
+                      <div className="flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-amber-500/10 text-amber-800 dark:text-amber-200 text-xs font-medium border border-amber-500/20">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-600" />
+                        <span>جاري تأكيد تسليم الرمز عبر واتساب... ({countdown15}ث)</span>
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+
                 <div className="space-y-3">
                   <label className="block text-xs font-medium text-neutral-500">
                     أدخل الرمز المكون من 6 أرقام
@@ -451,6 +552,81 @@ export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
                     <span>تأكيد ومتابعة</span>
                   )}
                 </Button>
+
+                {/* ─── Failover Card (الخطة الاحتياطية التلقائية بعد 15 ثانية) ─── */}
+                {method === "phone" && isFailoverActive && (
+                  <div className="rounded-2xl p-4 bg-gradient-to-br from-neutral-50 to-amber-50/50 dark:from-neutral-900 dark:to-neutral-800/80 border border-amber-300/80 dark:border-amber-700/60 text-right space-y-3 shadow-xs animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="flex items-center gap-2 text-xs font-bold text-neutral-800 dark:text-neutral-200">
+                      <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>تأخر وصول الرمز؟ اختر الخيار الأسرع لك:</span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {/* الخيار 1: استلام الكود عبر البريد */}
+                      {!showFallbackEmailInput ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowFallbackEmailInput(true)}
+                          className="w-full h-10 px-3 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-950 hover:bg-neutral-50 text-xs font-bold text-neutral-800 dark:text-neutral-200 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                        >
+                          <Mail className="w-4 h-4 text-[var(--clay-accent)]" />
+                          <span>استلام الكود عبر البريد الإلكتروني</span>
+                        </button>
+                      ) : (
+                        <div className="p-2.5 rounded-xl bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-700 space-y-2">
+                          <div className="relative">
+                            <Input
+                              type="email"
+                              dir="ltr"
+                              placeholder="أدخل بريدك الإلكتروني"
+                              value={fallbackEmail}
+                              onChange={(e) => setFallbackEmail(e.target.value)}
+                              autoFocus
+                              className="h-9 text-xs rounded-lg pr-7 text-left"
+                            />
+                            <Mail className="absolute right-2 top-1/2 -translate-y-1/2 size-3.5 text-neutral-400" />
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              disabled={isSendingFallbackEmail || !fallbackEmail.includes("@")}
+                              onClick={handleSendFallbackEmail}
+                              className="flex-1 h-8 rounded-lg bg-[var(--clay-accent)] text-white text-xs font-bold hover:opacity-90"
+                            >
+                              {isSendingFallbackEmail ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <span>إرسال للبريد الآن</span>
+                              )}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              onClick={() => setShowFallbackEmailInput(false)}
+                              className="h-8 px-2.5 rounded-lg text-xs text-neutral-500"
+                            >
+                              إلغاء
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* الخيار 2: تأكيد فوري عبر واتساب الإدارة */}
+                      <a
+                        href={`https://wa.me/966506709265?text=${encodeURIComponent(
+                          `السلام عليكم، أحتاج تفعيل كود الدخول لحسابي في شقق العلا لرقم الجوال: ${activeIdentifier}`
+                        )}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="w-full h-10 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all"
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                        <span>تأكيد سريع عبر واتساب الإدارة ⚡</span>
+                        <ExternalLink className="w-3 h-3 opacity-80" />
+                      </a>
+                    </div>
+                  </div>
+                )}
 
                 <div className="pt-2 flex flex-col items-center gap-2 text-xs">
                   {resendCooldown > 0 ? (
