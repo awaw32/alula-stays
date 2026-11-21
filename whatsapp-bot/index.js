@@ -566,8 +566,13 @@ async function startBot() {
   });
 }
 
-// ━━━ مراقبة طابور الرسائل كل 5 ثوانٍ ━━━
+// ━━━ مراقبة طابور الرسائل كل 3 ثوانٍ لمعالجة أكواد التحقق فوراً ━━━
+let isQueueProcessing = false;
+
 async function processQueue(sock) {
+  if (isQueueProcessing) return;
+  isQueueProcessing = true;
+
   try {
     const pending = await convex.query("whatsapp:getPendingMessages", {});
     lastSuccessfulPoll = Date.now();
@@ -577,18 +582,29 @@ async function processQueue(sock) {
         const cleanPhone = (item.ownerPhone || "").replace(/\D/g, "");
         if (!cleanPhone) continue;
         const jid = cleanPhone + "@s.whatsapp.net";
-        await sock.sendMessage(jid, { text: item.message });
+        
+        // إرسال الرسالة مع timeout لمنع تعليق الدورة في حال بطء الشبكة
+        await Promise.race([
+          sock.sendMessage(jid, { text: item.message }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout sending WhatsApp message")), 10000)),
+        ]);
+        
         await convex.mutation("whatsapp:markMessageSent", { id: item._id });
-        console.log(`📤 تم إرسال رسالة [${item.type || "عامة"}] إلى ${item.ownerPhone}`);
+        console.log(`📤 تم إرسال رسالة [${item.type || "عامة"}] إلى ${item.ownerPhone} بنجاح ✅`);
       } catch (err) {
         console.error(`❌ فشل إرسال رسالة إلى ${item.ownerPhone}:`, err.message);
+        await convex.mutation("whatsapp:markMessageFailed", {
+          id: item._id,
+          error: err.message,
+        }).catch(() => {});
       }
     }
   } catch (err) {
-    console.error("❌ خطأ في جلب الرسائل المعلقة:", err.message);
+    console.error("❌ خطأ في جلب الرسائل المعلقة من Convex:", err.message);
+  } finally {
+    isQueueProcessing = false;
+    setTimeout(() => processQueue(sock), 3000);
   }
-
-  setTimeout(() => processQueue(sock), 5000);
 }
 
 // ━━━ فحص وجود إنترنت فعلي عبر DNS ━━━

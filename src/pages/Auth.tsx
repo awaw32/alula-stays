@@ -189,7 +189,12 @@ export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
       navigate(redirect);
     } catch (err) {
       console.error("[Verify OTP Error]", err);
-      setError("رمز التحقق غير صحيح أو قد انتهت صلاحيته. يرجى المحاولة مجدداً.");
+      const customMsg = getErrorMessage(err);
+      if (customMsg && (customMsg.includes("غير صحيح") || customMsg.includes("صلاحيت"))) {
+        setError(customMsg);
+      } else {
+        setError("رمز التحقق الذي كتبته غير صحيح أو انتهت صلاحيته. يرجى التأكد وإعادة المحاولة.");
+      }
       setOtp("");
     } finally {
       setIsLoading(false);

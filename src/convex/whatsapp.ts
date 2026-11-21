@@ -141,18 +141,30 @@ export const enqueueOtpMessage = internalMutation({
     const now = Date.now();
     const expiresAt = now + 5 * 60 * 1000; // 5 دقائق
 
-    // فحص حماية التكرار (Rate Limit: 60 ثانية)
+    // فحص حماية التكرار (Rate Limit: 30 ثانية لتسهيل طلب الرمز مجدداً دون تعليق)
     const existing = await ctx.db
       .query("phoneVerifications")
       .withIndex("by_phone", (q) => q.eq("phone", normalizedPhone))
       .first();
 
-    if (existing && now - existing.lastSentAt < 60 * 1000) {
-      const waitSeconds = Math.ceil((60 * 1000 - (now - existing.lastSentAt)) / 1000);
+    if (existing && now - existing.lastSentAt < 30 * 1000) {
+      const waitSeconds = Math.ceil((30 * 1000 - (now - existing.lastSentAt)) / 1000);
       throw new Error(`يرجى الانتظار ${waitSeconds} ثانية قبل طلب رمز تحقق جديد.`);
     }
 
-    // حفظ كود التحقق في قاعدة البيانات
+    // تنظيف أي رسائل OTP معلقة قديمة لنفس الرقم في طابور الواتساب
+    // لضمان عدم إرسال أكواد متراكمة قديمة عند إعادة المحاولة
+    const oldPendingOtps = await ctx.db
+      .query("whatsappQueue")
+      .withIndex("by_status", (q) => q.eq("status", "pending"))
+      .collect();
+    for (const oldMsg of oldPendingOtps) {
+      if (oldMsg.type === "otp" && oldMsg.ownerPhone === normalizedPhone) {
+        await ctx.db.patch(oldMsg._id, { status: "failed", error: "استبدل برمز أحدث" });
+      }
+    }
+
+    // حفظ كود التحقق الجديد في قاعدة البيانات
     if (existing) {
       await ctx.db.patch(existing._id, {
         code,
@@ -170,7 +182,7 @@ export const enqueueOtpMessage = internalMutation({
       });
     }
 
-    // إدراج الرسالة في طابور الواتساب
+    // إدراج الرسالة في طابور الواتساب فوراً
     const message = `رمز التحقق الخاص بك في منصة شقق العلا هو: ${code} (صالح لمدة 5 دقائق).\n\nلا تشارك هذا الرمز مع أي شخص حفاظاً على أمان حسابك 🔒.`;
     await ctx.db.insert("whatsappQueue", {
       ownerPhone: normalizedPhone,
