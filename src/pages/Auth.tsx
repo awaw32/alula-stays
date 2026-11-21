@@ -4,7 +4,6 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -15,21 +14,17 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { DEMO_MODE } from "@/lib/demo-data";
 import {
-  ArrowRight,
-  CheckCircle2,
   ChevronDown,
   Loader2,
-  Lock,
   Mail,
+  MessageSquare,
   Phone,
   RefreshCw,
-  RotateCcw,
   ShieldCheck,
-  Smartphone,
-  UserX,
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { getErrorMessage } from "@/lib/error-message";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import {
@@ -201,81 +196,72 @@ export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
     }
   };
 
-  const handleGuestLogin = async () => {
-    if (DEMO_MODE) {
-      await demoBlock();
-      return;
-    }
-    setIsLoading(true);
-    setError(null);
-    try {
-      await signIn("anonymous");
-      navigate(redirect);
-    } catch (err) {
-      setError(getErrorMessage(err, "تعذر الدخول كضيف. حاول مرة أخرى."));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
     <main
       dir="rtl"
-      className="relative flex min-h-screen flex-col items-center justify-center bg-neutral-100/60 dark:bg-[#120E0A] px-4 py-8"
+      className="relative flex min-h-screen flex-col items-center justify-center bg-neutral-100/60 dark:bg-[#120E0A] px-4 py-8 overflow-x-hidden"
     >
       {/* Background Soft Glow */}
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[500px] rounded-full bg-[var(--clay-gold)]/10 blur-3xl" />
       </div>
 
-      <div className="w-full max-w-md">
-        {/* ─── Gathern Style Modal Card ─── */}
-        <Card className="relative border border-neutral-200/90 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-2xl rounded-3xl overflow-hidden p-2 sm:p-4">
-          {/* Close 'X' Button at top left (Image 4) */}
+      <div className="w-full max-w-[390px] mx-auto">
+        {/* ─── Premium Auth Card ─── */}
+        <Card className="relative border border-stone-200/70 dark:border-stone-800 bg-white dark:bg-neutral-900 shadow-xl rounded-3xl overflow-hidden">
+          {/* Close 'X' Button — quiet top-left corner */}
           <button
             type="button"
             onClick={() => navigate(returnTo || "/")}
             aria-label="إغلاق"
-            className="absolute top-5 left-5 w-9 h-9 rounded-full bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 flex items-center justify-center text-neutral-600 dark:text-neutral-300 transition-colors z-20"
+            className="absolute top-4 left-4 w-8 h-8 rounded-full bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 flex items-center justify-center text-neutral-500 dark:text-neutral-400 transition-colors z-20"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" strokeWidth={1.75} />
           </button>
 
-          <CardHeader className="flex flex-col items-center pb-3 pt-6 text-center">
+          <CardHeader className="flex flex-col items-center pb-2 pt-7 px-6 text-center">
             {/* Centered Brand Mark */}
-            <div className="mb-4 flex items-center gap-2.5">
+            <div className="mb-3 flex items-center gap-2">
               <img
                 src="/logo-icon.png"
                 alt="شقق العلا"
-                className="h-12 w-auto object-contain"
+                className="h-10 w-auto object-contain"
               />
-              <span className="font-black text-2xl tracking-tight text-neutral-900 dark:text-neutral-100">
+              <span className="font-bold text-xl tracking-tight text-neutral-900 dark:text-neutral-100">
                 شقق العلا
               </span>
             </div>
 
-            <CardTitle className="text-2xl font-black text-neutral-900 dark:text-neutral-100 mb-1">
-              {ownerMode ? "بوابة المضيفين" : "أهلاً بك"}
-            </CardTitle>
-            <CardDescription className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 max-w-xs leading-relaxed">
+            {/* Single subtitle — no "أهلاً بك" */}
+            <CardDescription className="text-xs text-stone-500 dark:text-stone-400 leading-relaxed max-w-[280px]">
               {ownerMode
-                ? "سجّل دخولك لإدارة شققك وحجوزاتك واستقبال النزلاء في العلا"
-                : "أدخل رقم هاتفك الجوال لإنشاء حساب أو تسجيل الدخول."}
+                ? "سجّل دخولك لإدارة شققك وحجوزاتك واستقبال النزلاء"
+                : "سجّل دخولك برقم الجوال للمتابعة"}
             </CardDescription>
 
-            {/* Quick Toggle Phone / Email */}
+            {/* ─── Segmented Control (Phone / Email) ─── */}
             {step === "input" && (
-              <div className="mt-4 flex items-center gap-1 rounded-xl bg-neutral-100 dark:bg-neutral-800 p-1 text-xs">
+              <div className="mt-4 w-full relative bg-stone-100 dark:bg-neutral-800 p-1 rounded-2xl flex">
+                {/* Animated Pill Indicator */}
+                <motion.div
+                  layoutId="auth-tab-pill"
+                  className="absolute top-1 bottom-1 rounded-[14px] bg-white dark:bg-neutral-900 shadow-sm"
+                  style={{
+                    width: "calc(50% - 4px)",
+                    left: method === "phone" ? "4px" : "calc(50% + 0px)",
+                  }}
+                  transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                />
                 <button
                   type="button"
                   onClick={() => {
                     setMethod("phone");
                     setError(null);
                   }}
-                  className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
+                  className={`relative z-10 flex-1 py-2 text-xs font-bold rounded-[14px] transition-colors ${
                     method === "phone"
-                      ? "bg-white dark:bg-neutral-900 text-[var(--clay-accent)] shadow-xs"
-                      : "text-neutral-500 hover:text-neutral-900"
+                      ? "text-[var(--clay-accent)]"
+                      : "text-neutral-500 hover:text-neutral-700"
                   }`}
                 >
                   رقم الجوال
@@ -286,10 +272,10 @@ export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
                     setMethod("email");
                     setError(null);
                   }}
-                  className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
+                  className={`relative z-10 flex-1 py-2 text-xs font-bold rounded-[14px] transition-colors ${
                     method === "email"
-                      ? "bg-white dark:bg-neutral-900 text-[var(--clay-accent)] shadow-xs"
-                      : "text-neutral-500 hover:text-neutral-900"
+                      ? "text-[var(--clay-accent)]"
+                      : "text-neutral-500 hover:text-neutral-700"
                   }`}
                 >
                   البريد الإلكتروني
@@ -298,29 +284,21 @@ export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
             )}
           </CardHeader>
 
-          <CardContent className="space-y-4 pt-1 px-4 sm:px-6">
-            {/* ── الخطوة الأولى: إدخال الرقم (Gathern Image 4 Layout) ── */}
+          <CardContent className="space-y-4 pt-1 px-6 pb-6">
+            {/* ── Step 1: Input ── */}
             {step === "input" && (
               <form onSubmit={handleSendCode} className="space-y-4">
                 {method === "phone" ? (
-                  <div className="space-y-1.5 text-right">
-                    <label
-                      htmlFor="phone-input"
-                      className="block text-xs font-bold text-neutral-700 dark:text-neutral-300"
-                    >
-                      رقم الجوال
-                    </label>
-
-                    {/* Gathern Outlined Input Box with Flag and Chevron */}
-                    <div className="relative flex items-center rounded-2xl border-2 border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-950 px-3 py-1 transition-all focus-within:border-[var(--clay-accent)] focus-within:ring-2 focus-within:ring-[var(--clay-accent)]/20">
+                  <div className="space-y-2">
+                    {/* Professional Phone Input */}
+                    <div className="relative flex items-center h-[52px] rounded-2xl border-2 border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-950 transition-all focus-within:border-[var(--clay-accent)] focus-within:ring-2 focus-within:ring-[var(--clay-accent)]/20">
                       <div
                         dir="ltr"
-                        className="flex select-none items-center gap-1.5 pl-2 pr-3 py-2 border-r border-neutral-200 dark:border-neutral-800 text-xs font-bold text-neutral-800 dark:text-neutral-200"
+                        className="flex select-none items-center gap-1.5 px-3 h-full border-l border-neutral-200 dark:border-neutral-700 text-xs font-bold text-neutral-700 dark:text-neutral-200"
                       >
                         <span className="text-base" role="img" aria-label="السعودية">
                           🇸🇦
                         </span>
-                        <ChevronDown className="w-3.5 h-3.5 text-neutral-400" />
                         <span className="tracking-wider">+966</span>
                       </div>
 
@@ -337,25 +315,19 @@ export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
                         }}
                         disabled={isLoading}
                         autoFocus
-                        className="border-0 bg-transparent text-left font-mono text-base font-bold shadow-none focus-visible:ring-0"
+                        className="border-0 bg-transparent text-left font-mono text-base font-bold shadow-none focus-visible:ring-0 h-full"
                       />
                     </div>
 
-                    <p className="text-[11px] leading-relaxed text-neutral-500 dark:text-neutral-400 pr-1 flex items-center gap-1">
-                      <span>💬</span>
-                      <span>ستصلك رسالة فورية برمز التحقق (6 أرقام) عبر تطبيق واتساب.</span>
+                    <p className="text-[11px] leading-relaxed text-stone-500 dark:text-stone-400 pr-0.5 flex items-center gap-1.5">
+                      <MessageSquare className="w-3 h-3 shrink-0 text-stone-400" strokeWidth={1.75} />
+                      <span>ستصلك رسالة فورية برمز التحقق عبر واتساب</span>
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-1.5 text-right">
-                    <label
-                      htmlFor="email-input"
-                      className="block text-xs font-bold text-neutral-700 dark:text-neutral-300"
-                    >
-                      البريد الإلكتروني
-                    </label>
+                  <div className="space-y-1.5">
                     <div className="relative flex items-center">
-                      <Mail className="absolute right-3.5 top-3.5 size-4 text-neutral-400" />
+                      <Mail className="absolute right-3.5 top-1/2 -translate-y-1/2 size-4 text-neutral-400" strokeWidth={1.75} />
                       <Input
                         id="email-input"
                         type="email"
@@ -368,7 +340,7 @@ export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
                         }}
                         disabled={isLoading}
                         autoFocus
-                        className="h-12 rounded-2xl pr-10 text-left font-sans text-sm border-2 border-neutral-200 dark:border-neutral-700"
+                        className="h-[52px] rounded-2xl pr-10 text-left font-sans text-sm border-2 border-neutral-200 dark:border-neutral-700"
                       />
                     </div>
                   </div>
@@ -380,11 +352,11 @@ export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
                   </div>
                 )}
 
-                {/* Primary Button: "متابعة" (Gathern Button) */}
+                {/* Primary "متابعة" Button */}
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="h-12 w-full rounded-2xl bg-[var(--clay-accent)] hover:opacity-90 text-white text-base font-extrabold shadow-lg shadow-[var(--clay-accent)]/20 transition-all cursor-pointer"
+                  className="h-12 w-full rounded-2xl bg-[var(--clay-accent)] hover:opacity-90 text-white text-base font-bold shadow-lg shadow-[var(--clay-accent)]/20 active:scale-[0.98] transition-all cursor-pointer"
                 >
                   {isLoading ? (
                     <span className="flex items-center gap-2">
@@ -398,12 +370,12 @@ export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
               </form>
             )}
 
-            {/* ── الخطوة الثانية: إدخال رمز التحقق OTP ── */}
+            {/* ── Step 2: OTP Verification ── */}
             {step === "otp" && (
               <div className="space-y-5 text-center">
                 <div className="rounded-2xl border border-amber-500/20 bg-amber-50/50 p-4 dark:bg-amber-950/20">
                   <div className="mx-auto mb-2 flex size-10 items-center justify-center rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300">
-                    {method === "phone" ? <Phone className="size-5" /> : <Mail className="size-5" />}
+                    {method === "phone" ? <Phone className="size-5" strokeWidth={1.75} /> : <Mail className="size-5" strokeWidth={1.75} />}
                   </div>
                   <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">
                     {method === "phone" ? "أرسلنا رمز التحقق عبر تطبيق واتساب 💬" : "أرسلنا رمز التحقق إلى بريدك"}
@@ -452,7 +424,7 @@ export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
                   type="button"
                   onClick={() => handleVerifyOtp()}
                   disabled={isLoading || otp.length !== 6}
-                  className="h-12 w-full rounded-2xl bg-[var(--clay-accent)] text-white text-base font-extrabold shadow-md cursor-pointer"
+                  className="h-12 w-full rounded-2xl bg-[var(--clay-accent)] text-white text-base font-bold shadow-md active:scale-[0.98] transition-all cursor-pointer"
                 >
                   {isLoading ? (
                     <span className="flex items-center gap-2">
@@ -476,7 +448,7 @@ export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
                       disabled={isLoading}
                       className="font-bold text-[var(--clay-accent)] hover:underline inline-flex items-center gap-1"
                     >
-                      <RefreshCw className="size-3.5" />
+                      <RefreshCw className="size-3.5" strokeWidth={1.75} />
                       إعادة إرسال رمز التحقق
                     </button>
                   )}
@@ -496,25 +468,22 @@ export default function Auth({ redirectAfterAuth }: AuthProps = {}) {
               </div>
             )}
 
-            {/* ─── Bottom CTA: "تبي تعرض وحدتك أو عقارك للإيجار؟ بوابة المضيفين" (Gathern Image 4) ─── */}
-            <div className="mt-6 pt-5 border-t border-neutral-100 dark:border-neutral-800 text-center">
-              <p className="text-xs sm:text-sm font-bold text-neutral-800 dark:text-neutral-200 mb-1.5">
-                تبي تعرض وحدتك أو عقارك للإيجار؟
-              </p>
+            {/* ─── Bottom: Host Portal Link ─── */}
+            <div className="mt-4 pt-4 border-t border-neutral-100 dark:border-neutral-800 text-center">
               <Link
                 to="/owner"
-                className="inline-flex items-center gap-1.5 text-xs font-extrabold text-[var(--clay-accent)] hover:underline"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--clay-accent)] hover:underline"
               >
-                <RotateCcw className="size-3.5" />
-                <span>بوابة المضيفين</span>
+                <span>تبي تعرض وحدتك؟</span>
+                <span className="underline">بوابة المضيفين</span>
               </Link>
             </div>
           </CardContent>
         </Card>
 
-        {/* Security & Licensing Trust Footer */}
+        {/* Security Trust Footer */}
         <p className="mt-4 flex items-center justify-center gap-1 text-center text-[11px] text-neutral-400">
-          <ShieldCheck className="size-3.5 text-emerald-600" />
+          <ShieldCheck className="size-3.5 text-emerald-600" strokeWidth={1.75} />
           <span>منصة معتمدة ومحمية بأحدث معايير الأمان والتشفير</span>
         </p>
       </div>

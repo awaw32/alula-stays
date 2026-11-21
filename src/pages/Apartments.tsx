@@ -158,7 +158,7 @@ export default function Apartments() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--background)] pb-24 md:pb-0">
+    <div className="min-h-screen bg-[var(--background)] pb-24 md:pb-0 overflow-x-hidden">
       <Navigation />
 
       {/* Page Header */}
@@ -187,8 +187,8 @@ export default function Apartments() {
           custom={1}
           className="mb-6"
         >
-          <div className="clay p-4">
-            <div className="flex flex-col md:flex-row gap-3">
+          <div className="clay p-4 hidden md:block">
+            <div className="hidden md:flex flex-col md:flex-row gap-3">
               {/* Search Input */}
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)]" />

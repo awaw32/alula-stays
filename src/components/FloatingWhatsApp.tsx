@@ -1,7 +1,15 @@
 import React from "react";
 import { MessageCircle } from "lucide-react";
+import { useLocation } from "react-router";
 
 export function FloatingWhatsApp() {
+  const location = useLocation();
+
+  // Hide on auth page to keep it clean on mobile
+  if (location.pathname === "/auth") {
+    return null;
+  }
+
   return (
     <aside aria-label="الدعم الفني عبر واتساب">
       <a

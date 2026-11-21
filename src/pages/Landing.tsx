@@ -233,7 +233,7 @@ export default function Landing() {
   }, [apartments]);
 
   return (
-    <div className="min-h-screen bg-[#FAF7F2] dark:bg-[#15100C] text-[var(--foreground)] pb-24 md:pb-12">
+    <div className="min-h-screen bg-[#FAF7F2] dark:bg-[#15100C] text-[var(--foreground)] pb-24 md:pb-12 overflow-x-hidden">
       <Navigation />
 
       {/* ─── Hero Section with Saudi Welcome Banner (Gathern Style) ─── */}
@@ -305,8 +305,8 @@ export default function Landing() {
             onSubmit={handleSearchSubmit}
             className="bg-white dark:bg-neutral-900 rounded-2xl sm:rounded-3xl shadow-2xl border border-neutral-200/90 dark:border-neutral-800 p-2 sm:p-3"
           >
-            {/* ── واجهة الجوال الفاخرة المدمجة (نفس الحقول بوضوح تام ودون رموز إنجليزية) ── */}
-            <div className="block md:hidden space-y-2">
+            {/* ── واجهة الجوال — مخفية (البحث الآن عبر أيقونة SearchFilterSheet) ── */}
+            <div className="hidden md:hidden space-y-2">
               {/* السطر الأول: اختر المدينة + نوع الوحدة جنباً إلى جنب */}
               <div className="grid grid-cols-2 gap-2">
                 {/* اختر المدينة */}

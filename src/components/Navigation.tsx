@@ -24,11 +24,11 @@ import {
   Instagram,
   Twitter,
   Youtube,
-  Share2,
 } from "lucide-react";
 import { useState } from "react";
-import { Link, useLocation } from "react-router";
+import { Link, useLocation, useSearchParams } from "react-router";
 import { NotificationBell } from "./NotificationBell";
+import { SearchFilterSheet } from "./SearchFilterSheet";
 
 const navLinks = [
   { href: "/", label: "الرئيسية", icon: Home, requiresAuth: false },
@@ -77,8 +77,10 @@ function isActivePath(pathname: string, href: string) {
 
 export function Navigation() {
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { isAuthenticated, role, user } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [searchSheetOpen, setSearchSheetOpen] = useState(false);
   const unreadCount = useQuery(
     api.messages.unreadCount,
     isAuthenticated && !DEMO_MODE ? {} : "skip",
@@ -101,6 +103,16 @@ export function Navigation() {
     : ownerStatus?.status === "pending"
     ? "طلب المالك"
     : "حسابي";
+
+  // Check if any search/filter is active (for badge dot)
+  const hasActiveSearch =
+    searchParams.has("q") ||
+    searchParams.has("location") ||
+    searchParams.has("sortBy") ||
+    searchParams.has("bedrooms") ||
+    searchParams.has("minPrice") ||
+    searchParams.has("maxPrice") ||
+    searchParams.has("type");
 
   const authHref = (href: string, requiresAuth: boolean) =>
     requiresAuth && !isAuthenticated ? `/auth?returnTo=${encodeURIComponent(href)}` : href;
@@ -143,7 +155,7 @@ export function Navigation() {
                   )}
                   aria-current={isActive ? "page" : undefined}
                 >
-                  <link.icon className="h-4 w-4" aria-hidden="true" />
+                  <link.icon className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
                   {link.label}
                 </Link>
               );
@@ -159,7 +171,7 @@ export function Navigation() {
                     : "text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800",
                 )}
               >
-                <MessageSquare className="h-4 w-4" aria-hidden="true" />
+                <MessageSquare className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
                 الرسائل
                 {unreadCount > 0 && (
                   <span className="flex h-4 min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
@@ -170,21 +182,21 @@ export function Navigation() {
             )}
           </nav>
 
-          {/* Right Header Actions: Host Gateway, Notification Bell & User Account */}
+          {/* Right Header Actions */}
           <div className="flex items-center gap-2">
             {/* بوابة المضيفين (Host CTA on Desktop) */}
             <Link
               to="/owner"
               className="hidden lg:flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-[var(--clay-accent)]/30 text-xs font-bold text-[var(--clay-accent)] hover:bg-[var(--clay-accent-soft)] transition-colors"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
+              <RotateCcw className="w-3.5 h-3.5" strokeWidth={1.75} />
               <span>بوابة المضيفين</span>
             </Link>
 
             {/* Notification Bell */}
             {isAuthenticated && <NotificationBell />}
 
-            {/* User Account Button */}
+            {/* User Account Button (Desktop) */}
             <Link
               to={isAuthenticated ? accountPath : "/auth"}
               className={cn(
@@ -200,18 +212,41 @@ export function Navigation() {
               <span>{isAuthenticated ? accountLabel : "تسجيل الدخول"}</span>
             </Link>
 
-            {/* Mobile Drawer Toggle (Hamburger) */}
-            <button
-              type="button"
-              onClick={() => setMobileOpen(true)}
-              className="p-2 rounded-xl text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors md:hidden"
-              aria-label="القائمة"
-            >
-              <Menu className="h-6 w-6" />
-            </button>
+            {/* ─── Mobile: Search Icon + Hamburger ─── */}
+            <div className="flex items-center gap-1.5 md:hidden">
+              {/* Search Icon Button */}
+              <button
+                type="button"
+                onClick={() => setSearchSheetOpen(true)}
+                className="relative w-10 h-10 rounded-full flex items-center justify-center text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                aria-label="البحث والفلاتر"
+              >
+                <Search className="h-5 w-5" strokeWidth={1.75} />
+                {/* Active filter badge dot */}
+                {hasActiveSearch && (
+                  <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-[var(--clay-accent)] border-2 border-white dark:border-[#15100C]" />
+                )}
+              </button>
+
+              {/* Hamburger Menu */}
+              <button
+                type="button"
+                onClick={() => setMobileOpen(true)}
+                className="w-10 h-10 rounded-full flex items-center justify-center text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                aria-label="القائمة"
+              >
+                <Menu className="h-5 w-5" strokeWidth={1.75} />
+              </button>
+            </div>
           </div>
         </div>
       </header>
+
+      {/* ─── Search & Filter Bottom Sheet (Mobile) ─── */}
+      <SearchFilterSheet
+        isOpen={searchSheetOpen}
+        onClose={() => setSearchSheetOpen(false)}
+      />
 
       {/* ─── Gathern Style Mobile Drawer Menu (Image 3) ─── */}
       {mobileOpen && (
@@ -231,7 +266,7 @@ export function Navigation() {
                 onClick={() => setMobileOpen(false)}
                 className="w-10 h-10 rounded-full bg-[var(--clay-accent-soft)] flex items-center justify-center text-[var(--clay-accent)] shadow-xs"
               >
-                <User className="w-5 h-5" />
+                <User className="w-5 h-5" strokeWidth={1.75} />
               </Link>
 
               <div className="flex items-center gap-2">
@@ -251,11 +286,11 @@ export function Navigation() {
                 className="w-9 h-9 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-600 dark:text-neutral-300"
                 aria-label="إغلاق"
               >
-                <X className="w-5 h-5" />
+                <X className="w-5 h-5" strokeWidth={1.75} />
               </button>
             </div>
 
-            {/* Categories List (Matching Gathern Image 3) */}
+            {/* Categories List */}
             <div className="p-4 space-y-1.5">
               {gathernCategories.map((cat) => (
                 <Link
@@ -273,7 +308,7 @@ export function Navigation() {
                       cat.badgeColor,
                     )}
                   >
-                    <cat.icon className="w-4 h-4" />
+                    <cat.icon className="w-4 h-4" strokeWidth={1.75} />
                   </div>
                 </Link>
               ))}
@@ -292,11 +327,11 @@ export function Navigation() {
                   <span className="block text-xs font-black">بوابة المضيفين</span>
                   <span className="block text-[10px] text-white/90">اعرض وحدتك في العلا</span>
                 </div>
-                <RotateCcw className="w-4 h-4" />
+                <RotateCcw className="w-4 h-4" strokeWidth={1.75} />
               </Link>
             </div>
 
-            {/* Language & Social Links (Gathern Image 3 bottom) */}
+            {/* Language & Social Links */}
             <div className="mt-auto p-4 border-t border-neutral-100 dark:border-neutral-800 space-y-4">
               <div className="flex justify-center">
                 <button
@@ -304,20 +339,20 @@ export function Navigation() {
                   onClick={() => alert("قريباً: النسخة الإنجليزية")}
                   className="flex items-center gap-1.5 px-6 py-2 rounded-xl bg-neutral-100 dark:bg-neutral-800 text-xs font-bold text-neutral-700 dark:text-neutral-300"
                 >
-                  <Globe className="w-4 h-4" />
+                  <Globe className="w-4 h-4" strokeWidth={1.75} />
                   <span>ENGLISH</span>
                 </button>
               </div>
 
               <div className="flex items-center justify-center gap-4 text-neutral-400">
                 <a href="https://instagram.com" target="_blank" rel="noreferrer" className="hover:text-[var(--clay-accent)]">
-                  <Instagram className="w-4 h-4" />
+                  <Instagram className="w-4 h-4" strokeWidth={1.75} />
                 </a>
                 <a href="https://twitter.com" target="_blank" rel="noreferrer" className="hover:text-[var(--clay-accent)]">
-                  <Twitter className="w-4 h-4" />
+                  <Twitter className="w-4 h-4" strokeWidth={1.75} />
                 </a>
                 <a href="https://youtube.com" target="_blank" rel="noreferrer" className="hover:text-[var(--clay-accent)]">
-                  <Youtube className="w-4 h-4" />
+                  <Youtube className="w-4 h-4" strokeWidth={1.75} />
                 </a>
               </div>
             </div>
@@ -325,7 +360,7 @@ export function Navigation() {
         </div>
       )}
 
-      {/* ─── Mobile Bottom App Bar (Clean & Elevated) ─── */}
+      {/* ─── Mobile Bottom App Bar ─── */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-neutral-200/90 dark:border-neutral-800 bg-white/95 dark:bg-[#15100C]/95 backdrop-blur-xl md:hidden">
         <div className="flex h-16 items-center justify-around px-2">
           {navLinks.map((link) => {
@@ -340,7 +375,7 @@ export function Navigation() {
                 )}
                 aria-current={isActive ? "page" : undefined}
               >
-                <link.icon className={cn("h-5 w-5", isActive && "stroke-[2.5]")} aria-hidden="true" />
+                <link.icon className={cn("h-5 w-5", isActive && "stroke-[2.5]")} strokeWidth={isActive ? 2.5 : 1.75} aria-hidden="true" />
                 <span className="text-[10px] font-bold">{link.label}</span>
               </Link>
             );
@@ -355,7 +390,7 @@ export function Navigation() {
                 : "text-neutral-400 dark:text-neutral-500",
             )}
           >
-            <User className={cn("h-5 w-5", isActivePath(location.pathname, accountPath) && "stroke-[2.5]")} aria-hidden="true" />
+            <User className={cn("h-5 w-5", isActivePath(location.pathname, accountPath) && "stroke-[2.5]")} strokeWidth={isActivePath(location.pathname, accountPath) ? 2.5 : 1.75} aria-hidden="true" />
             <span className="text-[10px] font-bold">{isAuthenticated ? "حسابي" : "دخول"}</span>
           </Link>
         </div>
