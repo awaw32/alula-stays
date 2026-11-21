@@ -39,7 +39,7 @@ const ADMIN_FALLBACK_JID = "966506709265@s.whatsapp.net";
 
 // ━━━ متغيرات تتبع حالة الاتصال ونظام المراقبة الذاتي (Watchdog) ━━━
 let isWaConnected = false;
-let disconnectedSince = 0;
+let disconnectedSince = Date.now();
 let wasOffline = false;
 let lastSuccessfulPoll = Date.now();
 let consecutiveDisconnects = 0;
@@ -627,38 +627,36 @@ function startNetworkWatchdog() {
 
     if (!isOnline) {
       if (!wasOffline) {
-        console.warn("⚠️ تم رصد انقطاع الاتصال بالإنترنت.");
+        console.warn("⚠️ [Watchdog] تم رصد انقطاع الاتصال بالإنترنت.");
         wasOffline = true;
       }
       return;
     }
 
     // الإنترنت متوفر الآن:
-    // 1. إذا كان الإنترنت منقطعاً سابقاً والآن عاد، وكان واتساب غير متصل أو متجمداً:
+    // 1. فور عودة الإنترنت بعد انقطاع: إعادة تشغيل فورية ونظيفة عبر PM2
     if (wasOffline) {
-      console.log("🌐 عادت شبكة الإنترنت بعد انقطاع!");
+      console.warn("🌐 [Watchdog] عادت شبكة الإنترنت بعد انقطاع! إعادة تشغيل البوت فوراً عبر PM2 لإنشاء اتصال نظيف...");
       wasOffline = false;
-      if (!isWaConnected) {
-        console.warn("🔄 إعادة تشغيل البوت فوراً عبر PM2 لإنشاء اتصال نظيف بعد عودة الشبكة...");
-        process.exit(1);
-      }
+      process.exit(1);
     }
 
-    // 2. إذا ظل واتساب غير متصل لأكثر من دقيقتين رغم توفر الإنترنت:
-    if (!isWaConnected && disconnectedSince > 0) {
-      const offlineDuration = now - disconnectedSince;
-      if (offlineDuration > TWO_MINUTES_MS) {
+    // 2. إذا ظل واتساب غير متصل لأكثر من دقيقتين مع وجود إنترنت:
+    if (!isWaConnected) {
+      if (!disconnectedSince) {
+        disconnectedSince = now;
+      } else if (now - disconnectedSince > TWO_MINUTES_MS) {
         console.warn(
-          `⚠️ واتساب غير متصل منذ ${Math.round(offlineDuration / 1000)} ثانية رغم توفر الإنترنت. إعادة التشغيل عبر PM2...`
+          `⚠️ [Watchdog] واتساب غير متصل منذ ${Math.round((now - disconnectedSince) / 1000)} ثانية رغم توفر الإنترنت. إعادة التشغيل عبر PM2...`
         );
         process.exit(1);
       }
     }
 
-    // 3. إذا لم ينجح فحص طابور Convex لأكثر من 3 دقائق رغم توفر الإنترنت (مؤشر تجمّد العملية):
+    // 3. إذا لم ينجح فحص طابور Convex لأكثر من 3 دقائق مع وجود إنترنت (مؤشر تجمّد العملية):
     if (now - lastSuccessfulPoll > THREE_MINUTES_MS) {
       console.warn(
-        `⚠️ توقف فحص طابور Convex منذ ${Math.round((now - lastSuccessfulPoll) / 1000)} ثانية (تجمّد محتمل). إعادة التشغيل عبر PM2...`
+        `⚠️ [Watchdog] توقف فحص طابور Convex منذ ${Math.round((now - lastSuccessfulPoll) / 1000)} ثانية (تجمّد محتمل). إعادة التشغيل عبر PM2...`
       );
       process.exit(1);
     }
