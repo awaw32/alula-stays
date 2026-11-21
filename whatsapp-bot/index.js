@@ -14,7 +14,15 @@ import fs from "fs";
 import { exec } from "child_process";
 import makeWASocket, { useMultiFileAuthState, DisconnectReason } from "@whiskeysockets/baileys";
 import QR from "qrcode-terminal";
-import { ConvexHttpClient } from "convex/browser";
+import WebSocket from "ws";
+
+// تفعيل دعم WebSocket لعميل Convex في بيئة Node.js
+if (!globalThis.WebSocket) {
+  globalThis.WebSocket = WebSocket;
+}
+
+import { ConvexClient, ConvexHttpClient } from "convex/browser";
+import { anyApi as api } from "convex/server";
 
 // ━━━ معالجة الأخطاء غير الملتقطة لمنع تعليق العملية ━━━
 process.on("uncaughtException", (err) => {
@@ -31,6 +39,7 @@ if (!CONVEX_URL) {
   process.exit(1);
 }
 const convex = new ConvexHttpClient(CONVEX_URL);
+const convexRealtime = new ConvexClient(CONVEX_URL);
 
 /** معرفات الأدمن القطعية (آخر 9 أرقام ومعرف LID) */
 const ADMIN_PHONE_SUFFIX = "506709265";
@@ -407,13 +416,14 @@ async function startBot() {
       isWaConnected = true;
       disconnectedSince = 0;
       consecutiveDisconnects = 0;
-      processQueue(sock);
+      setupRealtimeSubscription(sock);
       checkServerHealth(sock);
       setInterval(() => checkServerHealth(sock), 15 * 60 * 1000);
     }
 
     if (connection === "close") {
       isWaConnected = false;
+      currentSock = null;
       if (!disconnectedSince) {
         disconnectedSince = Date.now();
       }
@@ -566,45 +576,80 @@ async function startBot() {
   });
 }
 
-// ━━━ مراقبة طابور الرسائل كل 3 ثوانٍ لمعالجة أكواد التحقق فوراً ━━━
+// ━━━ نظام الاشتراك الفوري (Real-time Subscription) وتوفير البطارية ━━━
+let currentSock = null;
 let isQueueProcessing = false;
+let isRealtimeSubscribed = false;
 
-async function processQueue(sock) {
+async function handlePendingMessages(pending, sock = currentSock) {
+  if (!sock || !isWaConnected || !pending || pending.length === 0) return;
   if (isQueueProcessing) return;
   isQueueProcessing = true;
+  lastSuccessfulPoll = Date.now();
 
   try {
-    const pending = await convex.query("whatsapp:getPendingMessages", {});
-    lastSuccessfulPoll = Date.now();
-
     for (const item of pending) {
       try {
         const cleanPhone = (item.ownerPhone || "").replace(/\D/g, "");
         if (!cleanPhone) continue;
         const jid = cleanPhone + "@s.whatsapp.net";
-        
+
         // إرسال الرسالة مع timeout لمنع تعليق الدورة في حال بطء الشبكة
         await Promise.race([
           sock.sendMessage(jid, { text: item.message }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout sending WhatsApp message")), 10000)),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Timeout sending WhatsApp message")), 10000)
+          ),
         ]);
-        
+
         await convex.mutation("whatsapp:markMessageSent", { id: item._id });
         console.log(`📤 تم إرسال رسالة [${item.type || "عامة"}] إلى ${item.ownerPhone} بنجاح ✅`);
       } catch (err) {
         console.error(`❌ فشل إرسال رسالة إلى ${item.ownerPhone}:`, err.message);
-        await convex.mutation("whatsapp:markMessageFailed", {
-          id: item._id,
-          error: err.message,
-        }).catch(() => {});
+        await convex
+          .mutation("whatsapp:markMessageFailed", {
+            id: item._id,
+            error: err.message,
+          })
+          .catch(() => {});
       }
     }
   } catch (err) {
-    console.error("❌ خطأ في جلب الرسائل المعلقة من Convex:", err.message);
+    console.error("❌ خطأ أثناء معالجة رسائل طابور Convex:", err.message);
   } finally {
     isQueueProcessing = false;
-    setTimeout(() => processQueue(sock), 3000);
   }
+}
+
+function setupRealtimeSubscription(sock) {
+  currentSock = sock;
+  if (isRealtimeSubscribed) return;
+  isRealtimeSubscribed = true;
+
+  console.log("⚡ تفعيل الاشتراك الفوري (Real-time Subscription) مع Convex لحفظ بطارية السيرفر...");
+
+  // 1. الاشتراك اللحظي: يستيقظ البوت فوراً عند إضافة أي رسالة جديدة في whatsappQueue
+  convexRealtime.onUpdate(api.whatsapp.getPendingMessages, {}, async (messages) => {
+    lastSuccessfulPoll = Date.now();
+    if (messages && messages.length > 0) {
+      console.log(`⚡ وصل إشعار لحظي بوجود (${messages.length}) رسالة جديدة في الطابور!`);
+      await handlePendingMessages(messages, currentSock);
+    }
+  });
+
+  // 2. فحص احتياطي صامت كل 60 ثانية فقط كأمان إضافي في حال انقطاع الـ WebSocket مؤقتاً
+  setInterval(async () => {
+    if (!isWaConnected || !currentSock) return;
+    try {
+      const fallbackPending = await convex.query("whatsapp:getPendingMessages", {});
+      lastSuccessfulPoll = Date.now();
+      if (fallbackPending && fallbackPending.length > 0) {
+        await handlePendingMessages(fallbackPending, currentSock);
+      }
+    } catch {
+      // فحص احتياطي صامت
+    }
+  }, 60 * 1000);
 }
 
 // ━━━ فحص وجود إنترنت فعلي عبر DNS ━━━
