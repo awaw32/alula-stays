@@ -148,15 +148,12 @@ function VisitorTracker() {
   return null;
 }
 
-import { FloatingWhatsApp } from "@/components/FloatingWhatsApp";
-
 function AppRoutes() {
   return (
     <BrowserRouter basename={routerBasename}>
       <RouteSyncer />
       <VisitorTracker />
       <DemoBanner />
-      <FloatingWhatsApp />
       <Suspense fallback={<RouteLoading />}>
         <Routes>
           <Route path="/" element={<Landing />} />

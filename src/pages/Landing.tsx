@@ -26,29 +26,34 @@ import {
 
 const HERO_IMAGES = [
   {
-    // جبل الفيل (Elephant Rock) في العلا
+    // جبل الفيل (Elephant Rock) - المعلم الأيقوني التراثي الأشهر في العلا
     url: "https://images.unsplash.com/photo-1682687220063-4742bd7fd538?w=1800&q=85&auto=format&fit=crop",
     title: "جبل الفيل وتكوينات العلا الصخرية الساحرة",
   },
   {
-    // واحة نخيل العلا الخضراء بين الجبال
-    url: "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=1800&q=85&auto=format&fit=crop",
-    title: "واحات ونخيل العلا الغنّاء بين الجبال التراثية",
-  },
-  {
-    // سماء وصحراء العلا الذهبية عند الغروب
-    url: "https://images.unsplash.com/photo-1544644181-1484b3fdfc62?w=1800&q=85&auto=format&fit=crop",
-    title: "جبال وسهول العلا الخلابة في لحظات الغروب",
-  },
-  {
-    // قصر الفريد ومدائن صالح (الحجر) الموقع الأثري العالمي في العلا
-    url: "https://images.unsplash.com/photo-1518684079-3c830dcef090?w=1800&q=85&auto=format&fit=crop",
+    // الحِجر (مدائن صالح) - أول موقع مسجل في اليونسكو بالمملكة
+    url: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=1800&q=85&auto=format&fit=crop",
     title: "آثار الحِجر ومدائن صالح التاريخية في العلا",
   },
   {
-    // سماء العلا ورصد النجوم في صحراء الغراميل
-    url: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1800&q=85&auto=format&fit=crop",
-    title: "سماء العلا ورصد النجوم فوق التكوينات الصخرية",
+    // البلدة القديمة في العلا (AlUla Old Town) - مباني الطين والممرات الحجرية التاريخية
+    url: "https://images.unsplash.com/photo-1524758631624-e2822e304c36?w=1800&q=85&auto=format&fit=crop",
+    title: "ديرة العلا والبلدة التراثية القديمة ببيوتها الطينية العريقة",
+  },
+  {
+    // قاعة مرايا (Maraya Concert Hall) - أيقونة العمارة الصحراوية العاكسة بين جبال عِكرمة
+    url: "https://images.unsplash.com/photo-1518684079-3c830dcef090?w=1800&q=85&auto=format&fit=crop",
+    title: "قاعة مرايا الشهيرة وجمال العمارة المعاصرة وسط جبال العلا",
+  },
+  {
+    // واحة نخيل العلا التاريخية الخضراء وبساتين الحمضيات بين الجبال الصخرية
+    url: "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=1800&q=85&auto=format&fit=crop",
+    title: "واحات ونخيل العلا الغنّاء بين الجبال والكهوف الأثرية",
+  },
+  {
+    // سماء وصحراء العلا الذهبية عند المغيب وسحر رصد النجوم في الغراميل
+    url: "https://images.unsplash.com/photo-1544644181-1484b3fdfc62?w=1800&q=85&auto=format&fit=crop",
+    title: "سكون صحراء وسماء العلا الخلابة في لحظات الغروب",
   },
 ];
 
@@ -57,49 +62,49 @@ const alUlaDestinations = [
     id: "old-town",
     name: "ديرة العلا القديمة",
     location: "AlUla Old Town",
-    image: "https://images.unsplash.com/photo-1524758631624-e2822e304c36?w=240&h=240&fit=crop",
+    image: "https://images.unsplash.com/photo-1524758631624-e2822e304c36?w=400&h=400&fit=crop",
   },
   {
     id: "elephant-rock",
     name: "صخرة الفيل",
     location: "Elephant Rock",
-    image: "https://images.unsplash.com/photo-1518684079-3c830dcef090?w=240&h=240&fit=crop",
+    image: "https://images.unsplash.com/photo-1682687220063-4742bd7fd538?w=400&h=400&fit=crop",
   },
   {
     id: "hegra",
     name: "الحِجر (مدائن صالح)",
     location: "Hegra",
-    image: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=240&h=240&fit=crop",
+    image: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=400&h=400&fit=crop",
   },
   {
     id: "dadan",
     name: "مملكة دادان",
     location: "Dadan",
-    image: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=240&h=240&fit=crop",
+    image: "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=400&h=400&fit=crop",
   },
   {
     id: "oasis",
     name: "واحة النخيل",
     location: "AlUla Oasis",
-    image: "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=240&h=240&fit=crop",
+    image: "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=400&h=400&fit=crop",
   },
   {
-    id: "arts",
-    name: "حي الفنون (الجديدة)",
+    id: "maraya",
+    name: "قاعة مرايا والفنون",
     location: "AlUla Arts District",
-    image: "https://images.unsplash.com/photo-1513694203232-719a280e022f?w=240&h=240&fit=crop",
+    image: "https://images.unsplash.com/photo-1518684079-3c830dcef090?w=400&h=400&fit=crop",
   },
   {
     id: "sharaan",
-    name: "جبال شرعان",
+    name: "محمية شرعان",
     location: "Jabal Ithlib",
-    image: "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=240&h=240&fit=crop",
+    image: "https://images.unsplash.com/photo-1544644181-1484b3fdfc62?w=400&h=400&fit=crop",
   },
   {
     id: "stars",
-    name: "رصد النجوم",
+    name: "مخيمات الغراميل والنجوم",
     location: "Heritage Village",
-    image: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=240&h=240&fit=crop",
+    image: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400&h=400&fit=crop",
   },
 ];
 

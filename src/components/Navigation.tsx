@@ -420,8 +420,28 @@ export function Navigation() {
             </div>
 
             {/* Language & Social Links */}
-            <div className="mt-auto p-4 border-t border-neutral-100 dark:border-neutral-800 space-y-4">
-              <div className="flex justify-center">
+            <div className="mt-auto p-4 border-t border-neutral-100 dark:border-neutral-800 space-y-3">
+              {/* WhatsApp direct support channel in drawer */}
+              <a
+                href="https://wa.me/966535080498"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center justify-between p-3 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/50 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100/70 transition-colors"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-xs">
+                    <MessageSquare className="w-4 h-4" strokeWidth={1.75} />
+                  </div>
+                  <div className="text-right">
+                    <span className="block text-xs font-bold">تواصل معنا عبر واتساب</span>
+                    <span className="block text-[10px] text-emerald-600 dark:text-emerald-400">دعم مباشر وحجوزات العلا</span>
+                  </div>
+                </div>
+                <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300">فتح المحادثة 💬</span>
+              </a>
+
+              <div className="flex justify-center pt-1">
                 <button
                   type="button"
                   onClick={() => alert("قريباً: النسخة الإنجليزية")}
