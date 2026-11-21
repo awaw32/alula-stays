@@ -111,7 +111,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-80 sm:w-96 rounded-2xl bg-white dark:bg-[#1E1610] shadow-2xl border border-neutral-200/80 dark:border-neutral-800 z-50 overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150">
+        <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-[calc(100vw-2rem)] max-w-sm sm:w-96 rounded-2xl bg-white dark:bg-[#1E1610] shadow-2xl border border-neutral-200/80 dark:border-neutral-800 z-50 overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-100 dark:border-neutral-800/80 bg-neutral-50/70 dark:bg-neutral-900/40">
             <div className="flex items-center gap-2">

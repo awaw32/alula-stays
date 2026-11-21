@@ -78,30 +78,53 @@ function validateImageFile(file: File): string | null {
 
 /** قراءة البايتات الأولى للتحقق أن الملف صورة فعلية وليس ملفاً متنكراً */
 async function hasValidImageSignature(file: File): Promise<boolean> {
-  const header = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+  // إذا كان نوع الملف معروفاً وليس صورة، ارفضه
+  if (file.type && !file.type.startsWith("image/")) {
+    return false;
+  }
+  const header = new Uint8Array(await file.slice(0, 16).arrayBuffer());
   const startsWith = (bytes: number[]) => bytes.every((b, i) => header[i] === b);
-  // JPEG: FF D8 FF — PNG: 89 50 4E 47 — WebP: RIFF....WEBP
-  return (
-    startsWith([0xff, 0xd8, 0xff]) ||
-    startsWith([0x89, 0x50, 0x4e, 0x47]) ||
-    (startsWith([0x52, 0x49, 0x46, 0x46]) && header[8] === 0x57 && header[9] === 0x45 && header[10] === 0x42 && header[11] === 0x50)
-  );
+  // JPEG: FF D8 FF — PNG: 89 50 4E 47 — WebP: RIFF....WEBP — GIF: GIF8
+  // HEIC / HEIF / AVIF: ftyp box (bytes 4..7 === 'ftyp')
+  const isJpeg = startsWith([0xff, 0xd8, 0xff]);
+  const isPng = startsWith([0x89, 0x50, 0x4e, 0x47]);
+  const isWebp =
+    startsWith([0x52, 0x49, 0x46, 0x46]) &&
+    header[8] === 0x57 &&
+    header[9] === 0x45 &&
+    header[10] === 0x42 &&
+    header[11] === 0x50;
+  const isGif = startsWith([0x47, 0x49, 0x46, 0x38]);
+  const isFtyp =
+    header[4] === 0x66 &&
+    header[5] === 0x74 &&
+    header[6] === 0x79 &&
+    header[7] === 0x70;
+
+  return isJpeg || isPng || isWebp || isGif || isFtyp;
 }
 
 /** ضغط الصورة تلقائياً عبر canvas (أقصى عرض 1920px، جودة 0.82) */
 async function compressImage(file: File): Promise<Blob> {
-  const bitmap = await createImageBitmap(file);
-  const maxDim = 1920;
-  const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return file;
-  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  return await new Promise<Blob>((resolve) =>
-    canvas.toBlob((blob) => resolve(blob && blob.size < file.size ? blob : file), "image/jpeg", 0.82),
-  );
+  try {
+    if (typeof createImageBitmap === "function") {
+      const bitmap = await createImageBitmap(file);
+      const maxDim = 1920;
+      const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(bitmap.width * scale);
+      canvas.height = Math.round(bitmap.height * scale);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return file;
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      return await new Promise<Blob>((resolve) =>
+        canvas.toBlob((blob) => resolve(blob && blob.size < file.size ? blob : file), "image/jpeg", 0.82),
+      );
+    }
+  } catch (err) {
+    console.warn("createImageBitmap failed, uploading original file", err);
+  }
+  return file;
 }
 
 type ApartmentFormProps = {
@@ -354,7 +377,12 @@ export function ApartmentForm({ mode, initialValues, loading = false, disabled =
       </section>
 
       <section className="clay space-y-4 p-6">
-        <h2 className="text-lg font-bold text-[var(--foreground)]">الصور *</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-[var(--foreground)]">صور الشقة *</h2>
+          <span className="text-xs text-[var(--muted-foreground)]">
+            {form.images.length} من {MAX_IMAGES} صور
+          </span>
+        </div>
         <div>
           <input
             ref={fileInputRef}
@@ -368,25 +396,98 @@ export function ApartmentForm({ mode, initialValues, loading = false, disabled =
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading || disabled}
-            className="clay-btn w-full"
+            className="clay-btn w-full py-3 flex items-center justify-center gap-2 text-sm font-bold"
           >
-            {uploading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Upload className="h-4 w-4" aria-hidden="true" />}
-            {uploading ? "جاري رفع الصور..." : "رفع الصور من جهازك"}
+            {uploading ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Upload className="h-4 w-4" aria-hidden="true" />
+            )}
+            {uploading ? "جاري رفع ومعالجة الصور..." : "رفع الصور من جهازك (كاميرا / ألبوم)"}
           </Button>
         </div>
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t" />
+            <span className="w-full border-t border-[var(--border)]" />
           </div>
           <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-background px-2 text-muted-foreground">أو الصق رابط صورة</span>
+            <span className="bg-[var(--background)] px-2 text-[var(--muted-foreground)]">أو الصق رابط صورة</span>
           </div>
         </div>
         <div className="flex gap-2">
-          <Input value={imageUrl} onChange={(event) => setImageUrl(event.target.value)} className="clay-input flex-1" placeholder="الصق رابط صورة هنا..." type="url" aria-label="رابط صورة جديدة" onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addImage(); } }} />
-          <Button type="button" onClick={addImage} className="clay-btn" aria-label="إضافة صورة بالرابط"><Plus className="h-4 w-4" aria-hidden="true" />إضافة</Button>
+          <Input
+            value={imageUrl}
+            onChange={(event) => setImageUrl(event.target.value)}
+            className="clay-input flex-1 text-sm"
+            placeholder="الصق رابط صورة هنا..."
+            type="url"
+            aria-label="رابط صورة جديدة"
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                addImage();
+              }
+            }}
+          />
+          <Button type="button" onClick={addImage} className="clay-btn shrink-0" aria-label="إضافة صورة بالرابط">
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            إضافة
+          </Button>
         </div>
-        {form.images.length > 0 && <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{form.images.map((image, index) => <div key={`${image}-${index}`} className="group relative"><img src={image} alt={`صورة الشقة ${index + 1}`} className="h-24 w-full rounded-xl object-cover" /><Button type="button" variant="destructive" size="icon-sm" className="absolute right-1 top-1 opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100" onClick={() => update("images", form.images.filter((_, imageIndex) => imageIndex !== index))} aria-label={`حذف صورة الشقة ${index + 1}`}><X className="h-3 w-3" aria-hidden="true" /></Button></div>)}</div>}
+
+        {form.images.length > 0 && (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 pt-2">
+            {form.images.map((image, index) => (
+              <div
+                key={`${image}-${index}`}
+                className="group relative aspect-[4/3] w-full overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-900 shadow-xs"
+              >
+                <img
+                  src={image}
+                  alt={`صورة الشقة ${index + 1}`}
+                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  loading="lazy"
+                />
+
+                {/* شارة الصورة الرئيسية */}
+                {index === 0 && (
+                  <span className="absolute bottom-1.5 right-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500 text-white shadow-xs pointer-events-none">
+                    الصورة الرئيسية 🌟
+                  </span>
+                )}
+
+                {/* أزرار الإجراءات: تعيين كغلاف + حذف */}
+                <div className="absolute top-1.5 inset-x-1.5 flex items-center justify-between">
+                  {index > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const reordered = [image, ...form.images.filter((_, i) => i !== index)];
+                        update("images", reordered);
+                      }}
+                      className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-black/70 hover:bg-black/90 text-white backdrop-blur-xs transition-colors shadow-xs"
+                      title="تعيين كصورة رئيسية للشقة"
+                    >
+                      تعيين كغلاف
+                    </button>
+                  ) : (
+                    <div />
+                  )}
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon-sm"
+                    className="h-7 w-7 rounded-lg opacity-90 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 transition-opacity bg-red-600 hover:bg-red-700 text-white shadow-xs"
+                    onClick={() => update("images", form.images.filter((_, imageIndex) => imageIndex !== index))}
+                    aria-label={`حذف صورة الشقة ${index + 1}`}
+                  >
+                    <X className="h-3.5 w-3.5" aria-hidden="true" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="clay space-y-4 p-6">

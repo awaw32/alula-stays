@@ -201,8 +201,19 @@ export default function MyBookings() {
               return (
                 <motion.div key={booking._id} variants={fadeUp} custom={index + 1}>
                   <article className="clay p-5">
-                    <div className="flex flex-col gap-4 md:flex-row">
-                      {booking.apartment?.images?.[0] && <Link to={`/apartment/${booking.apartmentId}`} className="shrink-0"><img src={booking.apartment.images[0]} alt={title} className="h-24 w-full rounded-xl object-cover md:w-32" /></Link>}
+                    <div className="flex flex-col gap-4 sm:flex-row">
+                      {booking.apartment?.images?.[0] && (
+                        <Link
+                          to={`/apartment/${booking.apartmentId}`}
+                          className="shrink-0 block aspect-[16/9] sm:aspect-auto sm:h-28 sm:w-36 rounded-xl overflow-hidden bg-neutral-100 dark:bg-neutral-800"
+                        >
+                          <img
+                            src={booking.apartment.images[0]}
+                            alt={title}
+                            className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+                          />
+                        </Link>
+                      )}
                       <div className="min-w-0 flex-1">
                         <div className="mb-2 flex items-start justify-between gap-2">
                           <div>
@@ -220,7 +231,7 @@ export default function MyBookings() {
                         </div>
 
                         {/* أزرار الإجراءات والفاتورة */}
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <div className="mt-4 flex flex-wrap items-center gap-2">
                           <button
                             type="button"
                             onClick={() =>
@@ -248,7 +259,7 @@ export default function MyBookings() {
                                 createdAt: booking.createdAt,
                               })
                             }
-                            className="clay-sm flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium hover:bg-[var(--clay-accent-soft)]"
+                            className="clay-sm flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold hover:bg-[var(--clay-accent-soft)] transition-colors"
                           >
                             <FileText className="h-3.5 w-3.5 text-[var(--clay-accent)]" />
                             عرض الفاتورة
@@ -259,7 +270,7 @@ export default function MyBookings() {
                               type="button"
                               onClick={() => void handleSendWhatsAppInvoice(booking._id)}
                               disabled={sendingInvoiceId === booking._id}
-                              className="clay-sm flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
+                              className="clay-sm flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 transition-colors"
                               title="إرسال الفاتورة لرقم الواتساب"
                             >
                               {sendingInvoiceId === booking._id ? (
@@ -276,7 +287,7 @@ export default function MyBookings() {
                               type="button"
                               onClick={() => void handlePayNow(booking._id)}
                               disabled={payingBookingId === booking._id}
-                              className="clay-btn flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold shadow-sm"
+                              className="clay-btn flex items-center gap-1.5 px-4 py-2 text-xs font-bold shadow-sm"
                             >
                               {payingBookingId === booking._id ? (
                                 <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
@@ -292,7 +303,7 @@ export default function MyBookings() {
                               type="button"
                               onClick={() => setCancelTarget(booking._id)}
                               disabled={cancelling === booking._id}
-                              className="clay-sm flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+                              className="clay-sm flex items-center gap-1 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
                               aria-label={`إلغاء حجز ${title}`}
                             >
                               {cancelling === booking._id ? (
@@ -307,7 +318,7 @@ export default function MyBookings() {
                           <button
                             type="button"
                             onClick={() => setReportingBooking(booking)}
-                            className="clay-sm flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-50 dark:hover:bg-amber-950/40"
+                            className="clay-sm flex items-center gap-1 px-3 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors"
                             title="تقديم بلاغ أو ملاحظة للإدارة بخصوص الشقة أو الحجز"
                           >
                             <Flag className="h-3 w-3 text-amber-600" />

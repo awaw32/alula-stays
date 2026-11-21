@@ -465,41 +465,43 @@ export function Navigation() {
         </div>
       )}
 
-      {/* ─── Mobile Bottom App Bar ─── */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-neutral-200/90 dark:border-neutral-800 bg-white/95 dark:bg-[#15100C]/95 backdrop-blur-xl md:hidden">
-        <div className="flex h-16 items-center justify-around px-2">
-          {navLinks.map((link) => {
-            const isActive = isActivePath(location.pathname, link.href);
-            return (
-              <Link
-                key={link.href}
-                to={authHref(link.href, link.requiresAuth)}
-                className={cn(
-                  "flex min-w-[60px] flex-col items-center gap-0.5 transition-colors",
-                  isActive ? "text-[var(--clay-accent)]" : "text-neutral-400 dark:text-neutral-500",
-                )}
-                aria-current={isActive ? "page" : undefined}
-              >
-                <link.icon className={cn("h-5 w-5", isActive && "stroke-[2.5]")} strokeWidth={isActive ? 2.5 : 1.75} aria-hidden="true" />
-                <span className="text-[10px] font-bold">{link.label}</span>
-              </Link>
-            );
-          })}
+      {/* ─── Mobile Bottom App Bar (مخفي في صفحة تفاصيل الشقة لإتاحة شريط الحجز الكامل) ─── */}
+      {!location.pathname.startsWith("/apartment/") && (
+        <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-neutral-200/90 dark:border-neutral-800 bg-white/95 dark:bg-[#15100C]/95 backdrop-blur-xl md:hidden">
+          <div className="flex h-16 items-center justify-around px-2">
+            {navLinks.map((link) => {
+              const isActive = isActivePath(location.pathname, link.href);
+              return (
+                <Link
+                  key={link.href}
+                  to={authHref(link.href, link.requiresAuth)}
+                  className={cn(
+                    "flex min-w-[60px] flex-col items-center gap-0.5 transition-colors",
+                    isActive ? "text-[var(--clay-accent)]" : "text-neutral-400 dark:text-neutral-500",
+                  )}
+                  aria-current={isActive ? "page" : undefined}
+                >
+                  <link.icon className={cn("h-5 w-5", isActive && "stroke-[2.5]")} strokeWidth={isActive ? 2.5 : 1.75} aria-hidden="true" />
+                  <span className="text-[10px] font-bold">{link.label}</span>
+                </Link>
+              );
+            })}
 
-          <Link
-            to={isAuthenticated ? accountPath : "/auth"}
-            className={cn(
-              "flex min-w-[60px] flex-col items-center gap-0.5 transition-colors",
-              isActivePath(location.pathname, accountPath)
-                ? "text-[var(--clay-accent)]"
-                : "text-neutral-400 dark:text-neutral-500",
-            )}
-          >
-            <User className={cn("h-5 w-5", isActivePath(location.pathname, accountPath) && "stroke-[2.5]")} strokeWidth={isActivePath(location.pathname, accountPath) ? 2.5 : 1.75} aria-hidden="true" />
-            <span className="text-[10px] font-bold">{isAuthenticated ? "حسابي" : "دخول"}</span>
-          </Link>
-        </div>
-      </nav>
+            <Link
+              to={isAuthenticated ? accountPath : "/auth"}
+              className={cn(
+                "flex min-w-[60px] flex-col items-center gap-0.5 transition-colors",
+                isActivePath(location.pathname, accountPath)
+                  ? "text-[var(--clay-accent)]"
+                  : "text-neutral-400 dark:text-neutral-500",
+              )}
+            >
+              <User className={cn("h-5 w-5", isActivePath(location.pathname, accountPath) && "stroke-[2.5]")} strokeWidth={isActivePath(location.pathname, accountPath) ? 2.5 : 1.75} aria-hidden="true" />
+              <span className="text-[10px] font-bold">{isAuthenticated ? "حسابي" : "دخول"}</span>
+            </Link>
+          </div>
+        </nav>
+      )}
     </>
   );
 }

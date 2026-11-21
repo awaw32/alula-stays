@@ -67,19 +67,19 @@ export function InvoiceModal({ open, onOpenChange, invoice }: InvoiceModalProps)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto print:max-w-none print:m-0 print:p-0 bg-[var(--background)] border border-[var(--border)]">
-        <DialogHeader className="print:hidden flex flex-row items-center justify-between pb-2 border-b border-[var(--border)]">
-          <DialogTitle className="text-xl font-bold flex items-center gap-2">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto print:max-w-none print:m-0 print:p-0 bg-[var(--background)] border border-[var(--border)] p-4 sm:p-6">
+        <DialogHeader className="print:hidden flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-[var(--border)]">
+          <DialogTitle className="text-lg sm:text-xl font-bold flex flex-wrap items-center gap-2">
             <span>فاتورة الحجز الإلكترونية</span>
             <span className="text-xs font-mono bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded text-[var(--muted-foreground)]">
               #{invoice.invoiceNumber}
             </span>
           </DialogTitle>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
               onClick={handleSendWhatsApp}
               disabled={sendingWhatsApp}
-              className="clay-sm px-3 py-1.5 text-xs font-medium flex items-center gap-1.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
+              className="clay-sm flex-1 sm:flex-initial px-3 py-2 text-xs font-medium flex items-center justify-center gap-1.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 transition-colors"
               title="إرسال نسخة من الفاتورة إلى جوالك عبر واتساب"
             >
               {sendingWhatsApp ? (
@@ -91,18 +91,18 @@ export function InvoiceModal({ open, onOpenChange, invoice }: InvoiceModalProps)
             </button>
             <button
               onClick={handlePrint}
-              className="clay-sm px-3 py-1.5 text-xs font-medium flex items-center gap-1.5 hover:bg-[var(--clay-accent-soft)]"
+              className="clay-sm flex-1 sm:flex-initial px-3 py-2 text-xs font-medium flex items-center justify-center gap-1.5 hover:bg-[var(--clay-accent-soft)] transition-colors"
             >
               <Printer className="w-3.5 h-3.5" />
-              طباعة / حفظ PDF
+              طباعة / PDF
             </button>
           </div>
         </DialogHeader>
 
         {/* Invoice Printable Sheet */}
-        <div className="p-6 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm print:border-none print:shadow-none print:p-8">
+        <div className="p-4 sm:p-6 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm print:border-none print:shadow-none print:p-8">
           {/* Header */}
-          <div className="flex justify-between items-start border-b border-zinc-200 dark:border-zinc-800 pb-6 mb-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start gap-4 border-b border-zinc-200 dark:border-zinc-800 pb-5 mb-5">
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <img
@@ -116,7 +116,7 @@ export function InvoiceModal({ open, onOpenChange, invoice }: InvoiceModalProps)
               <p className="text-xs text-zinc-400">سجل تجاري / ترخيص رقمي معتمد</p>
             </div>
 
-            <div className="text-left">
+            <div className="text-right sm:text-left w-full sm:w-auto">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold mb-2">
                 {isPaid ? (
                   <span className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 px-2.5 py-1 rounded-full flex items-center gap-1">
@@ -144,7 +144,7 @@ export function InvoiceModal({ open, onOpenChange, invoice }: InvoiceModalProps)
           </div>
 
           {/* Parties Info */}
-          <div className="grid grid-cols-2 gap-6 pb-6 mb-6 border-b border-zinc-200 dark:border-zinc-800 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 pb-5 mb-5 border-b border-zinc-200 dark:border-zinc-800 text-sm">
             <div>
               <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">بيانات العميل / الضيف</h3>
               <p className="font-semibold text-zinc-800 dark:text-zinc-200">{invoice.guestName || "ضيف العلا"}</p>
@@ -165,22 +165,22 @@ export function InvoiceModal({ open, onOpenChange, invoice }: InvoiceModalProps)
           </div>
 
           {/* Stay Details */}
-          <div className="mb-6">
+          <div className="mb-5">
             <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">تفاصيل الإقامة والحجز</h3>
-            <div className="grid grid-cols-4 gap-2 bg-zinc-50 dark:bg-zinc-900/60 p-3 rounded-lg text-center text-xs">
-              <div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-zinc-50 dark:bg-zinc-900/60 p-3 rounded-lg text-center text-xs">
+              <div className="p-1">
                 <span className="text-zinc-500 block">تاريخ الوصول</span>
                 <span className="font-semibold text-zinc-800 dark:text-zinc-200">{new Date(invoice.checkIn).toLocaleDateString("ar-SA")}</span>
               </div>
-              <div>
+              <div className="p-1">
                 <span className="text-zinc-500 block">تاريخ المغادرة</span>
                 <span className="font-semibold text-zinc-800 dark:text-zinc-200">{new Date(invoice.checkOut).toLocaleDateString("ar-SA")}</span>
               </div>
-              <div>
+              <div className="p-1">
                 <span className="text-zinc-500 block">عدد الليالي</span>
                 <span className="font-semibold text-zinc-800 dark:text-zinc-200">{invoice.totalNights} ليالٍ</span>
               </div>
-              <div>
+              <div className="p-1">
                 <span className="text-zinc-500 block">عدد الضيوف</span>
                 <span className="font-semibold text-zinc-800 dark:text-zinc-200">{invoice.guests} ضيوف</span>
               </div>
