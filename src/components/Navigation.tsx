@@ -459,9 +459,6 @@ export function Navigation() {
                 <a href="https://twitter.com" target="_blank" rel="noreferrer" className="hover:text-[var(--clay-accent)]">
                   <Twitter className="w-4 h-4" strokeWidth={1.75} />
                 </a>
-                <a href="https://youtube.com" target="_blank" rel="noreferrer" className="hover:text-[var(--clay-accent)]">
-                  <Youtube className="w-4 h-4" strokeWidth={1.75} />
-                </a>
               </div>
             </div>
           </div>

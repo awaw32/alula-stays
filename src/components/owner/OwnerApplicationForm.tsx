@@ -113,22 +113,38 @@ export function OwnerApplicationForm({
         </p>
       </motion.div>
 
-      {/* ميزات المنصة للمالكين */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
-        <div className="clay p-4 text-center">
-          <ShieldCheck className="w-6 h-6 text-emerald-600 mx-auto mb-2" />
-          <h4 className="font-bold text-xs text-[var(--foreground)]">حماية ومدفوعات مضمونة</h4>
-          <p className="text-[11px] text-[var(--muted-foreground)] mt-1">تحصيل المبالغ فورياً وتوثيق هوية الزوار</p>
-        </div>
-        <div className="clay p-4 text-center">
-          <Building2 className="w-6 h-6 text-amber-600 mx-auto mb-2" />
-          <h4 className="font-bold text-xs text-[var(--foreground)]">تحكم كامل بالإتاحة</h4>
-          <p className="text-[11px] text-[var(--muted-foreground)] mt-1">تقويم ذكي وتحديد مرن للأسعار والمواسم</p>
-        </div>
-        <div className="clay p-4 text-center">
-          <CheckCircle2 className="w-6 h-6 text-blue-600 mx-auto mb-2" />
-          <h4 className="font-bold text-xs text-[var(--foreground)]">عمولة منافسة وتسويق مباشر</h4>
-          <p className="text-[11px] text-[var(--muted-foreground)] mt-1">وصول لأكبر شريحة من زوار محافظة العلا</p>
+      {/* ميزات المنصة للمالكين (مجموعة في شريط وبطاقة واحدة أنيقة ومضغوطة) */}
+      <div className="clay p-4 sm:p-5 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 divide-y sm:divide-y-0 sm:divide-x sm:divide-x-reverse divide-neutral-200/70 dark:divide-neutral-800">
+          <div className="flex items-center gap-3 p-2">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-5 h-5" strokeWidth={1.75} />
+            </div>
+            <div>
+              <h4 className="font-bold text-xs text-[var(--foreground)]">حماية ومدفوعات مضمونة</h4>
+              <p className="text-[11px] text-[var(--muted-foreground)] mt-0.5">تحصيل فوري وتوثيق هويات</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 p-2">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+              <Building2 className="w-5 h-5" strokeWidth={1.75} />
+            </div>
+            <div>
+              <h4 className="font-bold text-xs text-[var(--foreground)]">تحكم كامل بالإتاحة</h4>
+              <p className="text-[11px] text-[var(--muted-foreground)] mt-0.5">تقويم ذكي وتعديل مرن للأسعار</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 p-2">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center shrink-0">
+              <CheckCircle2 className="w-5 h-5" strokeWidth={1.75} />
+            </div>
+            <div>
+              <h4 className="font-bold text-xs text-[var(--foreground)]">عمولة منافسة وتسويق مباشر</h4>
+              <p className="text-[11px] text-[var(--muted-foreground)] mt-0.5">وصول لأكبر شريحة من زوار العلا</p>
+            </div>
+          </div>
         </div>
       </div>
 

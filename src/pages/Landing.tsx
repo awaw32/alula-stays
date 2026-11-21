@@ -208,41 +208,50 @@ export default function Landing() {
     navigate(`/apartments${params.toString() ? `?${params.toString()}` : ""}`);
   };
 
-  // Curated Collections (Gathern Rows)
-  const heritageApartments = useMemo(() => {
+  // Curated Collections (تنسيق منظم ومصنف: شقق يومية، شقق شهرية، شاليهات ومزارع)
+  // 1. شقق يومية (حجوزات يومية مرنة)
+  const dailyApartments = useMemo(() => {
     return apartments.filter(
       (a) =>
-        a.location === "Hegra" ||
-        a.location === "Dadan" ||
-        a.location === "Heritage Village" ||
-        a.location === "AlUla Old Town",
+        (!a.minNights || a.minNights < 30) &&
+        (a.propertyType === "apartment" || !a.propertyType),
     );
   }, [apartments]);
 
-  const mountainApartments = useMemo(() => {
+  // 2. شقق وإقامات شهرية (خصومات وإقامات عمل واستجمام طويلة)
+  const monthlyApartments = useMemo(() => {
     return apartments.filter(
       (a) =>
+        (a.minNights && a.minNights >= 14) ||
+        (a.price && a.price <= 700) ||
+        a.titleAr?.includes("شهري") ||
+        a.descriptionAr?.includes("إقامة طويلة"),
+    );
+  }, [apartments]);
+
+  // 3. شاليهات ومزارع واستراحات بمسابح وجلسات ريفية
+  const chaletsAndFarms = useMemo(() => {
+    return apartments.filter(
+      (a) =>
+        a.propertyType === "chalet" ||
+        a.propertyType === "villa" ||
+        a.amenities.includes("pool") ||
+        a.amenities.includes("garden") ||
+        a.location === "AlUla Oasis" ||
+        a.titleAr?.includes("مزرعة") ||
+        a.titleAr?.includes("شاليه"),
+    );
+  }, [apartments]);
+
+  // 4. أجنحة بإطلالات جبلية وصخرة الفيل ومخيمات رصد النجوم
+  const scenicAndCamps = useMemo(() => {
+    return apartments.filter(
+      (a) =>
+        a.propertyType === "camp" ||
         a.location === "Elephant Rock" ||
         a.location === "Jabal Ithlib" ||
+        a.location === "Hegra" ||
         a.amenities.includes("mountain_view"),
-    );
-  }, [apartments]);
-
-  const oasisApartments = useMemo(() => {
-    return apartments.filter(
-      (a) =>
-        a.location === "AlUla Oasis" ||
-        a.amenities.includes("garden") ||
-        a.titleAr?.includes("واحة"),
-    );
-  }, [apartments]);
-
-  const luxuryVillas = useMemo(() => {
-    return apartments.filter(
-      (a) =>
-        a.price >= 650 ||
-        a.amenities.includes("pool") ||
-        (a.bedrooms && a.bedrooms >= 3),
     );
   }, [apartments]);
 
@@ -694,45 +703,45 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ─── Curated Carousels (Gathern Style Rows) ─── */}
+      {/* ─── Curated Carousels (أقسام شقق العلا المصنفة: يومية، شهرية، شاليهات ومزارع) ─── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4 space-y-2">
-        {/* الصف الأول: اسكن حول المعالم التراثية */}
-        {heritageApartments.length > 0 && (
+        {/* الصف الأول: شقق العلا اليومية */}
+        {dailyApartments.length > 0 && (
           <ApartmentCarousel
-            title={siteSettings?.heritageSectionTitle || "اسكن حول المعالم التراثية (الحِجر ودادان)"}
-            subtitle={siteSettings?.heritageSectionSubtitle || "شقق وأجنحة في قلب عبق التاريخ والبلدة القديمة"}
-            apartments={heritageApartments}
+            title="شقق واستوديوهات العلا (إيجار يومي)"
+            subtitle="شقق مفروشة ومجهزة بالكامل لحجوزات يومية مرنة بالقرب من المعالم التراثية"
+            apartments={dailyApartments}
+            onViewAll={() => navigate("/apartments?type=apartment")}
+          />
+        )}
+
+        {/* الصف الثاني: شقق وإقامات شهرية */}
+        {monthlyApartments.length > 0 && (
+          <ApartmentCarousel
+            title="شقق وإقامات شهرية في العلا"
+            subtitle="خيارات مثالية للإقامات الطويلة، موظفي المشاريع، ومحبي الاستجمام المطول في العلا"
+            apartments={monthlyApartments}
             onViewAll={() => navigate("/apartments")}
           />
         )}
 
-        {/* الصف الثاني: أجنحة بإطلالات جبلية وصخرة الفيل */}
-        {mountainApartments.length > 0 && (
+        {/* الصف الثالث: شاليهات ومزارع واستراحات العلا */}
+        {chaletsAndFarms.length > 0 && (
           <ApartmentCarousel
-            title={siteSettings?.mountainSectionTitle || "أجنحة بإطلالات جبلية وصخرة الفيل"}
-            subtitle={siteSettings?.mountainSectionSubtitle || "إطلالات ساحرة على تشكيلات صخور وجبال العلا الصحراوية"}
-            apartments={mountainApartments}
-            onViewAll={() => navigate("/apartments")}
+            title="شاليهات، استراحات، ومزارع بمسابح خاصة"
+            subtitle="خصوصية تامة، بساتين نخيل، ومسابح وسط الطبيعة للعائلات والمجموعات"
+            apartments={chaletsAndFarms}
+            onViewAll={() => navigate("/apartments?type=chalet")}
           />
         )}
 
-        {/* الصف الثالث: إقامات واحة النخيل */}
-        {oasisApartments.length > 0 && (
+        {/* الصف الرابع: إطلالات جبلية ومخيمات رصد النجوم */}
+        {scenicAndCamps.length > 0 && (
           <ApartmentCarousel
-            title={siteSettings?.oasisSectionTitle || "إقامات قلب واحة النخيل والهدوء"}
-            subtitle={siteSettings?.oasisSectionSubtitle || "استوديوهات وشاليهات وسط بساتين النخيل والحمضيات"}
-            apartments={oasisApartments}
-            onViewAll={() => navigate("/apartments")}
-          />
-        )}
-
-        {/* الصف الرابع: فلل ملكية ومزارع بمسابح خاصة */}
-        {luxuryVillas.length > 0 && (
-          <ApartmentCarousel
-            title={siteSettings?.villasSectionTitle || "فلل ملكية ومزارع بمسابح خاصة"}
-            subtitle={siteSettings?.villasSectionSubtitle || "مساحات رحبة وخصوصية تامة للعائلات والمجموعات"}
-            apartments={luxuryVillas}
-            onViewAll={() => navigate("/apartments")}
+            title="أجنحة بإطلالات جبلية ومخيمات رصد النجوم"
+            subtitle="إطلالات ساحرة على صخرة الفيل ومخيمات صحراوية تحت سماء العلا المرصعة بالنجوم"
+            apartments={scenicAndCamps}
+            onViewAll={() => navigate("/apartments?type=camp")}
           />
         )}
       </div>
